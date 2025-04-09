@@ -5,13 +5,15 @@ import DefaultHomepage from "./components/Homepage";
 import Login from "./components/Login";
 import Navbar from "./components/Navbar";
 import Protected from "./components/Protected";
-import ArbitrageBetting from "./components/loggedUser/ArbitrageBetting";
+import ArbitrageBetting from "./components/loggedUser/ArbitraryBetting/ArbitrageBetting";
 import MyAccount from "./components/loggedUser/MyAccount";
 import Sidebar from "./components/loggedUser/Sidebar";
 import Statistics from "./components/loggedUser/Statistics";
 import RenderTips from "./components/loggedUser/Tips/RenderTips";
 import { RootState } from "./redux/store";
 import HowToPurchase, { StepTwo } from "./components/HowToPurchase";
+import BestOdds from "./components/loggedUser/BestOdds";
+import NotFound from "./components/NotFound";
 
 function App() {
   const isLoggedIn = useSelector<RootState>(
@@ -19,7 +21,7 @@ function App() {
   );
 
   return (
-    <div className={`h-[100vh] w-full ${isLoggedIn ? "flex" : ""} `}>
+    <div className={`h-[100vh] w-full ${isLoggedIn ? "flex" : ""} relative`}>
       <HashRouter>
         {!isLoggedIn ? <Navbar /> : <Sidebar />}
         <Routes>
@@ -27,6 +29,7 @@ function App() {
           <Route path="/onama" element={<AboutUs />} />
           <Route path="/kupi" element={<HowToPurchase />}>
             <Route path="/kupi/:paymentOption" element={<StepTwo />} />
+            <Route path="/kupi/uplatnica/potvrda" element={<p>p</p>}/>
           </Route>
           <Route
             path="/login"
@@ -88,10 +91,11 @@ function App() {
             path="/najboljekvote"
             element={
               <Protected protectionMode="loggedIn">
-                <MyAccount />
+                <BestOdds />
               </Protected>
             }
           />
+          <Route path="*" element={<NotFound />} />
         </Routes>
       </HashRouter>
     </div>

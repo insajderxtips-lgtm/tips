@@ -24,6 +24,13 @@ html {
 .testFont {
   font-family: "Vampire Wars", sans-serif; /* Use the same font family name */
 }
+.raceFont {
+  font-family: Race Sport, Arial, Helvetica, sans-serif;
+}
+@font-face {
+  font-family: Race Sport;
+  src: url("/src/assets/Race\ Sport.ttf");
+}
 .burger {
   display: none;
 }
@@ -187,4 +194,75 @@ html {
     var(--card4-gradient-color1),
     var(--card4-gradient-color2)
   );
+}
+.loader {
+  width: fit-content;
+  font-size: 40px;
+  line-height: 1.5;
+  font-family: system-ui, sans-serif;
+  font-weight: bold;
+  text-transform: uppercase;
+  color: #0000;
+  -webkit-text-stroke: 1px gray;
+  margin-inline: auto;
+  background: radial-gradient(1.13em at 50% 1.6em, #000 99%, #0000 101%)
+      calc(50% - 1.6em) 0/3.2em 100% text,
+    radial-gradient(1.13em at 50% -0.8em, #0000 99%, #000 101%) 50% 0.8em/3.2em
+      100% repeat-x text;
+  animation: l9 2s linear infinite;
+}
+
+@keyframes l9 {
+  to {
+    background-position: calc(50% + 1.6em) 0, calc(50% + 3.2em) 0.8em;
+  }
+}
+/* Custom Scrollbar Styling */
+/* Works for Chrome, Edge, Safari */
+::-webkit-scrollbar {
+  width: 12px; /* Vertical scrollbar width */
+  height: 4px; /* Horizontal scrollbar height */
+}
+
+::-webkit-scrollbar-track {
+  background: #0f172a; /* Track color (dark blue) */
+  border-radius: 8px;
+}
+
+::-webkit-scrollbar-thumb {
+  background: #334155; /* Thumb color (slate-700) */
+  border-radius: 8px;
+  border: 2px solid #0f172a; /* Creates border effect */
+  transition: all 0.3s ease;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: #475569; /* Hover color (slate-600) */
+  transform: scale(1.02);
+}
+
+/* For Firefox */
+* {
+  scrollbar-width: thin;
+  scrollbar-color: #334155 #0f172a; /* thumb and track color */
+}
+
+/* Optional: Smooth scrolling behavior */
+html {
+  scroll-behavior: smooth;
+}
+
+/* Optional: Custom scrollbar for specific elements */
+.scrollbar-custom {
+  scrollbar-width: thin;
+  scrollbar-color: #475569 #1e293b;
+}
+
+.scrollbar-custom::-webkit-scrollbar-track {
+  background: #1e293b;
+}
+
+.scrollbar-custom::-webkit-scrollbar-thumb {
+  background: #475569;
+  border: 2px solid #1e293b;
 }

@@ -20,7 +20,7 @@ export default function Sidebar(): React.ReactNode {
       {/* Burger Menu Button (Only visible when sidebar is closed) */}
       {!sidebarVisible && (
         <button
-          className="fixed top-4 left-4 bg-gray-800 p-2 cursor-pointer rounded-md z-90 sm:block opacity-80 border"
+          className="fixed top-4 left-4 hover:-scale-[0.85] transition-transform duration-500 ease bg-gray-800 p-2 cursor-pointer rounded-md z-90 sm:block opacity-80 border"
           onClick={() => setSidebarVisible(true)}
         >
           <svg
@@ -41,13 +41,13 @@ export default function Sidebar(): React.ReactNode {
 
       {/* Sidebar */}
       <div
-        className={`bg-gray-950 transition-transform duration-300 border-r border-blue-950 fixed left-0 top-0 h-screen w-[250px] flex flex-col p-4 items-center text-white z-50
-        ${sidebarVisible ? "translate-x-0" : "-translate-x-full"}`}
+        className={`bg-gray-950 transition-transform duration-300 border-r  select-none border-blue-950 fixed left-0 top-0 h-screen w-[250px] flex flex-col p-4 items-center text-white z-50
+        ${sidebarVisible ? "translate-x-0 " : "-translate-x-full "}`}
       >
         {/* Close Button (Only visible when sidebar is open) */}
         {sidebarVisible && (
           <button
-            className="absolute top-4 right-4 bg-gray-700 p-2 rounded-md cursor-pointer"
+            className="absolute hover:-scale-[0.85] transition-transform duration-500 top-4 right-4 bg-gray-700 p-2 rounded-md cursor-pointer"
             onClick={() => setSidebarVisible(false)}
           >
             <svg
@@ -188,9 +188,9 @@ export default function Sidebar(): React.ReactNode {
             Najbolje kvote
           </div>
           {/* Premium Purchase */}
-          {currentUser.tier !== "FREE" && (
+          {currentUser.tier === "FREE" && (
             <div
-              className="p-2 cursor-pointer bg-yellow-600 text-white rounded-md flex items-center gap-2"
+              className="p-2 mt-auto mb-2 flex justify-center cursor-pointer bg-yellow-600 text-white rounded-md flex items-center gap-2"
               onClick={() => nav("/premiumtips")}
             >
               <svg
