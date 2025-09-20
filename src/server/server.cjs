@@ -9,7 +9,6 @@ const socketIo = require("socket.io");
 const rateLimit = require("express-rate-limit");
 const nodemailer = require("nodemailer");
 const { v4: uuidv4 } = require("uuid");
-require("dotenv").config();
 
 app.use(express.json());
 app.use(cors());
@@ -22,7 +21,9 @@ const io = socketIo(server, {
 });
 
 mongoose
-  .connect(process.env.MONGO_URI)
+  .connect(
+    "mongodb+srv://bogdandjakovic123:WXhytqY263CV7naU@insajdercluster.hpjtu.mongodb.net/insiderDb?retryWrites=true&w=majority&appName=insajderCluster"
+  )
   .then(() => console.log("Successfully connected to MongoDB."))
   .catch((err) => console.log("Connection error:", err));
 
