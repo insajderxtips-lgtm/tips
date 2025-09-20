@@ -127,7 +127,7 @@ export default function UserBets({
       }
 
       if (updates.length > 0) {
-        await fetch("http://localhost:1337/updateStatistics", {
+        await fetch("/updateStatistics", {
           method: "PUT",
           headers: {
             "Content-Type": "application/json",
@@ -137,7 +137,7 @@ export default function UserBets({
         });
       }
 
-      await fetch("http://localhost:1337/removeBet", {
+      await fetch("/removeBet", {
         method: "PUT",
         headers: {
           "Content-Type": "application/json",
@@ -363,7 +363,7 @@ export default function UserBets({
 
       // --- Perform API Calls ---
       // Chain the API calls to first update statistics, then the bet itself.
-      fetch("http://localhost:1337/updateStatistics", {
+      fetch("/updateStatistics", {
         method: "PUT",
         headers: {
           "Content-Type": "application/json",
@@ -378,7 +378,7 @@ export default function UserBets({
         })
         .then(() => {
           // After successfully updating stats, update the bet's status.
-          return fetch("http://localhost:1337/updateBet", {
+          return fetch("/updateBet", {
             method: "PUT",
             headers: {
               "Content-Type": "application/json",

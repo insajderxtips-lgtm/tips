@@ -1,7 +1,3 @@
 export default function Footer(): React.ReactNode {
-    return (
-        <div>
-            Footer!
-        </div>
-    )
+  return <div>Footer!</div>;
 }

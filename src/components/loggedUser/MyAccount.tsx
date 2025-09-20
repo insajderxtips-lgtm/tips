@@ -21,7 +21,7 @@ export default function MyAccount(): React.ReactNode {
   // ====================
   const saveCurrency = async () => {
     try {
-      const res = await fetch("http://localhost:1337/api/user/currency", {
+      const res = await fetch("/api/user/currency", {
         method: "PUT",
         headers: {
           "Content-Type": "application/json",
@@ -58,7 +58,7 @@ export default function MyAccount(): React.ReactNode {
     if (!confirmed) return;
 
     try {
-      const response = await fetch("http://localhost:1337/resetStatistics", {
+      const response = await fetch("/resetStatistics", {
         method: "PUT",
         headers: {
           "Content-Type": "application/json",

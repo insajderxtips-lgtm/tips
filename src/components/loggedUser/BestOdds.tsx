@@ -92,7 +92,7 @@ export default function BestOdds() {
 
   const find = () => {
     if (searchQuery && searchQuery.length >= 3) {
-      fetch(`http://localhost:1337/oddsChecker/getSearch/${searchQuery}`, {
+      fetch(`/oddsChecker/getSearch/${searchQuery}`, {
         method: "GET",
       })
         .then((res) => res.json())
@@ -105,7 +105,7 @@ export default function BestOdds() {
       setLoading(true);
       const game = upcomingGames[id];
 
-      fetch("http://localhost:1337/oddsChecker/getOdds/", {
+      fetch("/oddsChecker/getOdds/", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({

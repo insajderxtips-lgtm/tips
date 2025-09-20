@@ -307,7 +307,7 @@ export default function Statistics(): React.ReactNode {
     userStats.statistics.monthlyStats[currentMonth].totalBets += 1;
 
     try {
-      const response = await fetch("http://localhost:1337/updateStatistics", {
+      const response = await fetch("/updateStatistics", {
         method: "PUT",
         headers: {
           "Content-Type": "application/json",
@@ -574,7 +574,7 @@ export default function Statistics(): React.ReactNode {
   const updateInitialCapital = () => {
     // If the user has just bought a premium, his money is at 0. when user chooses initial capital, we save the capital to the server.
     if (bankCapital) {
-      fetch("http://localhost:1337/updateCapital", {
+      fetch("/updateCapital", {
         headers: {
           Authorization: "Bearer " + JWT,
           "Content-Type": "application/json",
@@ -607,7 +607,7 @@ export default function Statistics(): React.ReactNode {
     }
     const { username } = currentUser;
     // Fetch statistics
-    fetch("http://localhost:1337/statistics/" + username, {
+    fetch("/statistics/" + username, {
       headers: { Authorization: "Bearer " + JWT },
     }).then((res) => {
       if (!res.ok) {
