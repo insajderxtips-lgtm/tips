@@ -1,6 +1,5 @@
 import React, { useEffect, useState } from "react";
 import { useSelector } from "react-redux";
-import SoccerLineUp from "react-soccer-lineup";
 import { RootState } from "../../../redux/store";
 import PremiumFallback from "../PremiumFallback";
 
@@ -50,7 +49,7 @@ const RenderTips: React.FC<RenderTipsProps> = ({ tier }) => {
 
       try {
         // Fetches the tips free or premium, dynamically, server checks JWT to make sure the user has that role.
-        const response = await fetch(`http://localhost:1337/tips/${tier}/2`, {
+        const response = await fetch(`http://localhost:1337/tips/${tier}`, {
           headers: {
             Authorization: `Bearer ${JWT}`,
           },
@@ -101,17 +100,6 @@ const RenderTips: React.FC<RenderTipsProps> = ({ tier }) => {
       }),
     ])
       .then(([pregameFormRes, lineupsRes, gameDataRes, headtoHeadRes]) => {
-        // Check if both responses are successful
-        if (
-          !pregameFormRes.ok ||
-          !lineupsRes.ok ||
-          !gameDataRes ||
-          !headtoHeadRes
-        ) {
-          throw new Error("One or both fetch requests failed.");
-        }
-
-        // Parse both responses as JSON
         return Promise.all([
           pregameFormRes.json(),
           lineupsRes.json(),
@@ -325,7 +313,7 @@ const RenderTips: React.FC<RenderTipsProps> = ({ tier }) => {
         {loading ? (
           <div className="text-xl text-gray-300">Učitavanje...</div>
         ) : tips.length === 0 ? (
-          <div className="fixed inset-0 flex items-center justify-center bg-black/50 backdrop-blur-sm z-40">
+          <div className="fixed inset-0 flex items-center justify-center  backdrop-blur-sm z-40">
             <div className="bg-gradient-to-br from-gray-900 to-gray-800 border-2 border-red-900/50 rounded-xl p-8 shadow-2xl shadow-red-950/50 max-w-md mx-4 text-center animate-pulse-slow">
               <svg
                 xmlns="http://www.w3.org/2000/svg"
@@ -385,7 +373,8 @@ const RenderTips: React.FC<RenderTipsProps> = ({ tier }) => {
                           </div>
 
                           <div className="bg-gradient-to-br from-amber-500 to-orange-500 rounded-full w-10 h-10 flex items-center justify-center text-white font-bold shadow-md shadow-amber-900/30">
-                            {currentGameStats?.pregameForm?.homeTeam?.avgRating}
+                            {currentGameStats?.pregameForm?.homeTeam?.value ||
+                              "-"}
                           </div>
                         </div>
                       </div>
@@ -417,117 +406,118 @@ const RenderTips: React.FC<RenderTipsProps> = ({ tier }) => {
                           </div>
 
                           <div className="bg-gradient-to-br from-amber-500 to-orange-500 rounded-full w-10 h-10 flex items-center justify-center text-white font-bold shadow-md shadow-amber-900/30">
-                            {currentGameStats?.pregameForm?.awayTeam?.avgRating}
+                            {currentGameStats?.pregameForm?.awayTeam
+                              ?.avgRating || "-"}
                           </div>
                         </div>
                       </div>
                     </div>
                   </>
 
-                  <SoccerLineUp
-                    homeTeam={currentGameStats.formations.home}
-                    awayTeam={currentGameStats.formations.away}
-                    size="responsive"
-                    pattern="lines"
-                    color="green"
-                  />
-                  <div className="bg-gray-900 w-full flex flex-col main-font">
-                    <div className="text-center flex-col p-4 w-full bg-gray-800 flex justify-center gap-x-4 cursor-pointer select-none">
-                      <div
-                        className="flex justify-between items-center p-4 w-full cursor-pointer transition-all duration-300 
-    hover:bg-purple-900/20 rounded-lg group"
-                        onClick={() => setCurrentTabState(0)}
-                        role="button"
-                        tabIndex={0}
-                        onKeyPress={(e) =>
-                          e.key === "Enter" && setCurrentTabState(0)
-                        }
-                      >
-                        <span className="text-lg font-medium text-purple-100 group-hover:text-white">
-                          Povrede i suspenzije
-                        </span>
+                  <div className="bg-gradient-to-br from-gray-900 to-gray-800 w-full flex flex-col rounded-xl overflow-hidden shadow-2xl">
+                    {gameStats.sport === "football" && (
+                      <div className="text-center flex-col p-4 w-full bg-gradient-to-r from-gray-800 to-gray-700 flex justify-center gap-x-4 cursor-pointer select-none">
+                        <div
+                          className="flex justify-between items-center p-4 w-full cursor-pointer transition-all duration-300 
+          hover:bg-gradient-to-r hover:from-purple-900/30 hover:to-indigo-900/30 rounded-xl group"
+                          onClick={() => setCurrentTabState(0)}
+                          role="button"
+                          tabIndex={0}
+                          onKeyPress={(e) =>
+                            e.key === "Enter" && setCurrentTabState(0)
+                          }
+                        >
+                          <span className="text-lg font-semibold text-purple-100 group-hover:text-white transition-colors">
+                            Povrede i suspenzije
+                          </span>
 
-                        <svg
-                          xmlns="http://www.w3.org/2000/svg"
-                          fill="none"
-                          viewBox="0 0 24 24"
-                          strokeWidth="2"
-                          stroke="currentColor"
-                          className={`size-6 transition-transform duration-300 ease-in-out ${
-                            currentTab === 0
-                              ? "text-purple-400 rotate-180"
-                              : "text-purple-300"
+                          <svg
+                            xmlns="http://www.w3.org/2000/svg"
+                            fill="none"
+                            viewBox="0 0 24 24"
+                            strokeWidth="2"
+                            stroke="currentColor"
+                            className={`size-6 transition-all duration-300 ease-in-out ${
+                              currentTab === 0
+                                ? "text-purple-400 rotate-180"
+                                : "text-purple-300"
+                            }`}
+                          >
+                            <path
+                              strokeLinecap="round"
+                              strokeLinejoin="round"
+                              d="M19.5 8.25l-7.5 7.5-7.5-7.5"
+                            />
+                          </svg>
+                        </div>
+                        <div
+                          className={`grid grid-cols-2 gap-4 p-2 transition-all duration-500 ${
+                            currentTab === 0 ? "grid" : "hidden"
                           }`}
                         >
-                          <path
-                            strokeLinecap="round"
-                            strokeLinejoin="round"
-                            d="M19.5 8.25l-7.5 7.5-7.5-7.5"
-                          />
-                        </svg>
-                      </div>
-                      <div
-                        className={`flex justify-around  p-2 gap-2 ${
-                          currentTab === 0 ? "flex" : "hidden"
-                        }`}
-                      >
-                        <div className=" mb-2 gap-2  w-1/2 h-max">
-                          {currentGameStats?.formations?.home?.missingPlayers.map(
-                            (missingPlayer: any) => {
-                              return (
-                                <div className="flex bg-gray-700 items-center gap-1 mb-2 justify-center  rounded-lg p-4 w-full">
-                                  <div className="flex flex-col">
-                                    <span>{missingPlayer.player.name}</span>
-                                    <span
-                                      className={`${
-                                        missingPlayer.type === "missing"
-                                          ? "text-red-500"
-                                          : "text-yellow-500"
-                                      }`}
-                                    >
-                                      {missingPlayer.type === "missing"
-                                        ? "Ne igra."
-                                        : "Možda ne igra."}
-                                    </span>
+                          <div className="mb-2 gap-2 h-max">
+                            {currentGameStats?.formations?.home?.missingPlayers.map(
+                              (missingPlayer: any) => {
+                                return (
+                                  <div className="flex bg-gradient-to-r from-gray-700 to-gray-600 items-center gap-2 mb-3 justify-center rounded-xl p-3 w-full transition-transform hover:scale-[101%] shadow-md">
+                                    <div className="flex flex-col">
+                                      <span className="font-medium text-gray-100">
+                                        {missingPlayer.player.name}
+                                      </span>
+                                      <span
+                                        className={`text-sm font-semibold ${
+                                          missingPlayer.type === "missing"
+                                            ? "text-red-400"
+                                            : "text-yellow-400"
+                                        }`}
+                                      >
+                                        {missingPlayer.type === "missing"
+                                          ? "Ne igra."
+                                          : "Možda ne igra."}
+                                      </span>
+                                    </div>
                                   </div>
-                                </div>
-                              );
-                            }
-                          )}
-                        </div>
-                        <div className=" w-1/2 h-max">
-                          {currentGameStats?.formations?.away?.missingPlayers.map(
-                            (missingPlayer: any) => {
-                              return (
-                                <div className="flex items-center gap-1 mb-2 bg-gray-700 rounded-lg p-4 w-full justify-center">
-                                  <div className="flex flex-col">
-                                    <span>{missingPlayer.player.name}</span>
-                                    <span
-                                      className={`${
-                                        missingPlayer.type === "missing"
-                                          ? "text-red-500"
-                                          : "text-yellow-500"
-                                      }`}
-                                    >
-                                      {missingPlayer.type === "missing"
-                                        ? "Ne igra."
-                                        : "Možda ne igra."}
-                                    </span>
+                                );
+                              }
+                            )}
+                          </div>
+                          <div className="h-max">
+                            {currentGameStats?.formations?.away?.missingPlayers.map(
+                              (missingPlayer: any) => {
+                                return (
+                                  <div className="flex items-center gap-2 mb-3 bg-gradient-to-r from-gray-700 to-gray-600 rounded-xl p-3 w-full justify-center transition-transform hover:scale-[101%] shadow-md">
+                                    <div className="flex flex-col">
+                                      <span className="font-medium text-gray-100">
+                                        {missingPlayer.player.name}
+                                      </span>
+                                      <span
+                                        className={`text-sm font-semibold ${
+                                          missingPlayer.type === "missing"
+                                            ? "text-red-400"
+                                            : "text-yellow-400"
+                                        }`}
+                                      >
+                                        {missingPlayer.type === "missing"
+                                          ? "Ne igra."
+                                          : "Možda ne igra."}
+                                      </span>
+                                    </div>
                                   </div>
-                                </div>
-                              );
-                            }
-                          )}
+                                );
+                              }
+                            )}
+                          </div>
                         </div>
                       </div>
-                    </div>
-                    <div className="text-center p-4 w-full bg-gray-800 flex flex-col justify-center gap-x-4 cursor-pointer select-none border-t border-gray-700">
+                    )}
+
+                    <div className="text-center p-4 w-full bg-gradient-to-r from-gray-800 to-gray-700 flex flex-col justify-center gap-x-4 cursor-pointer select-none border-t border-gray-600">
                       <div
                         className="flex justify-between items-center p-4 w-full cursor-pointer transition-all duration-300 
-    hover:bg-purple-900/20 rounded-lg group"
+          hover:bg-gradient-to-r hover:from-purple-900/30 hover:to-indigo-900/30 rounded-xl group"
                         onClick={() => setCurrentTabState(1)}
                       >
-                        <span className="text-lg font-medium text-purple-100 group-hover:text-white">
+                        <span className="text-lg font-semibold text-purple-100 group-hover:text-white transition-colors">
                           Medjusobni mecevi
                         </span>
 
@@ -537,7 +527,7 @@ const RenderTips: React.FC<RenderTipsProps> = ({ tier }) => {
                           viewBox="0 0 24 24"
                           strokeWidth="2"
                           stroke="currentColor"
-                          className={`size-6 transition-transform duration-300 ease-in-out ${
+                          className={`size-6 transition-all duration-300 ease-in-out ${
                             currentTab === 1
                               ? "text-purple-400 rotate-180"
                               : "text-purple-300"
@@ -552,7 +542,7 @@ const RenderTips: React.FC<RenderTipsProps> = ({ tier }) => {
                       </div>
 
                       <div
-                        className={`flex-col gap-y-2 ${
+                        className={`flex flex-col gap-3 mt-2 transition-all duration-500 ${
                           currentTab === 1 ? "flex" : "hidden"
                         }`}
                       >
@@ -580,26 +570,28 @@ const RenderTips: React.FC<RenderTipsProps> = ({ tier }) => {
                           return (
                             <div
                               key={match.id}
-                              className="flex flex-col md:flex-row justify-between items-center bg-gray-800 rounded-xl px-4 py-2 text-white shadow-md"
+                              className="flex flex-col md:flex-row justify-between items-center bg-gradient-to-r from-gray-700 to-gray-600 rounded-xl px-5 py-3 text-white shadow-md transition-transform hover:scale-[101%]"
                             >
                               {/* Date */}
-                              <div className="text-sm text-gray-400 w-full md:w-1/5 text-center md:text-left">
+                              <div className="text-sm text-gray-300 w-full md:w-1/5 text-center md:text-left mb-2 md:mb-0">
                                 {date}
                               </div>
 
                               {/* Match Info */}
-                              <div className="flex items-center justify-center gap-3 w-full md:w-4/5">
+                              <div className="flex items-center justify-center gap-4 w-full md:w-4/5">
                                 {/* Home Team */}
                                 <div
                                   className={`font-semibold ${
-                                    isHomeWinner ? "text-green-400" : ""
+                                    isHomeWinner
+                                      ? "text-green-300"
+                                      : "text-gray-200"
                                   }`}
                                 >
                                   {match.homeTeam.name}
                                 </div>
 
                                 {/* Score */}
-                                <div className="text-sm text-gray-300 min-w-[40px] text-center">
+                                <div className="text-sm font-medium bg-gray-600 px-3 py-1 rounded-lg min-w-[50px] text-center">
                                   {homeScore != null && awayScore != null
                                     ? `${homeScore} : ${awayScore}`
                                     : "vs"}
@@ -608,7 +600,9 @@ const RenderTips: React.FC<RenderTipsProps> = ({ tier }) => {
                                 {/* Away Team */}
                                 <div
                                   className={`font-semibold ${
-                                    isAwayWinner ? "text-green-400" : ""
+                                    isAwayWinner
+                                      ? "text-green-300"
+                                      : "text-gray-200"
                                   }`}
                                 >
                                   {match.awayTeam.name}
@@ -619,14 +613,15 @@ const RenderTips: React.FC<RenderTipsProps> = ({ tier }) => {
                         })}
                       </div>
                     </div>
-                    <div className="text-center p-4 w-full bg-gray-800 flex justify-center relative gap-x-4 cursor-pointer select-none border-t border-gray-700 flex-col">
+
+                    <div className="text-center p-4 w-full bg-gradient-to-r from-gray-800 to-gray-700 flex justify-center relative gap-x-4 cursor-pointer select-none border-t border-gray-600 flex-col">
                       <div
                         className="flex justify-between items-center p-4 w-full cursor-pointer transition-all duration-300 
-    hover:bg-purple-900/20 rounded-lg group"
+          hover:bg-gradient-to-r hover:from-purple-900/30 hover:to-indigo-900/30 rounded-xl group"
                         onClick={() => setCurrentTabState(2)}
                       >
                         {" "}
-                        <span className="text-lg font-medium text-purple-100 group-hover:text-white">
+                        <span className="text-lg font-semibold text-purple-100 group-hover:text-white transition-colors">
                           Analiza i najbolja kvota
                         </span>
                         <svg
@@ -635,7 +630,7 @@ const RenderTips: React.FC<RenderTipsProps> = ({ tier }) => {
                           viewBox="0 0 24 24"
                           strokeWidth="2"
                           stroke="currentColor"
-                          className={`size-6 transition-transform duration-300 ease-in-out ${
+                          className={`size-6 transition-all duration-300 ease-in-out ${
                             currentTab === 2
                               ? "text-purple-400 rotate-180"
                               : "text-purple-300"
@@ -650,40 +645,276 @@ const RenderTips: React.FC<RenderTipsProps> = ({ tier }) => {
                       </div>
 
                       <div
-                        className={`my-6 flex flex-col bg-gray-900 rounded-md p-4 shadow-gray-500 shadow-md ${
+                        className={`my-4 flex flex-col bg-gradient-to-br from-gray-800 to-gray-700 rounded-xl p-5 shadow-lg transition-all duration-500 ${
                           currentTab === 2 ? "flex" : "hidden"
                         }`}
                       >
-                        <span> {gameStats.analysis}</span>
+                        <span className="text-gray-200 leading-relaxed">
+                          {" "}
+                          {gameStats.analysis}
+                        </span>
 
-                        <span className="my-2 flex flex-col">
+                        <span className="my-4 flex flex-col">
                           Najbolju kvotu za ovaj tip ima{" "}
                           <span
-                            className="bg-cyan-800/50 p-2 rounded-md relative"
+                            className="bg-gradient-to-r from-cyan-800/70 to-teal-800/70 p-3 rounded-xl relative mt-2 cursor-pointer transition-all hover:scale-[102%] group"
                             onClick={() =>
                               window.open(gameStats?.bestOdds?.link, "_blank")
                             }
                           >
-                            {gameStats?.bestOdds?.store}
+                            <span className="font-semibold text-cyan-100">
+                              {gameStats?.bestOdds?.store}
+                            </span>
                             <svg
                               xmlns="http://www.w3.org/2000/svg"
                               fill="none"
                               viewBox="0 0 24 24"
                               strokeWidth="1.5"
                               stroke="currentColor"
-                              className="size-6 absolute -right-2 -top-2 -rotate-90"
+                              className="size-5 absolute -right-2 -top-2 -rotate-45 text-cyan-300 group-hover:scale-110 transition-transform"
                             >
                               <path
-                                stroke-linecap="round"
-                                stroke-linejoin="round"
+                                strokeLinecap="round"
+                                strokeLinejoin="round"
                                 d="M15.042 21.672 13.684 16.6m0 0-2.51 2.225.569-9.47 5.227 7.917-3.286-.672ZM12 2.25V4.5m5.834.166-1.591 1.591M20.25 10.5H18M7.757 14.743l-1.59 1.59M6 10.5H3.75m4.007-4.243-1.59-1.59"
                               />
                             </svg>
                           </span>
                         </span>
 
-                        <div className=" w-max absolute right-2 bottom-2 ">
-                          Mi tipujemo: {gameStats.tip}
+                        <div className="mt-4 p-3 bg-gradient-to-r from-purple-900/40 to-blue-900/40 rounded-lg w-max ml-auto">
+                          <span className="font-semibold text-purple-100">
+                            Mi tipujemo:{" "}
+                          </span>
+                          <span className="font-bold text-white">
+                            {gameStats.tip}
+                          </span>
+                        </div>
+                      </div>
+                    </div>
+                    <div className="text-center p-4 w-full bg-gradient-to-r from-gray-800 to-gray-700 flex justify-center relative gap-x-4 cursor-pointer select-none border-t border-gray-600 flex-col">
+                      <div
+                        className="flex justify-between items-center p-4 w-full cursor-pointer transition-all duration-300 
+          hover:bg-gradient-to-r hover:from-purple-900/30 hover:to-indigo-900/30 rounded-xl group"
+                        onClick={() => setCurrentTabState(3)}
+                      >
+                        <span className="text-lg font-semibold text-purple-100 group-hover:text-white transition-colors">
+                          Sastavi timova
+                        </span>
+                        <svg
+                          xmlns="http://www.w3.org/2000/svg"
+                          fill="none"
+                          viewBox="0 0 24 24"
+                          strokeWidth="2"
+                          stroke="currentColor"
+                          className={`size-6 transition-all duration-300 ease-in-out ${
+                            currentTab === 3
+                              ? "text-purple-400 rotate-180"
+                              : "text-purple-300"
+                          }`}
+                        >
+                          <path
+                            strokeLinecap="round"
+                            strokeLinejoin="round"
+                            d="M19.5 8.25l-7.5 7.5-7.5-7.5"
+                          />
+                        </svg>
+                      </div>
+
+                      <div
+                        className={`my-4 flex flex-col transition-all duration-500 ${
+                          currentTab === 3 ? "flex" : "hidden"
+                        }`}
+                      >
+                        {/* Player Lists */}
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                          {/* Home Team */}
+                          <div className="bg-gradient-to-br from-gray-800 to-gray-700 rounded-2xl p-5 shadow-lg">
+                            <h3 className="text-xl font-bold text-blue-300 mb-4">
+                              {currentGameStats?.matchData?.homeTeam?.name ||
+                                "Domaci tim"}
+                            </h3>
+                            <div className="space-y-3">
+                              {(() => {
+                                const homeSquad =
+                                  currentGameStats?.formations?.home?.squad;
+                                if (!homeSquad)
+                                  return (
+                                    <div className="text-gray-400">
+                                      Nema podataka o sastavu
+                                    </div>
+                                  );
+
+                                const players = [];
+
+                                // Add goalkeeper
+                                if (homeSquad.gk) {
+                                  players.push({
+                                    number: homeSquad.gk.number,
+                                    name: homeSquad.gk.name,
+                                    position: "G",
+                                  });
+                                }
+
+                                // Add defenders
+                                if (homeSquad.df && homeSquad.df.length) {
+                                  homeSquad.df.forEach((player) => {
+                                    players.push({
+                                      number: player.number,
+                                      name: player.name,
+                                      position: "DF",
+                                    });
+                                  });
+                                }
+
+                                // Add defensive midfielders
+                                if (homeSquad.cdm && homeSquad.cdm.length) {
+                                  homeSquad.cdm.forEach((player) => {
+                                    players.push({
+                                      number: player.number,
+                                      name: player.name,
+                                      position: "MF",
+                                    });
+                                  });
+                                }
+
+                                // Add attacking midfielders
+                                if (homeSquad.cam && homeSquad.cam.length) {
+                                  homeSquad.cam.forEach((player) => {
+                                    players.push({
+                                      number: player.number,
+                                      name: player.name,
+                                      position: "MF",
+                                    });
+                                  });
+                                }
+
+                                // Add forwards
+                                if (homeSquad.fw && homeSquad.fw.length) {
+                                  homeSquad.fw.forEach((player) => {
+                                    players.push({
+                                      number: player.number,
+                                      name: player.name,
+                                      position: "FW",
+                                    });
+                                  });
+                                }
+
+                                return players.map((player) => (
+                                  <div
+                                    key={`home-${player.number}`}
+                                    className="flex items-center bg-gray-700/50 p-3 rounded-xl hover:bg-blue-900/30 transition-colors group"
+                                  >
+                                    <div className="w-8 h-8 rounded-full bg-blue-700 flex items-center justify-center text-white font-bold mr-3 group-hover:scale-110 transition-transform">
+                                      {player.number}
+                                    </div>
+                                    <div className="flex-1">
+                                      <div className="text-gray-200 font-medium">
+                                        {player.name}
+                                      </div>
+                                    </div>
+                                    <div className="px-3 py-1 bg-blue-600/30 rounded-lg text-blue-300 text-sm font-bold">
+                                      {player.position}
+                                    </div>
+                                  </div>
+                                ));
+                              })()}
+                            </div>
+                          </div>
+
+                          {/* Away Team */}
+                          <div className="bg-gradient-to-br from-gray-800 to-gray-700 rounded-2xl p-5 shadow-lg">
+                            <h3 className="text-xl font-bold text-red-300 mb-4">
+                              {currentGameStats?.matchData?.awayTeam?.name ||
+                                "Gostujuci tim"}
+                            </h3>
+                            <div className="space-y-3">
+                              {(() => {
+                                const awaySquad =
+                                  currentGameStats?.formations?.away?.squad;
+                                if (!awaySquad)
+                                  return (
+                                    <div className="text-gray-400">
+                                      Nema podataka o sastavu
+                                    </div>
+                                  );
+
+                                const players = [];
+
+                                // Add goalkeeper
+                                if (awaySquad.gk) {
+                                  players.push({
+                                    number: awaySquad.gk.number,
+                                    name: awaySquad.gk.name,
+                                    position: "G",
+                                  });
+                                }
+
+                                // Add defenders
+                                if (awaySquad.df && awaySquad.df.length) {
+                                  awaySquad.df.forEach((player) => {
+                                    players.push({
+                                      number: player.number,
+                                      name: player.name,
+                                      position: "DF",
+                                    });
+                                  });
+                                }
+
+                                // Add defensive midfielders
+                                if (awaySquad.cdm && awaySquad.cdm.length) {
+                                  awaySquad.cdm.forEach((player) => {
+                                    players.push({
+                                      number: player.number,
+                                      name: player.name,
+                                      position: "MF",
+                                    });
+                                  });
+                                }
+
+                                // Add attacking midfielders
+                                if (awaySquad.cam && awaySquad.cam.length) {
+                                  awaySquad.cam.forEach((player) => {
+                                    players.push({
+                                      number: player.number,
+                                      name: player.name,
+                                      position: "MF",
+                                    });
+                                  });
+                                }
+
+                                // Add forwards
+                                if (awaySquad.fw && awaySquad.fw.length) {
+                                  awaySquad.fw.forEach((player) => {
+                                    players.push({
+                                      number: player.number,
+                                      name: player.name,
+                                      position: "FW",
+                                    });
+                                  });
+                                }
+
+                                return players.map((player) => (
+                                  <div
+                                    key={`away-${player.number}`}
+                                    className="flex items-center bg-gray-700/50 p-3 rounded-xl hover:bg-red-900/30 transition-colors group"
+                                  >
+                                    <div className="w-8 h-8 rounded-full bg-red-700 flex items-center justify-center text-white font-bold mr-3 group-hover:scale-110 transition-transform">
+                                      {player.number}
+                                    </div>
+                                    <div className="flex-1">
+                                      <div className="text-gray-200 font-medium">
+                                        {player.name}
+                                      </div>
+                                    </div>
+                                    <div className="px-3 py-1 bg-red-600/30 rounded-lg text-red-300 text-sm font-bold">
+                                      {player.position}
+                                    </div>
+                                  </div>
+                                ));
+                              })()}
+                            </div>
+                          </div>
                         </div>
                       </div>
                     </div>
@@ -691,68 +922,71 @@ const RenderTips: React.FC<RenderTipsProps> = ({ tier }) => {
                 </div>
               ) : (
                 <div className="p-2 max-h-[600px] overflow-y-auto flex flex-col gap-3 scrollbar-thin scrollbar-track-transparent scrollbar-thumb-gray-700/50 rounded-xl shadow-inner shadow-blue-900/20">
-                  {tips.map((tip, index) => (
-                    <div
-                      key={index}
-                      onClick={() => setCurrentGameState(tip)}
-                      className="relative bg-gradient-to-br from-gray-800 to-gray-900 border-2 border-gray-700/40 hover:border-blue-400/30 p-5 rounded-xl cursor-pointer transition-all duration-300  shadow-lg hover:shadow-xl shadow-black/20 group"
-                    >
-                      {/* Type Badge */}
+                  {tips.message ||
+                    tips.map((tip, index) => (
                       <div
-                        className={`inline-flex items-center gap-2 mb-4 ${
-                          tip.type === "free"
-                            ? "text-blue-400 bg-blue-900/20"
-                            : "text-orange-300 bg-orange-900/20"
-                        } px-3 py-1 rounded-full text-sm font-bold`}
+                        key={index}
+                        onClick={() =>
+                          tip.type === "premium" && setCurrentGameState(tip)
+                        }
+                        className="relative bg-gradient-to-br from-gray-800 to-gray-900 border-2 border-gray-700/40 hover:border-blue-400/30 p-5 rounded-xl cursor-pointer transition-all duration-300  shadow-lg hover:shadow-xl shadow-black/20 group"
                       >
-                        <svg
-                          className="w-4 h-4"
-                          fill="none"
-                          stroke="currentColor"
-                          viewBox="0 0 24 24"
+                        {/* Type Badge */}
+                        <div
+                          className={`inline-flex items-center gap-2 mb-4 ${
+                            tip?.type === "free"
+                              ? "text-blue-400 bg-blue-900/20"
+                              : "text-orange-300 bg-orange-900/20"
+                          } px-3 py-1 rounded-full text-sm font-bold`}
                         >
-                          <path
-                            strokeLinecap="round"
-                            strokeLinejoin="round"
-                            strokeWidth="2"
-                            d="M13 10V3L4 14h7v7l9-11h-7z"
-                          />
-                        </svg>
-                        {tip.type} tip
-                      </div>
-
-                      {/* Title */}
-                      <h2 className="text-2xl font-bold bg-gradient-to-r from-blue-400 to-cyan-400 bg-clip-text text-transparent group-hover:from-blue-300 group-hover:to-cyan-300 transition-all">
-                        {tip.tipTitle}
-                      </h2>
-
-                      {/* Main Tip */}
-                      <div className="mt-4 p-3 bg-gray-700/20 rounded-lg border border-gray-700/30 group-hover:border-blue-400/20">
-                        <span className="text-sm font-semibold text-gray-400">
-                          Mi tipujemo:
-                        </span>
-                        <span className="ml-2 text-xl font-black bg-gradient-to-r from-green-400 to-cyan-400 bg-clip-text text-transparent">
-                          {tip.tip}
-                        </span>
-                      </div>
-
-                      {/* Analysis */}
-                      <div className="mt-4 text-gray-300 italic relative pl-4 border-l-4 border-gray-700/50 group-hover:border-cyan-400/50 transition-colors">
-                        <div className="absolute top-0 left-0 text-2xl opacity-20">
-                          “
+                          <svg
+                            className="w-4 h-4"
+                            fill="none"
+                            stroke="currentColor"
+                            viewBox="0 0 24 24"
+                          >
+                            <path
+                              strokeLinecap="round"
+                              strokeLinejoin="round"
+                              strokeWidth="2"
+                              d="M13 10V3L4 14h7v7l9-11h-7z"
+                            />
+                          </svg>
+                          {tip.type} tip
                         </div>
-                        <span className="font-medium text-gray-400 not-italic">
-                          Analiza ukratko:
-                        </span>{" "}
-                        {tip.shortAnalysis}
-                      </div>
 
-                      {/* Date */}
-                      <div className="absolute top-3 right-3 text-sm text-gray-500 group-hover:text-cyan-400 transition-colors font-mono">
-                        {tip.date}
+                        {/* Title */}
+                        <h2 className="text-2xl font-bold bg-gradient-to-r from-blue-400 to-cyan-400 bg-clip-text text-transparent group-hover:from-blue-300 group-hover:to-cyan-300 transition-all">
+                          {tip.tipTitle}
+                        </h2>
+
+                        {/* Main Tip */}
+                        <div className="mt-4 p-3 bg-gray-700/20 rounded-lg border border-gray-700/30 group-hover:border-blue-400/20">
+                          <span className="text-sm font-semibold text-gray-400">
+                            Mi tipujemo:
+                          </span>
+                          <span className="ml-2 text-xl font-black bg-gradient-to-r from-green-400 to-cyan-400 bg-clip-text text-transparent">
+                            {tip.tip}
+                          </span>
+                        </div>
+
+                        {/* Analysis */}
+                        <div className="mt-4 text-gray-300 italic relative pl-4 border-l-4 border-gray-700/50 group-hover:border-cyan-400/50 transition-colors">
+                          <div className="absolute top-0 left-0 text-2xl opacity-20">
+                            “
+                          </div>
+                          <span className="font-medium text-gray-400 not-italic">
+                            Analiza ukratko:
+                          </span>{" "}
+                          {tip.shortAnalysis}
+                        </div>
+
+                        {/* Date */}
+                        <div className="absolute top-3 right-3 text-sm text-gray-500 group-hover:text-cyan-400 transition-colors font-mono">
+                          {tip.date}
+                        </div>
                       </div>
-                    </div>
-                  ))}
+                    ))}
                 </div>
               )}
             </div>

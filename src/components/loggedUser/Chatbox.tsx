@@ -26,7 +26,7 @@ export default function Chatbox(): React.ReactNode {
     document.title = "Insajder | Početna";
 
     // Initialize socket connection
-    socketRef.current = io("https://9e60-109-93-175-89.ngrok-free.app", {
+    socketRef.current = io("http://localhost:1337", {
       auth: {
         token: userData.token,
       },
@@ -50,11 +50,6 @@ export default function Chatbox(): React.ReactNode {
     };
   }, [userData.token]); // Added dependency
 
-  useEffect(() => {
-    // Auto-scroll to bottom when messages change
-    messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
-  }, [messages]);
-
   const sendMessage = () => {
     if (!currentMessage.trim() || !socketRef.current || !isLoggedIn) return;
 
@@ -76,7 +71,7 @@ export default function Chatbox(): React.ReactNode {
   };
 
   return (
-    <div className="flex w-full flex-col space-y-6 max-w-4xl mx-auto p-4 h-full max-h-[80%]">
+    <div className="flex w-full flex-col space-y-6 max-w-4xl mx-auto p-4 ">
       {/* Header Section */}
       <div className="text-center space-y-2">
         <h1 className="text-2xl md:text-3xl lg:text-4xl font-bold bg-clip-text text-transparent bg-gradient-to-r from-cyan-400 to-blue-500">
@@ -105,7 +100,7 @@ export default function Chatbox(): React.ReactNode {
               <div
                 className={`max-w-[70%] p-3 rounded-xl ${
                   message.sender === userData.username
-                    ? "bg-gradient-to-br from-cyan-600 to-blue-700 rounded-tr-none"
+                    ? "bg-gradient-to-br from-blue-700 to-blue-950 rounded-tr-none"
                     : "bg-blue-900/40 rounded-tl-none"
                 }`}
               >
@@ -114,14 +109,18 @@ export default function Chatbox(): React.ReactNode {
                     className={`text-xs font-medium ${
                       message.tier === "premium"
                         ? "text-transparent bg-clip-text bg-gradient-to-r from-amber-400 to-orange-500"
-                        : "text-cyan-400"
+                        : "text-gray-400"
                     }`}
                   >
                     {message.sender}
                   </div>
-                  {message.tier === "premium" && (
+                  {message.tier === "premium" ? (
                     <span className="text-xs px-1.5 py-0.5 rounded-full bg-amber-500/20 text-amber-300">
                       PREMIUM
+                    </span>
+                  ) : (
+                    <span className="text-xs px-1.5 py-0.5 rounded-full bg-gray-500/20 text-gray-300">
+                      FREE
                     </span>
                   )}
                 </div>

@@ -21,8 +21,10 @@ export default function Navbar(): React.ReactNode {
   }, [location.pathname]);
 
   return (
-    <div className="flex  mx-auto  w-full   z-50 select-none fixed  top-0  bg-[radial-gradient(rgba(36,22,80,0.01)_0%,rgba(2,3,27,0.5)_100%)]
- ">
+    <div
+      className="flex  mx-auto  w-full   z-50 select-none fixed  top-0  bg-[radial-gradient(rgba(36,22,80,0.01)_0%,rgba(2,3,27,0.5)_100%)]
+ "
+    >
       <div onClick={() => nav("/")}>
         <img src={logo} className="w-14 h-14 md:w-24 md:h-24 cursor-pointer" />
       </div>
@@ -45,7 +47,7 @@ export default function Navbar(): React.ReactNode {
         ))}
         <div
           className={`text-sm font-bold group cursor-pointer`}
-          onClick={() => nav("/kupi")}
+          onClick={() => nav("/login")}
         >
           <span>Kupi Premium</span>
         </div>

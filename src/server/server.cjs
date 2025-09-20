@@ -6,6 +6,9 @@ const jwt = require("jsonwebtoken");
 const { request } = require("undici");
 const http = require("http");
 const socketIo = require("socket.io");
+const rateLimit = require("express-rate-limit");
+const nodemailer = require("nodemailer");
+const { v4: uuidv4 } = require("uuid");
 
 app.use(express.json());
 app.use(cors());
@@ -44,6 +47,11 @@ const UserSchema = new mongoose.Schema(
     password: { type: String, required: true },
     username: { type: String },
     tier: { type: String },
+    isVerified: { type: Boolean, required: true },
+    verificationCode: { type: String },
+    codeExpiresAt: { type: Date },
+    resetPasswordToken: { type: String },
+    resetPasswordExpires: { type: Date },
     defaultCurrency: String,
     statistics: {
       totalBets: { type: Number, default: 0 },
@@ -88,8 +96,33 @@ const TipSchema = new mongoose.Schema({
   type: String,
   active: Boolean,
 });
+const tipStatSchema = new mongoose.Schema(
+  {
+    id: String,
+    match: String,
+    tip: String,
+    odds: String,
+    stake: String,
+    status: String,
+    date: String,
+    sport: String,
+    profit: Number,
+    grupa: String,
+  },
+  { collection: "stats" }
+);
+const PaymentSchema = new mongoose.Schema({
+  imageUrl: { type: String, required: false },
+  userEmail: { type: String, required: true },
+  userName: { type: String, required: true },
+  paymentType: { type: String, required: true },
+  mtcn: { type: String, required: false },
+});
+const Payment = mongoose.model("Payment", PaymentSchema);
 const User = mongoose.model("User", UserSchema);
 const Tip = mongoose.model("Tip", TipSchema);
+const TipStat = mongoose.model("TipStat", tipStatSchema);
+
 const JWT_SECRET = "unlockstheworld.";
 
 const verifyToken = (req, res, next) => {
@@ -171,12 +204,20 @@ app.post("/register", async (req, res) => {
       if (existingUser) {
         return res.status(400).json({ message: "Taj email se vec koristi." });
       }
+      const verificationCode = Math.floor(
+        100000 + Math.random() * 900000
+      ).toString();
+      const codeExpiresAt = new Date(Date.now() + 10 * 60 * 1000);
+
       const newUser = new User({
         email,
         password: password,
         username,
         defaultCurrency: defaultCurrency,
         tier: "free",
+        isVerified: false,
+        verificationCode: verificationCode,
+        codeExpiresAt: codeExpiresAt,
         statistics: {
           totalBets: 0,
           totalWins: 0,
@@ -273,6 +314,19 @@ app.post("/register", async (req, res) => {
         },
       });
       await newUser.save();
+      const transport = nodemailer.createTransport({
+        service: "gmail",
+        auth: {
+          user: "bogdandjakovic123@gmail.com",
+          pass: "xxrs arbb nioh nmzm",
+        },
+      });
+      await transport.sendMail({
+        from: "Insajder verifikacija (:",
+        to: email,
+        subject: "InsajderTips | Verifikacija",
+        text: "Vaš verifikacioni kod je: " + verificationCode,
+      });
       res.status(201).json({ message: "Registracija uspesna!" });
     } catch (err) {
       res.status(500).json({ message: "Doslo je do greske sa registracijom." });
@@ -283,6 +337,57 @@ app.post("/register", async (req, res) => {
       .json({ message: "Doslo je do greske. Unesite svako polje." });
   }
 });
+app.post("/verification", async (req, res) => {
+  console.log("📩 POST /verification called");
+  console.log("🔍 Request body:", req.body);
+
+  const { email, code } = req.body;
+
+  // Basic type checks
+  console.log("📧 Email:", email, " | Type:", typeof email);
+  console.log("🧾 Code:", code, " | Type:", typeof code);
+
+  if (!email || !code) {
+    return res.status(400).json({ message: "Email i kod su obavezni." });
+  }
+
+  const user = await User.findOne({ email });
+  console.log("👤 Found user:", user ? user.email : "None");
+
+  if (!user) {
+    console.log("❌ User not found.");
+    return res.status(404).json({ message: "Korisnik nije pronađen." });
+  }
+
+  if (user.isVerified) {
+    console.log("✅ User already verified.");
+    return res.status(400).json({ message: "Nalog je već verifikovan." });
+  }
+
+  console.log(
+    "📤 Stored code:",
+    user.verificationCode,
+    "| Type:",
+    typeof user.verificationCode
+  );
+  console.log("📥 Received code:", code, "| Type:", typeof code);
+
+  // Compare as strings (optional: trim just in case)
+  if (String(user.verificationCode).trim() !== String(code).trim()) {
+    console.log("❌ Kod nije tačan.");
+    return res.status(400).json({ message: "Neispravan verifikacioni kod." });
+  }
+
+  // Finalize verification
+  user.isVerified = true;
+  user.verificationCode = undefined;
+  user.codeExpiresAt = undefined;
+  await user.save();
+
+  console.log("🎉 Verification successful for:", email);
+  return res.status(200).json({ message: "Nalog uspešno verifikovan!" });
+});
+
 app.get("/user", verifyToken, async (req, res) => {
   // fetches the current user provided by the verifyToken middleware
   try {
@@ -290,17 +395,16 @@ app.get("/user", verifyToken, async (req, res) => {
     res.status(200).json({ user: userData });
   } catch (err) {}
 });
-app.get("/tips/free/:amount", (req, res) => {
-  // gets free betting tips with the specified amount
-  const amount = req.params.amount;
+app.get("/tips/free/", (req, res) => {
   Tip.find({ type: "free", active: true })
-    .limit(Number(amount))
+
     .then((tips) => {
       if (!tips) {
         return res
           .status(404)
           .json({ message: "Nije pronadjen ni jedan besplatan tip." });
       }
+
       res.json(tips);
     })
     .catch((err) => {
@@ -309,16 +413,15 @@ app.get("/tips/free/:amount", (req, res) => {
     });
 });
 
-app.get("/tips/premium/:amount", verifyToken, (req, res) => {
+app.get("/tips/premium/", verifyToken, (req, res) => {
   const decodedJWT = req.user;
-  const amount = req.params.amount;
 
   if (decodedJWT.tier !== "premium") {
     return res.status(403).json({ message: "Nemate pristup ovim tipovima." });
   }
 
   Tip.find({ type: "premium", active: true })
-    .limit(Number(amount))
+
     .then((tips) => {
       if (!tips.length) {
         return res
@@ -418,6 +521,7 @@ app.put("/updateStatistics", verifyToken, async (req, res) => {
       .json({ message: "Server error while updating stats." });
   }
 });
+
 app.put("/updateBet", verifyToken, async (req, res) => {
   const { userId } = req.user;
   const { betId, date, newStatus, isParlay } = req.body.bet;
@@ -478,6 +582,201 @@ app.put("/updateBet", verifyToken, async (req, res) => {
     });
   }
 });
+app.put("/removeBet", verifyToken, async (req, res) => {
+  const { userId } = req.user;
+  const { betId } = req.body;
+
+  if (!userId || !betId) {
+    return res.status(400).json({ message: "Missing required parameters." });
+  }
+
+  try {
+    const user = await User.findById(userId);
+    if (!user) {
+      return res.status(404).json({ message: "User not found." });
+    }
+
+    let betRemoved = false;
+    let removedBet = null;
+    let removedMonthKey = null;
+
+    // Find & remove the bet (single or parlay)
+    if (user.statistics && user.statistics.monthlyStats) {
+      for (const monthKey in user.statistics.monthlyStats) {
+        const month = user.statistics.monthlyStats[monthKey];
+        if (!month || !month.bets) continue;
+
+        for (const dayKey in month.bets) {
+          const dayBets = month.bets[dayKey];
+
+          if (!Array.isArray(dayBets)) continue;
+
+          const newDayBets = [];
+
+          for (const existingBet of dayBets) {
+            // Single bet object
+            if (existingBet && existingBet.betId === betId) {
+              betRemoved = true;
+              removedBet = existingBet;
+              removedMonthKey = monthKey;
+              // skip pushing -> removed
+              continue;
+            }
+
+            // Parlay stored as array of bet objects
+            if (Array.isArray(existingBet)) {
+              const parlayContains = existingBet.some((g) => g.betId === betId);
+              if (parlayContains) {
+                betRemoved = true;
+                removedBet = existingBet; // the whole parlay array
+                removedMonthKey = monthKey;
+                continue; // remove whole parlay
+              }
+            }
+
+            // keep this bet
+            newDayBets.push(existingBet);
+          }
+
+          month.bets[dayKey] = newDayBets;
+        }
+      }
+    }
+
+    if (!betRemoved || !removedBet) {
+      return res.status(404).json({ message: "Bet not found." });
+    }
+
+    // Normalize processing: if parlay (array) -> process each element,
+    // otherwise single element array
+    const isParlay = Array.isArray(removedBet);
+    const betsToProcess = isParlay ? removedBet : [removedBet];
+
+    // Ensure statistics numbers exist
+    user.statistics.totalBets = Number(user.statistics.totalBets || 0);
+    user.statistics.totalWins = Number(user.statistics.totalWins || 0);
+    user.statistics.totalLosses = Number(user.statistics.totalLosses || 0);
+    user.statistics.totalProfit = Number(user.statistics.totalProfit || 0);
+    user.statistics.initialInvestment = Number(
+      user.statistics.initialInvestment || 0
+    );
+
+    // Get month object (for monthly updates)
+    const month =
+      removedMonthKey != null
+        ? user.statistics.monthlyStats[removedMonthKey]
+        : null;
+    if (month) {
+      month.totalBets = Number(month.totalBets || 0);
+      month.totalWins = Number(month.totalWins || 0);
+      month.totalLosses = Number(month.totalLosses || 0);
+      month.monthlyProfit = Number(month.monthlyProfit || 0);
+    }
+
+    // For each "bet entry" removed, reverse its statistical and balance effects
+    for (const bet of betsToProcess) {
+      // Parse numeric values safely
+      const stake = parseFloat(bet.stake) || 0;
+      const odds = parseFloat(bet.odds) || 1;
+      const status = (bet.status || "").toLowerCase();
+
+      // Decrement global and monthly totalBets per entry removed
+      user.statistics.totalBets = Math.max(0, user.statistics.totalBets - 1);
+      if (month) month.totalBets = Math.max(0, month.totalBets - 1);
+
+      if (status === "win") {
+        // Undo a win:
+        // - decrease totalWins
+        // - subtract recorded profit from totalProfit/monthlyProfit
+        // - remove that profit from initialInvestment (payout that was previously added)
+        const profit = stake * odds - stake; // stake * (odds - 1)
+        user.statistics.totalWins = Math.max(0, user.statistics.totalWins - 1);
+        user.statistics.totalProfit =
+          (user.statistics.totalProfit || 0) - profit;
+        if (month) {
+          month.totalWins = Math.max(0, month.totalWins - 1);
+          month.monthlyProfit = (month.monthlyProfit || 0) - profit;
+        }
+        // Subtract profit from the balance to revert the payout the win added earlier.
+        user.statistics.initialInvestment = Math.max(
+          0,
+          (user.statistics.initialInvestment || 0) - profit
+        );
+      } else if (status === "loss") {
+        // Undo a loss:
+        // - decrease totalLosses
+        // - add stake back to totalProfit/monthlyProfit (undo loss)
+        // - refund stake back to initialInvestment
+        user.statistics.totalLosses = Math.max(
+          0,
+          user.statistics.totalLosses - 1
+        );
+        user.statistics.totalProfit =
+          (user.statistics.totalProfit || 0) + stake;
+        if (month) {
+          month.totalLosses = Math.max(0, month.totalLosses - 1);
+          month.monthlyProfit = (month.monthlyProfit || 0) + stake;
+        }
+        user.statistics.initialInvestment =
+          (user.statistics.initialInvestment || 0) + stake;
+      } else {
+        // active / unsettled bet: placing the bet previously subtracted stake from balance,
+        // so removing an active bet should refund the stake.
+        user.statistics.initialInvestment =
+          (user.statistics.initialInvestment || 0) + stake;
+        // active bets shouldn't affect totalWins/totalLosses/totalProfit
+      }
+    }
+
+    // Recalculate winRate safely
+    user.statistics.winRate =
+      user.statistics.totalBets > 0
+        ? (user.statistics.totalWins / user.statistics.totalBets) * 100
+        : 0;
+
+    await user.save();
+
+    return res.status(200).json({ message: "Bet successfully removed." });
+  } catch (err) {
+    console.error("Error removing bet:", err);
+    return res
+      .status(500)
+      .json({ message: "Server error while removing bet." });
+  }
+});
+
+// PUT /api/user/currency
+app.put("/api/user/currency", verifyToken, async (req, res) => {
+  const { userId } = req.user; // from your token
+  const { currency } = req.body;
+
+  if (!currency) {
+    return res.status(400).json({ message: "Currency is required." });
+  }
+
+  try {
+    const user = await User.findById(userId);
+
+    if (!user) {
+      return res.status(404).json({ message: "User not found." });
+    }
+
+    // Update currency
+    user.defaultCurrency = currency.toLowerCase(); // normalize
+    await user.save();
+
+    return res.status(200).json({
+      message: `Currency updated to ${currency.toUpperCase()}`,
+      defaultCurrency: user.defaultCurrency,
+    });
+  } catch (err) {
+    console.error("Error updating currency:", err);
+    return res
+      .status(500)
+      .json({ message: "Server error while updating currency." });
+  }
+});
+
 app.put("/updateName", verifyToken, async (req, res) => {
   try {
     const { oldName, newName } = req.body;
@@ -520,33 +819,203 @@ app.put("/updateName", verifyToken, async (req, res) => {
     res.status(500).json({ error: "Internal Server Error" });
   }
 });
+app.post("/requestPasswordResetCode", async (req, res) => {
+  const { email } = req.body;
+  console.log("Password reset request received for:", email);
 
+  if (!email || !email.includes("@")) {
+    return res.status(400).json({ message: "Nevalidan email." });
+  }
+
+  const user = await User.findOne({ email });
+  if (!user) {
+    return res
+      .status(200)
+      .json({ message: "Ako email postoji, reset link je poslat." });
+  }
+
+  // 1. Generate UUID token
+  const token = uuidv4();
+  const tokenExpiry = Date.now() + 1000 * 60 * 60; // 1 hour
+
+  // 2. Save token and expiry to DB
+  user.resetPasswordToken = token;
+  user.resetPasswordExpires = tokenExpiry;
+  await user.save();
+
+  // 3. Compose reset link
+  const resetLink = `http://localhost:5173/#/reset-password?token=${token}`;
+
+  // 4. Send email with link
+  const transport = nodemailer.createTransport({
+    service: "gmail",
+    auth: {
+      user: "bogdandjakovic123@gmail.com",
+      pass: "xxrs arbb nioh nmzm",
+    },
+  });
+
+  await transport.sendMail({
+    from: "Insajder verifikacija (:",
+    to: email,
+    subject: "InsajderTips | Resetujte Sifru",
+    text: `Da biste resetovali sifru, kliknite na sledeći link: ${resetLink}\n\nAko niste vi zahtevali, ignorisite ovaj email.`,
+  });
+
+  return res
+    .status(200)
+    .json({ message: "Ako email postoji, reset link je poslat." });
+});
+app.put("/resetStatistics", verifyToken, async (req, res) => {
+  try {
+    const { userId } = req.user;
+
+    if (!userId) {
+      return res.status(400).json({ message: "User ID is required." });
+    }
+
+    // Create empty monthly stats for all 12 months
+    const monthNames = [
+      "January",
+      "February",
+      "March",
+      "April",
+      "May",
+      "June",
+      "July",
+      "August",
+      "September",
+      "October",
+      "November",
+      "December",
+    ];
+
+    const monthlyStats = monthNames.map((monthName, index) => ({
+      month: monthName,
+      bets: [],
+      monthlyProfit: 0,
+      totalBets: 0,
+      totalWins: 0,
+      totalLosses: 0,
+    }));
+
+    // Reset statistics to default values
+    const defaultStats = {
+      totalBets: 0,
+      totalWins: 0,
+      totalLosses: 0,
+      winRate: 0,
+      totalProfit: 0,
+      initialInvestment: 0,
+      avgBetAmount: 0,
+      monthlyStats: monthlyStats,
+    };
+
+    await User.findByIdAndUpdate(userId, {
+      $set: { statistics: defaultStats },
+    });
+
+    return res.status(200).json({ message: "Statistics successfully reset." });
+  } catch (err) {
+    console.error("Error resetting statistics:", err);
+
+    // Check if it's an authentication error
+    if (err.name === "JsonWebTokenError" || err.name === "TokenExpiredError") {
+      return res
+        .status(401)
+        .json({ message: "Authentication failed. Please log in again." });
+    }
+
+    return res
+      .status(500)
+      .json({ message: "Server error while resetting statistics." });
+  }
+});
+app.post("/resetPassword", async (req, res) => {
+  const { token, newPassword } = req.body;
+
+  if (!token || !newPassword) {
+    return res.status(400).json({ message: "Token i lozinka su obavezni." });
+  }
+
+  try {
+    const user = await User.findOne({ resetPasswordToken: token });
+
+    if (!user) {
+      return res.status(404).json({ message: "Nevalidan ili istekao token." });
+    }
+
+    user.password = newPassword; // ✅ not hashed, raw password
+    user.resetToken = undefined;
+    user.resetTokenExpiry = undefined;
+
+    await user.save();
+
+    res.status(200).json({ message: "Lozinka uspešno resetovana." });
+  } catch (err) {
+    console.error("Greška:", err);
+    res.status(500).json({ message: "Greška na serveru." });
+  }
+});
 // OddsChecker
 app.get("/oddsChecker/getSearch/:query", async (req, res) => {
   const query = req.params.query;
+
   const api = `https://www.soccerbet.rs/restapi/offer/sr/search/${query}/mob?annex=0&mobileVersion=2.36.3.14&locale=sr`;
+
   try {
     const response = await request(api);
     const ctp = response.headers["content-type"];
+
     if (ctp && ctp.includes("application/json")) {
       const data = await response.body.json();
-      
 
-      return res
-        .status(200)
-        .json(
-          data?.esMatches.filter(
-            (match) =>
-              match.sport === "S" ||
-              (match.sport === "B" && match.leagueName !== "Evroliga Igrači")
-          )
-        );
+      // Debug: Log all matches with sport and leagueName
+      data?.esMatches.forEach((match, index) => {
+        console.log(`Match #${index + 1}:`, match.sport, "-", match.leagueName);
+      });
+
+      // Filter out any matches where leagueName or leagueToken contains "Igrači"
+      // Also keep only sport S or B, apply extra filters to basketball leagues
+      const filtered = data?.esMatches.filter((match) => {
+        const leagueNameLower = (match.leagueName || "").toLowerCase();
+        const leagueTokenLower = (match.leagueToken || "").toLowerCase();
+
+        // Exclude all matches related to "igrači" (players) for any sport
+        if (
+          leagueNameLower.includes("igrači") ||
+          leagueTokenLower.includes("igrači")
+        ) {
+          return false;
+        }
+
+        // Only soccer (S) or basketball (B)
+        if (match.sport === "S") {
+          return true;
+        }
+
+        if (match.sport === "B") {
+          // Additional basketball exclusions
+          if (match.leagueName === "Evroliga Igrači") return false;
+          if (match.leagueName.includes("NBA 2024/25")) return false;
+          return true;
+        }
+
+        return false;
+      });
+
+      return res.status(200).json(filtered);
     }
-  } catch (err) {}
+  } catch (err) {
+    console.error("Error in /oddsChecker/getSearch/:query:", err.message);
+    res.status(500).json({ error: "Internal server error" });
+  }
 });
 
 app.post("/oddsChecker/getOdds/", async (req, res) => {
   // attempts to get the odds for a specific match on all the bet stores.
+
+  console.log("Entered getOdds.");
 
   const { home, away, date, soccerId, searchQuery, sport } = req.body;
   // the info we will use to find the actual game
@@ -565,10 +1034,15 @@ app.post("/oddsChecker/getOdds/", async (req, res) => {
         doubleChance_1X: { reference: "1x" },
         doubleChance_X2: { reference: "x2" },
         doubleChance_12: { reference: "12" },
+        homeAndHome2Plus: { reference: "1&D2+" }, // new
+        homeAndHome3Plus: { reference: "1&D3+" }, // new
+        awayAndAway2Plus: { reference: "2&G2+" }, // new
+        awayAndAway3Plus: { reference: "2&G3+" }, // new
         homeAnd3Plus: { reference: "1&3+" },
         homeAnd4Plus: { reference: "1&4+" },
         awayAnd3Plus: { reference: "2&3+" },
         awayAnd4Plus: { reference: "2&4+" },
+        homeAndGG: { reference: "1&gg" }, // new
         awayAndGG: { reference: "2&gg" },
       },
 
@@ -580,15 +1054,15 @@ app.post("/oddsChecker/getOdds/", async (req, res) => {
         over_4_5: { reference: "5+" },
         under1_5: { reference: "0-1" },
         under2_5: { reference: "0-2" },
-        twoToFour: { reference: "2-4" }, // new
-        twoToSix: { reference: "2-6" }, // new
-        threeToSix: { reference: "3-6" }, // new
+        twoToFour: { reference: "2-4" },
+        twoToSix: { reference: "2-6" },
+        threeToSix: { reference: "3-6" },
         gg: { reference: "gg" },
         gg3: { reference: "gg3+" },
         ng: { reference: "ng" },
-        firstMore: { reference: "1>" }, // new
-        secondMore: { reference: "2>" }, // new
-        equalGoals: { reference: "1=2" }, // new
+        firstMore: { reference: "1>" },
+        secondMore: { reference: "2>" },
+        equalGoals: { reference: "1=2" },
       },
 
       homeGoals: {
@@ -596,6 +1070,11 @@ app.post("/oddsChecker/getOdds/", async (req, res) => {
         over_0_5: { reference: "D1+" },
         over_1_5: { reference: "D2+" },
         over_2_5: { reference: "D3+" },
+        over_3_5: { reference: "D4+" },
+        zeroToOne: { reference: "D0-1" },
+        zeroToTwo: { reference: "D0-2" },
+        first_0_5: { reference: "1.POL D1+" },
+        first_1_5: { reference: "1.POL D2+" },
       },
 
       awayGoals: {
@@ -603,36 +1082,47 @@ app.post("/oddsChecker/getOdds/", async (req, res) => {
         over_0_5: { reference: "G1+" },
         over_1_5: { reference: "G2+" },
         over_2_5: { reference: "G3+" },
+        over_3_5: { reference: "G4+" },
+        zeroToOne: { reference: "G0-1" },
+        first_0_5: { reference: "1.POL G1+" },
+        first_1_5: { reference: "1.POL G2+" },
       },
 
       firstHalf: {
         name: "Prvo poluvreme",
-        over_0_5: { reference: "pp1+" },
-        over_1_5: { reference: "pp2+" },
-        over_2_5: { reference: "pp3+" },
-        over_0_5_both: { reference: "1p1+&2p1+" },
-        first05Second15: { reference: "1p1+&2p2+" },
-        homeOver_0_5: { reference: "d1+" },
-        homeOver_1_5: { reference: "d2+" },
-        awayOver_0_5: { reference: "g1+" },
-        awayOver_1_5: { reference: "g2+" },
-        ki1: { reference: "pp1" },
-        ki2: { reference: "pp2" },
-        kix: { reference: "ppx" },
-        gg: { reference: "gg1" },
+        gg: { reference: "GG1" },
+        over_0_5: { reference: "PP1+" },
+        over_1_5: { reference: "PP2+" },
+        over_2_5: { reference: "PP3+" },
+        over_0_5_both: { reference: "1P1+&2P1+" },
+        first05Second15: { reference: "1P1+&2P2+" },
+        ki1: { reference: "Ishod PP. 1" },
+        ki2: { reference: "Ishod PP 2." },
+        kix: { reference: "Ishod PP X." },
+        pg1: { reference: "Prvi Gol PP. 1" },
+        pg2: { reference: "Prvi Gol PP. 2" },
+      },
+      secondHalf: {
+        name: "Drugo poluvreme",
+        over_0_5: { reference: "2P1+" },
+        over_1_5: { reference: "2P2++" },
+        over_2_5: { reference: "2P3++" },
+        ki1: { reference: "Ishod 2P. 1" },
+        ki2: { reference: "Ishod 2P. 2" },
+        kix: { reference: "Ishod 2P. X" },
       },
 
       htft: {
         name: "Prelazi",
         hh: { reference: "1-1" },
-        hx: { reference: "1-x" },
+        hx: { reference: "1-X" },
         ha: { reference: "1-2" },
         aa: { reference: "2-2" },
-        ax: { reference: "2-x" },
+        ax: { reference: "2-X" },
         ah: { reference: "2-1" },
-        xh: { reference: "x-1" },
-        xx: { reference: "x-x" },
-        xa: { reference: "x-2" },
+        xh: { reference: "X-1" },
+        xx: { reference: "X-X" },
+        xa: { reference: "X-2" },
       },
     };
 
@@ -674,40 +1164,141 @@ app.post("/oddsChecker/getOdds/", async (req, res) => {
     const soccerApi = `https://www.soccerbet.rs/restapi/offer/sr/match/${soccerId}?annex=0&desktopVersion=2.36.3.14&locale=sr`;
     const maxbetSearch = `https://www.maxbet.rs/restapi/offer/sr/search/${searchQuery}/mob?mobileVersion=1.2.1.14&locale=sr`;
     const mozzartSearch = `https://www.mozzartbet.com/betting/search?term=${searchQuery}`;
-
+    const oktagonSearch = `https://www.oktagonbet.com/restapi/offer/sr/search/${searchQuery}/mob?annex=1&mobileVersion=2.38.5.1&locale=sr`;
     // Fetch both API responses in parallel
-    const [soccerResponse, maxbetSearchResponse, mozzartResponse] =
-      await Promise.all([
-        request(soccerApi),
-        request(maxbetSearch),
-        request(mozzartSearch, {
-          headers: {
-            "Content-Type": "application/json",
-            Accept: "application/json",
-            Medium: "WEB",
-            "User-Agent":
-              "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/134.0.0.0 Safari/537.36",
-            Referer:
-              "https://www.mozzartbet.com/sr/kladjenje/sport/1?date=today",
-            "X-Requested-With": "XMLHttpRequest",
-          },
-        }),
-      ]);
+    const [
+      soccerResponse,
+      maxbetSearchResponse,
+      mozzartResponse,
+      oktagonSearchResponse,
+    ] = await Promise.all([
+      request(soccerApi),
+      request(maxbetSearch),
+      request(mozzartSearch, {
+        headers: {
+          "Content-Type": "application/json",
+          Accept: "application/json",
+          Medium: "WEB",
+          "User-Agent":
+            "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/134.0.0.0 Safari/537.36",
+          Referer: "https://www.mozzartbet.com/sr/kladjenje/sport/1?date=today",
+          "X-Requested-With": "XMLHttpRequest",
+        },
+      }),
+      request(oktagonSearch),
+    ]);
 
     const soccerJson = await soccerResponse.body.json();
     const maxbetJson = await maxbetSearchResponse.body.json();
     const mozzartJson = await mozzartResponse.body.json();
 
+    const oktagonJson = await oktagonSearchResponse.body.json();
+    if (oktagonJson.esMatches) {
+      const filteredGames = oktagonJson.esMatches.filter(
+        (game) => game.kickOffTime === date
+      );
+      if (filteredGames.length > 0) {
+        const matchId = filteredGames[0].id;
+
+        const match = `https://www.oktagonbet.com/restapi/offer/sr/match/${matchId}?annex=1&mobileVersion=2.38.5.1&locale=sr`;
+        await fetch(match).then((res) => {
+          res.json().then((json) => {
+            const currentOdds = json.odds;
+            odds["homeGoals"]["zeroToOne"]["oktagon"] = currentOdds["355"];
+            odds["ki"]["1"]["oktagon"] = currentOdds["1"];
+            odds["ki"]["x"]["oktagon"] = currentOdds["2"];
+            odds["ki"]["2"]["oktagon"] = currentOdds["3"];
+            odds["goals"]["gg"]["oktagon"] = currentOdds["272"];
+            odds["goals"]["ng"]["oktagon"] = currentOdds["273"];
+            odds["ki"]["doubleChance_1X"]["oktagon"] = currentOdds["7"];
+            odds["ki"]["doubleChance_12"]["oktagon"] = currentOdds["8"];
+            odds["ki"]["doubleChance_X2"]["oktagon"] = currentOdds["9"];
+            odds["goals"]["over2_5"]["oktagon"] = currentOdds["24"];
+            odds["goals"]["under2_5"]["oktagon"] = currentOdds["22"];
+            // x
+            odds["ki"]["homeAnd3Plus"]["oktagon"] = currentOdds["287"];
+            odds["ki"]["homeAnd4Plus"]["oktagon"] = currentOdds["314"];
+            odds["ki"]["awayAnd3Plus"]["oktagon"] = currentOdds["288"]; // fix
+            odds["ki"]["awayAnd4Plus"]["oktagon"] = currentOdds["315"]; // fix
+            odds["ki"]["awayAndGG"]["oktagon"] = currentOdds["366"];
+            odds["ki"]["homeAndHome2Plus"]["oktagon"] = currentOdds["419"];
+            odds["ki"]["homeAndHome3Plus"]["oktagon"] = currentOdds["484"];
+            odds["ki"]["awayAndAway2Plus"]["oktagon"] = currentOdds["420"];
+            odds["ki"]["awayAndAway3Plus"]["oktagon"] = currentOdds["413"];
+
+            odds["goals"]["over1_5"]["oktagon"] = currentOdds["8"];
+            odds["goals"]["over2_5"]["oktagon"] = currentOdds["24"];
+            odds["goals"]["over_3_5"]["oktagon"] = currentOdds["25"];
+            odds["goals"]["over_4_5"]["oktagon"] = currentOdds["27"];
+            odds["goals"]["under1_5"]["oktagon"] = currentOdds["21"];
+            odds["goals"]["under2_5"]["oktagon"] = currentOdds["22"];
+            odds["goals"]["twoToFour"]["oktagon"] = currentOdds["243"];
+            odds["goals"]["twoToSix"]["oktagon"] = currentOdds["220"];
+            odds["goals"]["threeToSix"]["oktagon"] = currentOdds["382"];
+            odds["goals"]["firstMore"]["oktagon"] = currentOdds["29"];
+            odds["goals"]["secondMore"]["oktagon"] = currentOdds["31"];
+            odds["goals"]["equalGoals"]["oktagon"] = currentOdds["30"];
+
+            odds["homeGoals"]["over_0_5"]["oktagon"] = currentOdds["238"];
+            odds["homeGoals"]["over_1_5"]["oktagon"] = currentOdds["248"];
+            odds["homeGoals"]["over_2_5"]["oktagon"] = currentOdds["276"];
+            odds["homeGoals"]["over_3_5"]["oktagon"] = currentOdds["555"];
+            odds["awayGoals"]["over_0_5"]["oktagon"] = currentOdds["240"];
+            odds["awayGoals"]["over_1_5"]["oktagon"] = currentOdds["250"];
+            odds["awayGoals"]["over_2_5"]["oktagon"] = currentOdds["277"];
+            odds["awayGoals"]["zeroToOne"]["oktagon"] = currentOdds["249"];
+            odds["homeGoals"]["zeroToTwo"]["oktagon"] = currentOdds["551"];
+            odds["awayGoals"]["over_3_5"]["oktagon"] = currentOdds["556"];
+
+            odds["firstHalf"]["over_0_5"]["oktagon"] = currentOdds["207"];
+            odds["firstHalf"]["over_1_5"]["oktagon"] = currentOdds["208"];
+            odds["firstHalf"]["over_2_5"]["oktagon"] = currentOdds["209"];
+            odds["homeGoals"]["first_0_5"]["oktagon"] = currentOdds["307"];
+            odds["homeGoals"]["first_1_5"]["oktagon"] = currentOdds["274"];
+            odds["awayGoals"]["first_0_5"]["oktagon"] = currentOdds["308"];
+            odds["awayGoals"]["first_1_5"]["oktagon"] = currentOdds["275"];
+            odds["firstHalf"]["ki1"]["oktagon"] = currentOdds["4"];
+            odds["firstHalf"]["ki2"]["oktagon"] = currentOdds["6"];
+            odds["firstHalf"]["kix"]["oktagon"] = currentOdds["5"];
+            odds["firstHalf"]["gg"]["oktagon"] = currentOdds["291"];
+            odds["firstHalf"]["first05Second15"]["oktagon"] =
+              currentOdds["316"];
+            odds["firstHalf"]["over_0_5_both"]["oktagon"] = currentOdds["363"];
+
+            odds["secondHalf"]["over_0_5"]["oktagon"] = currentOdds["213"];
+            odds["secondHalf"]["over_1_5"]["oktagon"] = currentOdds["214"];
+            odds["secondHalf"]["over_0_5"]["oktagon"] = currentOdds["215"];
+            odds["secondHalf"]["ki1"]["oktagon"] = currentOdds["235"];
+            odds["secondHalf"]["kix"]["oktagon"] = currentOdds["236"];
+            odds["secondHalf"]["ki2"]["oktagon"] = currentOdds["237"];
+
+            odds["htft"]["hh"]["oktagon"] = currentOdds["10"];
+            odds["htft"]["hx"]["oktagon"] = currentOdds["11"];
+            odds["htft"]["ha"]["oktagon"] = currentOdds["12"];
+            odds["htft"]["aa"]["oktagon"] = currentOdds["18"];
+            odds["htft"]["ax"]["oktagon"] = currentOdds["17"];
+            odds["htft"]["ah"]["oktagon"] = currentOdds["16"];
+            odds["htft"]["xh"]["oktagon"] = currentOdds["13"];
+            odds["htft"]["xx"]["oktagon"] = currentOdds["14"];
+            odds["htft"]["xa"]["oktagon"] = currentOdds["15"];
+
+            odds["goals"]["gg3"]["oktagon"] = currentOdds["303"];
+          });
+        });
+      }
+    }
     if (maxbetJson.esMatches) {
       // here, we will try to find the exact game from the search list.
+
       const filteredGames = maxbetJson.esMatches.filter(
-        (game) => game.kickOffTime === date
+        (game) =>
+          game.kickOffTime === date &&
+          game.leagueName != "Max Bonus Tip Fudbal "
       );
 
       // if we found the game we are lookingg for, append its odds in the container.
       if (filteredGames.length > 0 && sport === "S") {
         const currentOdds = filteredGames[0].odds;
-        console.log(currentOdds);
 
         odds["ki"]["1"]["maxBet"] = currentOdds["1"];
         odds["ki"]["x"]["maxBet"] = currentOdds["2"];
@@ -722,9 +1313,14 @@ app.post("/oddsChecker/getOdds/", async (req, res) => {
         // x
         odds["ki"]["homeAnd3Plus"]["maxBet"] = currentOdds["287"];
         odds["ki"]["homeAnd4Plus"]["maxBet"] = currentOdds["314"];
-        odds["ki"]["awayAnd3Plus"]["maxBet"] = currentOdds["288"]; // fix
-        odds["ki"]["awayAnd4Plus"]["maxBet"] = currentOdds["315"]; // fix
+        odds["ki"]["awayAnd3Plus"]["maxBet"] = currentOdds["288"];
+        odds["ki"]["awayAnd4Plus"]["maxBet"] = currentOdds["315"];
         odds["ki"]["awayAndGG"]["maxBet"] = currentOdds["366"];
+
+        odds["ki"]["homeAndHome2Plus"]["maxBet"] = currentOdds["419"];
+        odds["ki"]["homeAndHome3Plus"]["maxBet"] = currentOdds["484"];
+        odds["ki"]["awayAndAway2Plus"]["maxBet"] = currentOdds["420"];
+        odds["ki"]["awayAndAway3Plus"]["maxBet"] = currentOdds["50267"];
 
         odds["goals"]["over1_5"]["maxBet"] = currentOdds["8"];
         odds["goals"]["over2_5"]["maxBet"] = currentOdds["24"];
@@ -742,23 +1338,48 @@ app.post("/oddsChecker/getOdds/", async (req, res) => {
         odds["homeGoals"]["over_0_5"]["maxBet"] = currentOdds["238"];
         odds["homeGoals"]["over_1_5"]["maxBet"] = currentOdds["248"];
         odds["homeGoals"]["over_2_5"]["maxBet"] = currentOdds["276"];
+        odds["homeGoals"]["zeroToOne"]["maxBet"] = currentOdds["247"];
+        odds["homeGoals"]["zeroToTwo"]["maxBet"] = currentOdds["551"];
+        odds["homeGoals"]["over_3_5"]["maxBet"] = currentOdds["555"];
         odds["awayGoals"]["over_0_5"]["maxBet"] = currentOdds["240"];
         odds["awayGoals"]["over_1_5"]["maxBet"] = currentOdds["250"];
         odds["awayGoals"]["over_2_5"]["maxBet"] = currentOdds["277"];
 
+        odds["awayGoals"]["zeroToOne"]["maxBet"] = currentOdds["249"];
+        odds["awayGoals"]["over_3_5"]["maxBet"] = currentOdds["556"];
+
+        odds["secondHalf"]["ki1"]["maxBet"] = currentOdds["235"];
+        odds["secondHalf"]["ki2"]["maxBet"] = currentOdds["236"];
+        odds["secondHalf"]["kix"]["maxBet"] = currentOdds["237"];
+
+        odds["secondHalf"]["over_0_5"]["maxBet"] = currentOdds["213"];
+        odds["secondHalf"]["over_1_5"]["maxBet"] = currentOdds["214"];
+        odds["secondHalf"]["over_2_5"]["maxBet"] = currentOdds["215"];
+
         odds["firstHalf"]["over_0_5"]["maxBet"] = currentOdds["207"];
         odds["firstHalf"]["over_1_5"]["maxBet"] = currentOdds["208"];
         odds["firstHalf"]["over_2_5"]["maxBet"] = currentOdds["209"];
-        odds["firstHalf"]["homeOver_0_5"]["maxBet"] = currentOdds["307"];
-        odds["firstHalf"]["homeOver_1_5"]["maxBet"] = currentOdds["274"];
-        odds["firstHalf"]["awayOver_0_5"]["maxBet"] = currentOdds["308"];
-        odds["firstHalf"]["awayOver_1_5"]["maxBet"] = currentOdds["275"];
+
+        odds["homeGoals"]["first_0_5"]["maxBet"] = currentOdds["307"];
+        odds["homeGoals"]["first_1_5"]["maxBet"] = currentOdds["274"];
+        odds["awayGoals"]["first_0_5"]["maxBet"] = currentOdds["308"];
+        odds["awayGoals"]["first_1_5"]["maxBet"] = currentOdds["275"];
         odds["firstHalf"]["ki1"]["maxBet"] = currentOdds["4"];
         odds["firstHalf"]["ki2"]["maxBet"] = currentOdds["6"];
         odds["firstHalf"]["kix"]["maxBet"] = currentOdds["5"];
         odds["firstHalf"]["gg"]["maxBet"] = currentOdds["291"];
         odds["firstHalf"]["first05Second15"]["maxBet"] = currentOdds["316"];
         odds["firstHalf"]["over_0_5_both"]["maxBet"] = currentOdds["363"];
+
+        odds["firstHalf"]["pg1"]["maxBet"] = currentOdds["363"];
+        odds["firstHalf"]["pg2"]["maxBet"] = currentOdds["363"];
+
+        odds["secondHalf"]["over_0_5"]["maxBet"] = currentOdds["213"];
+        odds["secondHalf"]["over_1_5"]["maxBet"] = currentOdds["214"];
+        odds["secondHalf"]["over_0_5"]["maxBet"] = currentOdds["215"];
+        odds["secondHalf"]["ki1"]["maxBet"] = currentOdds["235"];
+        odds["secondHalf"]["kix"]["maxBet"] = currentOdds["236"];
+        odds["secondHalf"]["ki2"]["maxBet"] = currentOdds["237"];
 
         odds["htft"]["hh"]["maxBet"] = currentOdds["10"];
         odds["htft"]["hx"]["maxBet"] = currentOdds["11"];
@@ -785,6 +1406,10 @@ app.post("/oddsChecker/getOdds/", async (req, res) => {
       const soccerOdds = soccerJson?.betMap; // Get the whole betMap
 
       if (soccerOdds && sport === "S") {
+        odds["ki"]["awayAndAway3Plus"]["soccerBet"] =
+          soccerOdds["50267"]?.NULL?.ov;
+        odds["ki"]["homeAndHome3Plus"]["soccerBet"] =
+          soccerOdds["221"]?.NULL?.ov;
         odds["ki"]["1"]["soccerBet"] = soccerOdds["1"]?.NULL?.ov;
         odds["ki"]["x"]["soccerBet"] = soccerOdds["2"]?.NULL?.ov;
         odds["ki"]["2"]["soccerBet"] = soccerOdds["3"]?.NULL?.ov;
@@ -812,6 +1437,16 @@ app.post("/oddsChecker/getOdds/", async (req, res) => {
           soccerOdds["248"]?.NULL?.ov;
         odds["homeGoals"]["over_2_5"]["soccerBet"] =
           soccerOdds["276"]?.NULL?.ov;
+        odds["homeGoals"]["over_3_5"]["soccerBet"] =
+          soccerOdds["555"]?.NULL?.ov;
+        odds["homeGoals"]["zeroToOne"]["soccerBet"] =
+          soccerOdds["247"]?.NULL?.ov;
+        odds["homeGoals"]["zeroToTwo"]["soccerBet"] =
+          soccerOdds["551"]?.NULL?.ov;
+        odds["awayGoals"]["over_3_5"]["soccerBet"] =
+          soccerOdds["556"]?.NULL?.ov;
+        odds["awayGoals"]["zeroToOne"]["soccerBet"] =
+          soccerOdds["249"]?.NULL?.ov;
 
         odds["awayGoals"]["over_0_5"]["soccerBet"] =
           soccerOdds["240"]?.NULL?.ov;
@@ -820,13 +1455,13 @@ app.post("/oddsChecker/getOdds/", async (req, res) => {
         odds["awayGoals"]["over_2_5"]["soccerBet"] =
           soccerOdds["277"]?.NULL?.ov;
 
-        odds["firstHalf"]["homeOver_0_5"]["soccerBet"] =
+        odds["homeGoals"]["first_0_5"]["soccerBet"] =
           soccerOdds["307"]?.NULL?.ov;
-        odds["firstHalf"]["homeOver_1_5"]["soccerBet"] =
+        odds["homeGoals"]["first_1_5"]["soccerBet"] =
           soccerOdds["274"]?.NULL?.ov;
-        odds["firstHalf"]["awayOver_0_5"]["soccerBet"] =
+        odds["awayGoals"]["first_0_5"]["soccerBet"] =
           soccerOdds["308"]?.NULL?.ov;
-        odds["firstHalf"]["awayOver_1_5"]["soccerBet"] =
+        odds["awayGoals"]["first_1_5"]["soccerBet"] =
           soccerOdds["275"]?.NULL?.ov;
         odds["firstHalf"]["ki1"]["soccerBet"] = soccerOdds["4"]?.NULL?.ov;
         odds["firstHalf"]["kix"]["soccerBet"] = soccerOdds["5"]?.NULL?.ov;
@@ -836,6 +1471,16 @@ app.post("/oddsChecker/getOdds/", async (req, res) => {
           soccerOdds["363"]?.NULL?.ov;
         odds["firstHalf"]["first05Second15"]["soccerBet"] =
           soccerOdds["316"]?.NULL?.ov;
+
+        odds["secondHalf"]["ki1"]["soccerBet"] = soccerOdds["235"]?.NULL?.ov;
+        odds["secondHalf"]["kix"]["soccerBet"] = soccerOdds["236"]?.NULL?.ov;
+        odds["secondHalf"]["ki2"]["soccerBet"] = soccerOdds["237"]?.NULL?.ov;
+        odds["secondHalf"]["over_0_5"]["soccerBet"] =
+          soccerOdds["213"]?.NULL?.ov;
+        odds["secondHalf"]["over_1_5"]["soccerBet"] =
+          soccerOdds["214"]?.NULL?.ov;
+        odds["secondHalf"]["over_2_5"]["soccerBet"] =
+          soccerOdds["215"]?.NULL?.ov;
 
         odds["htft"]["hh"]["soccerBet"] = soccerOdds["10"]?.NULL?.ov;
         odds["htft"]["hx"]["soccerBet"] = soccerOdds["11"]?.NULL?.ov;
@@ -924,7 +1569,7 @@ app.post("/oddsChecker/getOdds/", async (req, res) => {
       const json = await mozzartOdds.body.json();
       if (json.status !== "ERROR") {
         const mOdds = json.match.odds;
-     
+        console.log(JSON.stringify(mOdds, null, 2)); // Pretty print
 
         if (mOdds && mOdds.length > 0 && sport === "S") {
           odds["ki"]["1"]["mozzartBet"] = mOdds[0].value;
@@ -933,6 +1578,7 @@ app.post("/oddsChecker/getOdds/", async (req, res) => {
 
           odds["ki"]["homeAnd3Plus"]["mozzartBet"] = mOdds[301].value;
           odds["ki"]["homeAnd4Plus"]["mozzartBet"] = mOdds[312].value;
+          odds["ki"]["homeAndHome2Plus"]["mozzartBet"] = mOdds[310].value;
 
           odds["ki"]["doubleChance_1X"]["mozzartBet"] = mOdds[3].value;
           odds["ki"]["doubleChance_12"]["mozzartBet"] = mOdds[4].value;
@@ -940,6 +1586,7 @@ app.post("/oddsChecker/getOdds/", async (req, res) => {
           odds["ki"]["awayAnd3Plus"]["mozzartBet"] = mOdds[302].value;
           odds["ki"]["awayAnd4Plus"]["mozzartBet"] = mOdds[313].value;
           odds["ki"]["awayAndGG"]["mozzartBet"] = mOdds[319].value;
+          odds["ki"]["awayAndAway2Plus"]["mozzartBet"] = mOdds[311].value;
 
           odds["goals"]["gg"]["mozzartBet"] = mOdds[223].value;
           odds["goals"]["ng"]["mozzartBet"] = mOdds[224].value;
@@ -972,20 +1619,38 @@ app.post("/oddsChecker/getOdds/", async (req, res) => {
           odds["homeGoals"]["over_0_5"]["mozzartBet"] = mOdds[243].value;
           odds["homeGoals"]["over_1_5"]["mozzartBet"] = mOdds[244].value;
           odds["homeGoals"]["over_2_5"]["mozzartBet"] = mOdds[250].value;
+          odds["homeGoals"]["over_3_5"]["mozzartBet"] = mOdds[260].value;
+          odds["homeGoals"]["zeroToOne"]["mozzartBet"] = mOdds[251].value;
+          odds["homeGoals"]["zeroToTwo"]["mozzartBet"] = mOdds[252].value;
+
           odds["awayGoals"]["over_0_5"]["mozzartBet"] = mOdds[268].value;
           odds["awayGoals"]["over_1_5"]["mozzartBet"] = mOdds[269].value;
           odds["awayGoals"]["over_2_5"]["mozzartBet"] = mOdds[275].value;
+          odds["awayGoals"]["over_3_5"]["mozzartBet"] = mOdds[285].value;
+          odds["awayGoals"]["zeroToOne"]["mozzartBet"] = mOdds[276].value;
+
+          odds["secondHalf"]["ki1"]["mozzartBet"] = mOdds[104].value;
+          odds["secondHalf"]["kix"]["mozzartBet"] = mOdds[105].value;
+          odds["secondHalf"]["ki2"]["mozzartBet"] = mOdds[106].value;
+
+          odds["secondHalf"]["over_0_5"]["mozzartBet"] = mOdds[87].value;
+          odds["secondHalf"]["over_1_5"]["mozzartBet"] = mOdds[88].value;
+          odds["secondHalf"]["over_2_5"]["mozzartBet"] = mOdds[89].value;
 
           odds["firstHalf"]["over_0_5_both"]["mozzartBet"] = mOdds[317].value;
           odds["firstHalf"]["first05Second15"]["mozzartBet"] = mOdds[315].value;
-          odds["firstHalf"]["awayOver_0_5"]["mozzartBet"] = mOdds[216].value;
-          odds["firstHalf"]["awayOver_1_5"]["mozzartBet"] = mOdds[217].value;
           odds["firstHalf"]["gg"]["mozzartBet"] = mOdds[226].value;
-          odds["firstHalf"]["homeOver_0_5"]["mozzartBet"] = mOdds[209].value;
-          odds["firstHalf"]["homeOver_1_5"]["mozzartBet"] = mOdds[210].value;
+
+          odds["homeGoals"]["first_0_5"]["mozzartBet"] = mOdds[209].value;
+          odds["homeGoals"]["first_1_5"]["mozzartBet"] = mOdds[210].value;
+
+          odds["awayGoals"]["first_0_5"]["mozzartBet"] = mOdds[216].value;
+          odds["awayGoals"]["first_1_5"]["mozzartBet"] = mOdds[217].value;
+
           odds["firstHalf"]["ki1"]["mozzartBet"] = mOdds[44].value;
           odds["firstHalf"]["ki2"]["mozzartBet"] = mOdds[46].value;
           odds["firstHalf"]["kix"]["mozzartBet"] = mOdds[45].value;
+
           odds["firstHalf"]["over_0_5"]["mozzartBet"] = mOdds[73].value;
           odds["firstHalf"]["over_1_5"]["mozzartBet"] = mOdds[74].value;
           odds["firstHalf"]["over_2_5"]["mozzartBet"] = mOdds[75].value;
@@ -999,5 +1664,82 @@ app.post("/oddsChecker/getOdds/", async (req, res) => {
     console.error("Error fetching odds data:", err);
     return res.status(500).json({ error: "Failed to fetch odds data" });
   }
+});
+app.get("/tipStats", async (req, res) => {
+  try {
+    const allTips = await TipStat.find();
+    if (allTips) {
+      return res.status(200).json(allTips);
+    }
+  } catch (err) {
+    console.log("error tipStats: " + err);
+    return res.status(400);
+  }
+});
+app.put("/removeBet", verifyToken, async (req, res) => {
+  const { userId } = req.user;
+  const { betId, datePath } = req.body;
+
+  if (!userId || !betId || !datePath) {
+    return res.status(400).json({ message: "Missing required parameters." });
+  }
+
+  try {
+    // Construct the full path to the bet array
+    const betPath = `statistics.monthlyStats.${datePath}`;
+
+    // Pull the bet from the array using betId
+    const result = await User.findByIdAndUpdate(
+      userId,
+      { $pull: { [betPath]: { betId: betId } } },
+      { new: true }
+    );
+
+    if (!result) {
+      return res.status(404).json({ message: "User not found." });
+    }
+
+    return res.status(200).json({ message: "Bet successfully removed." });
+  } catch (err) {
+    console.error("Error removing bet:", err);
+    return res
+      .status(500)
+      .json({ message: "Server error while removing bet." });
+  }
+});
+const wuLimiter = rateLimit({
+  windowMs: 24 * 60 * 60 * 1000,
+  max: 2,
+  keyGenerator: (req) => req.body.userEmail || req.ip,
+  message: {
+    message:
+      "Već ste poslali uplatu u poslednja 24h. Ukoliko imate problema, kontaktirajte nas => podrska@insajder.tips",
+  },
+  standardHeaders: true,
+  legacyHeaders: false,
+});
+
+app.post("/addPayment", wuLimiter, async (req, res) => {
+  const { imageUrl, userEmail, userName, paymentType, mtcn } = req.body;
+
+  if (!userEmail || !userName || !paymentType) {
+    return res.status(400).json({
+      message: "Doslo je do greske. Ili je problem do slike ili vaseg naloga.",
+    });
+  }
+  if (paymentType === "uplatnica" && !imageUrl) {
+    return res.status(400).json({
+      message: "Doslo je do greske. Ili je problem do slike ili vaseg naloga.",
+    });
+  }
+  const payment = await mongoose.model("Payment").create({
+    imageUrl,
+    userEmail,
+    userName,
+    paymentType,
+    mtcn,
+    createdAt: new Date(),
+  });
+  res.status(200).json(payment);
 });
 server.listen(1337, () => console.log("Listening on port 1337."));

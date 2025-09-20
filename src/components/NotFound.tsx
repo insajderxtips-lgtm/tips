@@ -5,11 +5,11 @@ const NotFound = () => {
   const navigate = useNavigate();
 
   useEffect(() => {
-    document.title = "Page Not Found | Your App Name";
+    document.title = "Stranica nije pronadjena.";
   }, []);
 
   return (
-    <div className="min-h-screen  flex items-center justify-center p-6">
+    <div className="min-h-screen  mx-auto  flex items-center justify-center p-6">
       <div className="text-center max-w-2xl">
         {/* Floating 404 text with individual animation */}
         <div className="relative mb-12">

@@ -28,10 +28,11 @@ const PREMIUM_FEATURES = {
     title: "Premium Funkcije",
     description: "Otključajte ekskluzivne funkcije sa Premium članstvom.",
     benefits: [
-      "Pristup svim premium savetima",
+      "Pristup svim premium tipovima",
       "Napredne analize",
-      "Ekskluzivni sadržaj",
-      "Personalizovane notifikacije",
+      "Pracenje statistika",
+      "Pronalazac najbolje kvote",
+      "Kalkulator sigurnog kladjenja",
     ],
   },
 };
@@ -97,13 +98,6 @@ export default function PremiumFallback({
             </svg>
             Nadogradi na Premium
           </button>
-
-          <p className="text-sm text-cyan-500/80">
-            Već imate premium?{" "}
-            <span className="text-cyan-400 cursor-pointer hover:underline">
-              Osvežite stranicu
-            </span>
-          </p>
         </div>
       </div>
     </div>

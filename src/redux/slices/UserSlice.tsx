@@ -7,6 +7,8 @@ interface UserState {
   tier: string | null;
   isAuthenticated: boolean;
   defaultCurrency: string | null;
+  isVerified: boolean | null;
+  vc: string | null;
 }
 
 const initialState: UserState = {
@@ -16,6 +18,8 @@ const initialState: UserState = {
   tier: null,
   isAuthenticated: false,
   defaultCurrency: null,
+  isVerified: false,
+  vc: null,
 };
 
 const userSlice = createSlice({
@@ -23,13 +27,15 @@ const userSlice = createSlice({
   initialState,
   reducers: {
     setUser: (state, action: PayloadAction<UserState>) => {
-      const { _id, username, email, tier, defaultCurrency } = action.payload;
+      const { _id, username, email, tier, defaultCurrency, isVerified } =
+        action.payload;
       state._id = _id;
       state.username = username;
       state.email = email;
       state.tier = tier;
       state.isAuthenticated = true;
       state.defaultCurrency = defaultCurrency;
+      state.isVerified = isVerified;
     },
     logout: (state) => {
       state.email = null;

@@ -20,7 +20,7 @@ export default function Sidebar(): React.ReactNode {
       {/* Burger Menu Button (Only visible when sidebar is closed) */}
       {!sidebarVisible && (
         <button
-          className="fixed top-4 left-4 hover:-scale-[0.85] transition-transform duration-500 ease bg-gray-800 p-2 cursor-pointer rounded-md z-90 sm:block opacity-80 border"
+          className="fixed top-4 left-4 hover:-scale-[0.85]  bg-gray-800 p-2 cursor-pointer rounded-md z-90 sm:block opacity-80 border"
           onClick={() => setSidebarVisible(true)}
         >
           <svg
@@ -47,7 +47,7 @@ export default function Sidebar(): React.ReactNode {
         {/* Close Button (Only visible when sidebar is open) */}
         {sidebarVisible && (
           <button
-            className="absolute hover:-scale-[0.85] transition-transform duration-500 top-4 right-4 bg-gray-700 p-2 rounded-md cursor-pointer"
+            className="absolute  top-4 right-4 bg-gray-700 p-2 rounded-md cursor-pointer"
             onClick={() => setSidebarVisible(false)}
           >
             <svg
@@ -207,6 +207,17 @@ export default function Sidebar(): React.ReactNode {
 
         {/* Account & Logout */}
         <div className="w-full flex flex-col gap-2">
+          {currentUser.tier === "free" && (
+            <button
+              className="bg-blue-600 w-full p-2 rounded-md hover:bg-blue-700 flex items-center justify-center gap-2"
+              onClick={() => nav("/kupi")}
+            >
+              <svg className="w-5 h-5" fill="white" viewBox="0 0 24 24">
+                <path d="M12 12a5 5 0 100-10 5 5 0 000 10zm0 2c-4 0-8 2-8 5v3h16v-3c0-3-4-5-8-5z" />
+              </svg>
+              Postani clan
+            </button>
+          )}
           <button
             className="bg-blue-600 w-full p-2 rounded-md hover:bg-blue-700 flex items-center justify-center gap-2"
             onClick={() => nav("/my-account")}
@@ -229,6 +240,9 @@ export default function Sidebar(): React.ReactNode {
             </svg>
             Odjava
           </button>
+          <div className=" text-center text-gray-400 text-sm bg-gray-900/50 rounded-md w-max mx-auto px-4 py-1">
+            podrska@insajder.tips
+          </div>
         </div>
       </div>
     </>

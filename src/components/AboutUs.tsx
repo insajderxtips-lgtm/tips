@@ -10,7 +10,6 @@ export default function AboutUs(): React.ReactNode {
 
   const location = useLocation();
   const expandItem = location.state?.expandItem;
-
   const [openSections, setOpenSections] = useState<{ [key: number]: boolean }>(
     {}
   );
@@ -28,231 +27,115 @@ export default function AboutUs(): React.ReactNode {
     }));
   };
 
-  return (
-    <div className="w-full mx-auto flex flex-col md:text-lg h-max p-2 overflow-hidden  min-h-screen">
-      <div className="flex flex-col items-center overflow-hidden justify-around py-12 relative">
-        <div className="absolute inset-0  z-0" />
-        <img
-          src={footballer}
-          className="w-64 transition-all duration-1000 ease-in-out starting:opacity-10 starting:-translate-x-[10vw]  rounded-full p-2  hover:shadow-purple-900/50 hover:scale-105 cursor-pointer z-10"
-        />
-        <div className="text-3xl starting:-translate-y-[20px] starting:opacity-0 transition-all duration-1000 delay-450 ease testFont bg-clip-text text-transparent bg-gradient-to-r from-blue-400 to-purple-300 mt-6 hover:scale-105">
-          INSAJDER TIM
+  const accordionData = [
+    {
+      title: "O Nama",
+      content:
+        "Insajder je napredna platforma za sportsko klađenje koja korisnicima omogućava efikasno upravljanje bankom, praćenje najboljih kvota na tržištu, izračunavanje arbitražnih opklada, detaljnu analizu statistike i pristup premium i besplatnim tipovima – sve na jednom mestu za pametnije i profitabilnije klađenje.",
+    },
+    {
+      title: "Kako funkcioniše ova platforma?",
+      content:
+        "Insajder platforma omogućava korisnicima pristup različitim funkcijama u zavisnosti od vrste naloga. Besplatni korisnici mogu pratiti samo besplatne tipove. Lite korisnici dobijaju pristup premium tipovima, dok Premium korisnici imaju pun pristup svim funkcijama uključujući bankroll menadžment, pregled kvota, arbitražni kalkulator i detaljne analize.",
+    },
+    {
+      title: "Šta je arbitražno klađenje?",
+      content:
+        "Arbitražno klađenje (sure betting) je strategija koja omogućava siguran profit iskorišćavanjem razlika u kvotama kod različitih kladionica. Premium korisnici imaju pristup našem arbitražnom kalkulatoru koji automatski pronalazi sigurne opklade i izračunava optimalne uloge za maksimalan profit.",
+    },
+    {
+      title: "Kako mogu da upravljam svojim bankrollom na Insajder platformi?",
+      content:
+        "Premium korisnici mogu unositi detalje o svakoj opkladi. Sistem automatski ažurira bankroll i statistiku nakon završetka utakmica, pružajući tačan uvid u stanje računa i pomažući optimizaciju klađenja.",
+    },
+    {
+      title: "Kako mogu da kupim članstvo na Insajder platformi?",
+      content: (
+        <div className="flex flex-col gap-2">
+          <p>Za kupovinu Lite/Premium članstva, možete koristiti:</p>
+          <div className="border-l-2 pl-3 bg-gray-900/20 rounded-sm border-emerald-500/30 hover:border-emerald-400/50 transition-colors">
+            <strong>PayPal / kartica:</strong> Brz i jednostavan proces. Nakon
+            uplate odmah dobijate pristup.
+          </div>
+          <div className="border-l-2 pl-3 bg-gray-900/20 rounded-sm border-emerald-500/30 hover:border-emerald-400/50 transition-colors">
+            <strong>Uplatnica:</strong> Uploadujte sliku uplate, naši admini će
+            vam odobriti pristup u kratkom roku.
+          </div>
+          <div className="border-l-2 pl-3 bg-gray-900/20 rounded-sm border-emerald-500/30 hover:border-emerald-400/50 transition-colors">
+            Ako imate problema, kontaktirajte nas putem Instagrama ili forme na
+            sajtu.
+          </div>
         </div>
+      ),
+    },
+  ];
+
+  return (
+    <div className="w-full mx-auto flex flex-col items-center justify-center p-4 sm:p-6 min-h-screen bg-transparent">
+      <div className="flex flex-col items-center justify-center py-8 sm:py-12 relative z-10">
+        {/* Title with a vibrant gradient and hover effect */}
+        <h1
+          className="raceFont text-4xl sm:text-5xl md:text-6xl text-center 
+               transition-all duration-700 delay-300 ease 
+               bg-clip-text text-transparent bg-gradient-to-r from-blue-300 via-purple-300 to-pink-300 
+                 mt-6 font-extrabold tracking-wide drop-shadow-lg 
+                 hover:scale-105 hover:tracking-widest cursor-pointer
+                 initial-opacity-0 initial-translate-y-[-20px]"
+        >
+          INSAJDERTIPS
+        </h1>
       </div>
 
-      <div className="mt-5 bg-gradient-to-br from-[#0f172a] to-[#1e1b4b] rounded-2xl p-6 w-[90%] md:max-w-[70%] lg:max-w-[60%] mx-auto starting:opacity-0 starting:translate-y-[50vh] transition-all duration-1000 ease delay-700 overflow-hidden shadow-2xl shadow-blue-900/20">
-        <div
-          className="flex flex-col justify-between w-[100%] cursor-pointer select-none p-2 border-b border-blue-800/40 hover:bg-blue-900/10 rounded-lg transition-colors"
-          onClick={() => toggleAccordionItem(0)}
-        >
-          <div className="flex justify-between">
-            <span className="text-blue-100/90 hover:text-blue-50">O Nama</span>
-            <svg
-              xmlns="http://www.w3.org/2000/svg"
-              fill="none"
-              viewBox="0 0 24 24"
-              strokeWidth="1.5"
-              stroke="currentColor"
-              className={`size-6 transition-transform text-blue-400 ${
-                openSections[0] ? "rotate-90" : ""
-              }`}
-            >
-              <path
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                d="m18.75 4.5-7.5 7.5 7.5 7.5m-6-15L5.25 12l7.5 7.5"
-              />
-            </svg>
-          </div>
+      {/* Accordion Container: The main glassmorphism element */}
+      <div
+        className="mt-8 mb-12 bg-white/10 backdrop-blur-xl border border-white/20 
+                  rounded-3xl p-4 sm:p-6 md:p-8 w-full max-w-xl lg:max-w-3xl xl:max-w-4xl mx-auto 
+                  shadow-2xl shadow-black/30 transform transition-all duration-1000 delay-500 ease 
+                  initial-opacity-0 initial-translate-y-[20vh] space-y-4 sm:space-y-5"
+      >
+        {accordionData.map((item, index) => (
           <div
-            className={`${
-              openSections[0] ? "flex" : "hidden"
-            } p-2 border-l-2 border-blue-500/30 bg-gradient-to-r from-blue-900/10 to-transparent m-2 rounded-r-lg`}
+            key={index}
+            className="flex flex-col p-4 rounded-xl cursor-pointer 
+                   bg-white/5 border border-white/10 
+                   hover:bg-white/15 hover:border-white/20 
+                   transition-all duration-300 group"
+            onClick={() => toggleAccordionItem(index)}
           >
-            Insajder je napredna platforma za sportsko klađenje koja korisnicima
-            omogućava efikasno upravljanje bankom, praćenje najboljih kvota na
-            tržištu, izračunavanje arbitražnih opklada, detaljnu analizu
-            statistike i pristup premium i besplatnim tipovima – sve na jednom
-            mestu za pametnije i profitabilnije klađenje.
-          </div>
-        </div>
-
-        <div
-          className="flex flex-col justify-between w-[100%] cursor-pointer select-none p-2 border-b border-blue-800/40 hover:bg-blue-900/10 rounded-lg transition-colors"
-          onClick={() => toggleAccordionItem(1)}
-        >
-          <div className="flex justify-between">
-            <span className="text-blue-100/90 hover:text-blue-50">
-              Kako funkcionise ova platforma?
-            </span>
-            <svg
-              xmlns="http://www.w3.org/2000/svg"
-              fill="none"
-              viewBox="0 0 24 24"
-              strokeWidth="1.5"
-              stroke="currentColor"
-              className={`size-6 transition-transform text-blue-400 ${
-                openSections[1] ? "rotate-90" : ""
-              }`}
-            >
-              <path
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                d="m18.75 4.5-7.5 7.5 7.5 7.5m-6-15L5.25 12l7.5 7.5"
-              />
-            </svg>
-          </div>
-          <div
-            className={`${
-              openSections[1] ? "flex" : "hidden"
-            } p-2 border-l-2 border-blue-500/30 bg-gradient-to-r from-blue-900/10 to-transparent m-2 rounded-r-lg`}
-          >
-            Insajder platforma omogućava korisnicima pristup različitim
-            funkcijama u zavisnosti od vrste naloga. mogu se registrovati i
-            pratiti samo besplatne tipove. Lite korisnici imaju mogućnost
-            registracije i pristupa premium tipovima, dok Premium korisnici
-            dobijaju kompletan paket funkcionalnosti, uključujući bankroll
-            menadžment, pregled najboljih kvota, arbitražni kalkulator, detaljne
-            statistike i analize mečeva.
-          </div>
-        </div>
-
-        <div
-          className="flex flex-col justify-between w-[100%] cursor-pointer select-none p-2 border-b border-blue-800/40 hover:bg-blue-900/10 rounded-lg transition-colors"
-          onClick={() => toggleAccordionItem(2)}
-        >
-          <div className="flex justify-between">
-            <span className="text-blue-100/90 hover:text-blue-50">
-              Šta je arbitražno klađenje?
-            </span>
-            <svg
-              xmlns="http://www.w3.org/2000/svg"
-              fill="none"
-              viewBox="0 0 24 24"
-              strokeWidth="1.5"
-              stroke="currentColor"
-              className={`size-6 transition-transform text-blue-400 ${
-                openSections[2] ? "rotate-90" : ""
-              }`}
-            >
-              <path
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                d="m18.75 4.5-7.5 7.5 7.5 7.5m-6-15L5.25 12l7.5 7.5"
-              />
-            </svg>
-          </div>
-          <div
-            className={`${
-              openSections[2] ? "flex" : "hidden"
-            } p-2 border-l-2 border-blue-500/30 bg-gradient-to-r from-blue-900/10 to-transparent m-2 rounded-r-lg`}
-          >
-            Arbitražno klađenje (sure betting) je strategija koja omogućava
-            igračima da ostvare siguran profit iskorišćavanjem razlika u kvotama
-            kod različitih kladionica. Ova tehnika funkcioniše tako što se
-            postavljaju opklade na sve moguće ishode jednog događaja kod
-            različitih kladionica, pri čemu je dobitak zagarantovan bez obzira
-            na krajnji ishod meča. Kako bi se arbitražno klađenje uspešno
-            primenilo, potrebno je brzo pronaći i izračunati odgovarajuće kvote,
-            što može biti komplikovano bez pravih alata. Zato Premium korisnici
-            na Insajder platformi imaju pristup našem arbitražnom kalkulatoru,
-            koji automatski pronalazi sigurne opklade i izračunava optimalne
-            uloge za maksimalan profit.
-          </div>
-        </div>
-
-        <div
-          className="flex flex-col justify-between w-[100%] cursor-pointer select-none p-2 border-b border-blue-800/40 hover:bg-blue-900/10 rounded-lg transition-colors"
-          onClick={() => toggleAccordionItem(3)}
-        >
-          <div className="flex justify-between">
-            <span className="text-blue-100/90 hover:text-blue-50">
-              Kako mogu da upravljam svojim bankrollom na Insajder platformi?
-            </span>
-            <svg
-              xmlns="http://www.w3.org/2000/svg"
-              fill="none"
-              viewBox="0 0 24 24"
-              strokeWidth="1.5"
-              stroke="currentColor"
-              className={`size-6 transition-transform text-blue-400 ${
-                openSections[3] ? "rotate-90" : ""
-              }`}
-            >
-              <path
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                d="m18.75 4.5-7.5 7.5 7.5 7.5m-6-15L5.25 12l7.5 7.5"
-              />
-            </svg>
-          </div>
-          <div
-            className={`${
-              openSections[3] ? "flex" : "hidden"
-            } p-2 border-l-2 border-blue-500/30 bg-gradient-to-r from-blue-900/10 to-transparent m-2 rounded-r-lg`}
-          >
-            Premium korisnici mogu uneti detalje o svakoj opkladi (kao što su
-            igra, ulog, kvote i vrsta opklade). Nakon što se utakmica završi,
-            sistem automatski ažurira vaš bankroll i statistiku, izračunavajući
-            dobitak ili gubitak na osnovu ishoda igre. Tako ćete uvek imati
-            tačan uvid u stanje svog bankroll-a, dok platforma automatski prati
-            sve vaše uloge i rezultate, omogućavajući vam da optimizujete
-            klađenje i upravljate kapitalom na najbolji način.
-          </div>
-        </div>
-
-        <div
-          className="flex flex-col justify-between w-[100%] cursor-pointer select-none p-2 border-b border-blue-800/40 hover:bg-blue-900/10 rounded-lg transition-colors"
-          onClick={() => toggleAccordionItem(4)}
-        >
-          <div className="flex justify-between">
-            <span className="text-blue-100/90 hover:text-blue-50">
-              Kako mogu da kupim članstvo na Insajder platformi?
-            </span>
-            <svg
-              xmlns="http://www.w3.org/2000/svg"
-              fill="none"
-              viewBox="0 0 24 24"
-              strokeWidth="1.5"
-              stroke="currentColor"
-              className={`size-6 transition-transform text-blue-400 ${
-                openSections[4] ? "rotate-90" : ""
-              }`}
-            >
-              <path
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                d="m18.75 4.5-7.5 7.5 7.5 7.5m-6-15L5.25 12l7.5 7.5"
-              />
-            </svg>
-          </div>
-          <div
-            className={`${
-              openSections[4] ? "flex flex-col gap-y-2" : "hidden"
-            } p-2 border-l-2 border-blue-500/30 bg-gradient-to-r from-blue-900/10 to-transparent m-2 rounded-r-lg`}
-          >
-            Za kupovinu Lite/Premium članstva, možete koristiti nekoliko opcija
-            plačanja: PayPal, karticu ili uplatnicu.
-            <div className="border-l-2 pl-2 bg-gray-900/20 rounded-sm border-emerald-500/30 hover:border-emerald-400/50 transition-colors">
-              PayPal i kartica: Proces je brz i jednostavan. Potrebno je da
-              pratite nekoliko koraka na sajtu i odmah ćete dobiti pristup
-              premium sadržaju nakon potvrde uplate.
+            <div className="flex justify-between items-center text-slate-100 group-hover:text-white">
+              <span className="text-base sm:text-lg font-semibold group-hover:font-bold transition-all duration-200">
+                {item.title}
+              </span>
+              <svg
+                xmlns="http://www.w3.org/2000/svg"
+                className={`size-6 sm:size-7 text-blue-300 group-hover:text-blue-200 transform transition-transform duration-300 ${
+                  openSections[index] ? "rotate-90" : ""
+                }`}
+                fill="none"
+                viewBox="0 0 24 24"
+                stroke="currentColor"
+                strokeWidth="2"
+              >
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  d="m8.25 4.5 7.5 7.5-7.5 7.5"
+                />
+              </svg>
             </div>
-            <div className="border-l-2 pl-2 bg-gray-900/20 rounded-sm border-emerald-500/30 hover:border-emerald-400/50 transition-colors">
-              Uplatnica: Ako se odlučite za uplatu putem uplatnice, potrebno je
-              da izvršite uplatu i zatim uploadujete sliku uplatnice na naš
-              sajt. Nakon što primimo sliku, naši administratori će u što kraćem
-              roku ažurirati vaš nalog i omogućiti vam pristup svim premium
-              funkcijama.
-            </div>
-            <div className="border-l-2 pl-2 bg-gray-900/20 rounded-sm border-emerald-500/30 hover:border-emerald-400/50 transition-colors">
-              Ukoliko imate bilo kakvih problema ili nedoumica tokom procesa
-              kupovine, možete nas kontaktirati putem Instagram-a ili direktno
-              putem kontakt forme na sajtu, i rado ćemo vam pomoći.
+            <div
+              className={`${
+                openSections[index]
+                  ? "max-h-96 opacity-100 pt-3"
+                  : "max-h-0 opacity-0 pt-0"
+              } text-slate-200 text-sm sm:text-base mt-2 
+             overflow-hidden transition-all duration-500 ease-in-out
+             border-l-2 border-blue-400/50 pl-4`}
+            >
+              {item.content}
             </div>
           </div>
-        </div>
+        ))}
       </div>
     </div>
   );
