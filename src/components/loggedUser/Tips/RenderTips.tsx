@@ -49,7 +49,7 @@ const RenderTips: React.FC<RenderTipsProps> = ({ tier }) => {
 
       try {
         // Fetches the tips free or premium, dynamically, server checks JWT to make sure the user has that role.
-        const response = await fetch(`http://localhost:1337/tips/${tier}`, {
+        const response = await fetch(`/tips/${tier}`, {
           headers: {
             Authorization: `Bearer ${JWT}`,
           },
