@@ -19,7 +19,7 @@ export default function TipsHistory() {
   >("all");
   const [tipStats, setTipStats] = useState([]);
   useEffect(() => {
-    fetch("http://localhost:1337/tipStats").then((res) => {
+    fetch("/tipStats").then((res) => {
       res.json().then((json) => {
         setTipStats([...json]);
       });

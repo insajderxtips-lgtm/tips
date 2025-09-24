@@ -13,9 +13,10 @@ const { v4: uuidv4 } = require("uuid");
 app.use(express.json());
 app.use(cors());
 const server = http.createServer(app);
+
 const io = socketIo(server, {
   cors: {
-    origin: "http://localhost:5173", // Must be an object
+    origin: "https://insajder.tips",
     methods: ["GET", "POST"],
   },
 });
@@ -844,7 +845,7 @@ app.post("/requestPasswordResetCode", async (req, res) => {
   await user.save();
 
   // 3. Compose reset link
-  const resetLink = `http://localhost:5173/#/reset-password?token=${token}`;
+  const resetLink = `http://insajder.tips/#/reset-password?token=${token}`;
 
   // 4. Send email with link
   const transport = nodemailer.createTransport({

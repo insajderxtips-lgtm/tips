@@ -87,7 +87,7 @@ export default function Login({ mode }: { mode: string }): React.ReactNode {
               defaultCurrency: formData.defaultCurrency,
             };
 
-      const res = await fetch(`http://localhost:1337/${endpoint}`, {
+      const res = await fetch(`/${endpoint}`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(body),
@@ -106,7 +106,7 @@ export default function Login({ mode }: { mode: string }): React.ReactNode {
       const data = await res.json();
       localStorage.setItem("insajder_token", data.token);
 
-      const userRes = await fetch("http://localhost:1337/user", {
+      const userRes = await fetch("/user", {
         headers: { Authorization: `Bearer ${data.token}` },
       });
 

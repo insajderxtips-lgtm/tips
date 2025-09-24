@@ -18,16 +18,13 @@ export default function ResetPassword({ view, setView }) {
       );
       return;
     }
-    const response = await fetch(
-      "http://localhost:1337/requestPasswordResetCode",
-      {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({ email }),
-      }
-    );
+    const response = await fetch("/requestPasswordResetCode", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({ email }),
+    });
 
     const data = await response.json();
 

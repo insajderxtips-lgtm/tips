@@ -209,7 +209,7 @@ export function StepTwo() {
     setStatus({ success: null, message: "" });
 
     try {
-      const response = await fetch("http://localhost:1337/addPayment", {
+      const response = await fetch("/addPayment", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -668,7 +668,7 @@ export function StepOne() {
       }
 
       // 2. Save to your backend
-      const backendResponse = await fetch("http://localhost:1337/addPayment", {
+      const backendResponse = await fetch("/addPayment", {
         method: "POST",
         headers: {
           "Content-Type": "application/json",

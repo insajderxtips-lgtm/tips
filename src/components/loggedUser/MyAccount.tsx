@@ -103,7 +103,7 @@ export default function MyAccount(): React.ReactNode {
       return;
     }
 
-    fetch("http://localhost:1337/updateName", {
+    fetch("/updateName", {
       method: "PUT",
       headers: {
         "Content-Type": "application/json",

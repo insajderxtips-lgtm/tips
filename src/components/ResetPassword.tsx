@@ -34,7 +34,7 @@ const ResetPassword: React.FC = () => {
     }
 
     // 🔧 Dummy API endpoint
-    const api = "http://localhost:1337/resetPassword";
+    const api = "/resetPassword";
 
     try {
       const res = await fetch(api, {

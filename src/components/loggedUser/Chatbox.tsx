@@ -26,7 +26,8 @@ export default function Chatbox(): React.ReactNode {
     document.title = "Insajder | Početna";
 
     // Initialize socket connection
-    socketRef.current = io("http://localhost:1337", {
+    // This is the corrected code
+    socketRef.current = io({
       auth: {
         token: userData.token,
       },
