@@ -78,13 +78,6 @@ export default function Chatbox(): React.ReactNode {
         <h1 className="text-3xl md:text-4xl font-bold bg-clip-text text-transparent bg-gradient-to-r from-cyan-300 to-blue-400 drop-shadow-sm">
           Dobrodošao nazad, {userData?.username || "Korisniče"}.
         </h1>
-        <div className="flex items-center justify-center gap-2 text-sm text-cyan-300 mt-2">
-          <div className="relative flex h-3 w-3">
-            <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-green-400 opacity-75"></span>
-            <span className="relative inline-flex rounded-full h-3 w-3 bg-green-500"></span>
-          </div>
-          <span>{onlineUsers.length} Korisnika Online</span>
-        </div>
       </div>
 
       {/* Chat Container with NEW BORDER PULSE ANIMATION */}

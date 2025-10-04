@@ -249,7 +249,7 @@ export default function MyAccount(): React.ReactNode {
             <h3 className="text-xl font-semibold text-white">Ostalo</h3>
             <p className="text-slate-400 mt-1 mb-6 text-sm"></p>
             <div className="flex flex-col sm:flex-row gap-4">
-              {currentUser.tier != "FREE" && (
+              {currentUser?.tier != "free" && (
                 <button
                   onClick={resetStatistics}
                   className="flex-1 bg-amber-600/80 hover:bg-amber-600 text-white font-semibold py-2.5 rounded-lg transition-all"
