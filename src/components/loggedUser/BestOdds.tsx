@@ -179,129 +179,64 @@ export default function BestOdds() {
   };
 
   return (
-    <div className="flex flex-col items-center justify-center min-h-screen w-full">
-      <div className="max-w-4xl bg-gray-950 border  p-4 rounded-xl shadow-xl space-y-8 w-[90%] mx-auto">
-        <div className="flex flex-col gap-3 w-full relative group">
-          {/* Search Input */}
-          <div className="relative w-full">
-            <input
-              type="text"
-              placeholder="Pretraga meča..."
-              onChange={(e) => setSearchQuery(e.target.value)}
-              className={`
-        w-full bg-gray-800 border-2 border-gray-700/50
-        rounded-xl py-4 px-6 text-lg text-white
-        placeholder-gray-500
-        focus:outline-none focus:border-cyan-400/50
-        focus:ring-4 focus:ring-cyan-900/30
-        hover:border-gray-600
-        transition-all duration-300
-        backdrop-blur-sm
-        shadow-lg shadow-black/10
-        group-hover:shadow-cyan-500/5
-        pr-16
-      `}
-            />
-
-            {/* Search Icon */}
-            <svg
-              className="absolute right-5 top-1/2 -translate-y-1/2 h-6 w-6 text-gray-500 group-focus-within:text-cyan-400 transition-colors"
-              fill="none"
-              stroke="currentColor"
-              viewBox="0 0 24 24"
-            >
-              <path
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                strokeWidth={2}
-                d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"
-              />
-            </svg>
-          </div>
-
-          {/* Find Button */}
-          <button
-            onClick={find}
-            className={`
-      w-full bg-gradient-to-r from-cyan-500 to-blue-600
-      hover:from-cyan-400 hover:to-blue-500
-      text-white font-semibold
-      py-4 px-8 rounded-xl
-      transition-all duration-300
-      hover:scale-[1.02] active:scale-[0.98]
-      shadow-xl hover:shadow-2xl
-      shadow-cyan-500/20 hover:shadow-cyan-500/30
-      flex items-center justify-center gap-2
-    `}
-          >
-            <svg
-              className="w-5 h-5 text-white"
-              fill="none"
-              stroke="currentColor"
-              viewBox="0 0 24 24"
-            >
-              <path
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                strokeWidth={2}
-                d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"
-              />
-            </svg>
-            Pronađi
-          </button>
-        </div>
-
+    <div className="flex flex-col items-center justify-center w-full min-h-screen p-4 bg-gray-950 relative font-sans">
+      {/* Main Content Card */}
+      <div className="w-full max-w-5xl bg-gray-900/50 backdrop-blur-xl border border-cyan-500/20 rounded-3xl shadow-2xl shadow-cyan-500/10 flex flex-col">
+        {/* Stage 1: Search for a Game */}
         {!selectedGame ? (
-          <div className="space-y-4 overflow-y-auto max-h-[600px] p-4">
-            <div className="space-y-3">
+          <div className="p-6 sm:p-8">
+            {/* Search Input and Button */}
+            <div className="flex flex-col sm:flex-row gap-3 w-full relative group">
+              <div className="relative w-full">
+                <input
+                  type="text"
+                  placeholder="Pretraži meč po timovima"
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                  className="w-full bg-gray-800/60 border-2 border-gray-700 rounded-xl py-4 pl-6 pr-14 text-lg text-white placeholder-gray-500 focus:outline-none focus:border-cyan-400 focus:ring-4 focus:ring-cyan-400/20 hover:border-gray-600 transition-all duration-300 shadow-inner"
+                />
+                <svg
+                  className="absolute right-5 top-1/2 -translate-y-1/2 h-6 w-6 text-gray-500 group-focus-within:text-cyan-400 transition-colors"
+                  fill="none"
+                  stroke="currentColor"
+                  viewBox="0 0 24 24"
+                >
+                  <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    strokeWidth={2}
+                    d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"
+                  />
+                </svg>
+              </div>
+              <button
+                onClick={find}
+                className="w-full sm:w-auto bg-gradient-to-r from-cyan-500 to-blue-600 hover:from-cyan-400 hover:to-blue-500 text-white font-semibold py-4 px-8 rounded-xl transition-all duration-300 transform hover:scale-105 active:scale-95 shadow-lg hover:shadow-xl shadow-cyan-500/20 hover:shadow-cyan-400/30 flex items-center justify-center gap-2"
+              >
+                <span>Pronađi</span>
+              </button>
+            </div>
+
+            {/* Upcoming Games List */}
+            <div className="mt-8 space-y-3 overflow-y-auto max-h-[65vh] pr-2 scrollbar-thin scrollbar-thumb-cyan-700/50 scrollbar-track-transparent">
               {upcomingGames.map((game, index) => (
                 <div
                   key={index}
                   onClick={() => selectGameById(index)}
-                  className={`
-        relative overflow-hidden
-        bg-gradient-to-br from-gray-800/90 to-gray-900/80
-        hover:from-gray-700/90 hover:to-gray-800/80
-        border border-gray-700/50
-        rounded-xl p-5 cursor-pointer
-        shadow-lg shadow-black/10
-        transition-all duration-300
-        hover:shadow-cyan-500/10 hover:border-cyan-500/30
-        hover:scale-[1.01] active:scale-[0.99]
-        group
-      `}
+                  className="relative bg-gray-800/70 hover:bg-gray-800/90 border border-gray-700/50 rounded-2xl p-5 cursor-pointer shadow-lg transition-all duration-300 hover:border-cyan-500/30 hover:shadow-cyan-500/10  group"
                 >
-                  {/* Glow effect on hover */}
-                  <div className="absolute inset-0 bg-cyan-500/10 opacity-0 group-hover:opacity-100 transition-opacity duration-500 rounded-xl" />
-
-                  <div className="relative z-10 flex flex-col md:flex-row md:items-center md:justify-between gap-4">
-                    {/* Teams */}
+                  <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
                     <div className="flex-1">
-                      <div className="flex items-center gap-3">
-                        <span className="text-xl font-bold text-white group-hover:text-cyan-400 transition-colors">
-                          {game.home}
-                        </span>
-                        <span className="px-2 py-1 bg-gray-700/50 text-sm rounded-md text-gray-300">
+                      <div className="flex items-center gap-4 text-xl font-bold text-white">
+                        <span>{game.home}</span>
+                        <span className="px-2 py-1 text-xs bg-gray-700/50 rounded-md text-gray-300">
                           vs
                         </span>
-                        <span className="text-xl font-bold text-white group-hover:text-cyan-400 transition-colors">
-                          {game.away}
-                        </span>
+                        <span>{game.away}</span>
                       </div>
-
-                      {/* League name (if available) */}
-                      {game.league && (
-                        <p className="mt-1 text-sm text-gray-400">
-                          {game.league}
-                        </p>
-                      )}
                     </div>
-
-                    {/* Date */}
-                    <div className="flex items-center gap-2">
+                    <div className="flex items-center gap-3 text-sm font-medium text-gray-300 border-t md:border-t-0 md:border-l border-gray-700 pt-3 md:pt-0 md:pl-6">
                       <svg
-                        xmlns="http://www.w3.org/2000/svg"
-                        className="h-5 w-5 text-cyan-500/80"
+                        className="h-5 w-5 text-cyan-500"
                         fill="none"
                         viewBox="0 0 24 24"
                         stroke="currentColor"
@@ -313,7 +248,7 @@ export default function BestOdds() {
                           d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"
                         />
                       </svg>
-                      <span className="text-sm font-medium text-gray-300">
+                      <span>
                         {new Intl.DateTimeFormat("sr-RS", {
                           day: "2-digit",
                           month: "2-digit",
@@ -329,61 +264,77 @@ export default function BestOdds() {
             </div>
           </div>
         ) : (
-          <div className=" w-full">
-            <div className="flex w-full my-2">
-              <button
-                className="bg-gray-700 text-white py-2 px-6 rounded-lg hover:bg-gray-600 transition duration-200 ease-in-out cursor-pointer"
-                onClick={handleBackButtonClick}
-              >
-                Nazad
-              </button>
-              {Object.keys(gameOdds).length > 0 && (
-                <div className="relative flex items-center w-full ml-4">
+          /* Stage 2: View Odds for a Selected Game */
+          <div className="flex flex-col h-full">
+            {/* Header */}
+            <div className="p-6 sm:p-8 border-b border-cyan-500/20">
+              <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+                <div>
+                  <button
+                    className="flex items-center gap-2 text-sm text-cyan-300 hover:text-white transition-colors mb-2"
+                    onClick={handleBackButtonClick}
+                  >
+                    <svg
+                      className="w-5 h-5"
+                      fill="none"
+                      stroke="currentColor"
+                      viewBox="0 0 24 24"
+                    >
+                      <path
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                        strokeWidth={2}
+                        d="M10 19l-7-7m0 0l7-7m-7 7h18"
+                      ></path>
+                    </svg>
+                    <span>Svi Mečevi</span>
+                  </button>
+                  <h2 className="text-2xl md:text-3xl font-bold text-white">
+                    {selectedGame.home}{" "}
+                    <span className="text-cyan-400">vs</span>{" "}
+                    {selectedGame.away}
+                  </h2>
+                </div>
+                <div className="relative w-full sm:w-72">
                   <input
                     onChange={(e) => setTipSearch(e?.target?.value)}
                     type="text"
-                    placeholder="Pronađi tip (Primer: 1&D2+, GG3+)"
+                    placeholder="Pronađi tip (npr. GG3+)"
                     value={tipSearch}
-                    className="px-3 py-2 text-base placeholder-gray-500 text-white rounded-lg border w-full mr-1 pr-10"
+                    className="w-full bg-gray-800/60 border-2 border-gray-700 rounded-xl py-2 px-4 text-white placeholder-gray-500 focus:outline-none focus:border-cyan-400"
                   />
                   {tipSearch && (
                     <button
                       onClick={() => setTipSearch("")}
-                      className="absolute right-3 text-gray-400 hover:text-white text-2xl"
+                      className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-white text-2xl"
                     >
-                      ×
+                      &times;
                     </button>
                   )}
                 </div>
-              )}
+              </div>
             </div>
-            <div className="text-3xl font-extrabold text-white mb-6 flex w-full justify-between items-center">
-              {selectedGame.home} vs {selectedGame.away}
-            </div>
-            <div className=" mt-6 max-h-[600px] overflow-auto shadow-lg rounded-xl bg-gray-800">
+
+            {/* Odds Table */}
+            <div className="flex-1 overflow-auto">
               {loading ? (
-                <div className="p-4 h-full w-full flex justify-center items-center loader">
+                <div className="p-10 text-center text-cyan-300">
                   Učitavanje kvota...
                 </div>
               ) : (
-                <div className="max-h-[500px] overflow-y-auto rounded-xl shadow-2xl shadow-cyan-900/20">
-                  <table className="min-w-full bg-gray-900 backdrop-blur-sm border-collapse">
-                    <thead className="sticky top-0 z-10">
-                      <tr className="relative">
+                <div className="max-h-[65vh] overflow-y-auto scrollbar-thin scrollbar-thumb-cyan-700/50 scrollbar-track-transparent">
+                  <table className="min-w-full text-sm text-left">
+                    <thead className="sticky top-0 bg-gray-900/60 backdrop-blur-md z-10">
+                      <tr>
                         {["Tip", "Soccer", "Mozzart", "MaxBet", "Oktagon"].map(
                           (header, idx) => (
                             <th
                               key={idx}
-                              className={`
-              px-6 py-4 text-lg font-bold tracking-wide
-              ${idx === 0 ? "text-cyan-400" : ""}
-              ${idx === 1 ? "text-green-400" : ""}
-              ${idx === 2 ? "text-orange-400" : ""}
-              ${idx === 3 ? "text-green-300" : ""}
-              bg-gray-900/80 backdrop-blur-sm
-              border-b-2 border-gray-700
-              hover:bg-gray-800/50 transition-colors duration-300
-            `}
+                              className={`px-6 py-4 font-semibold tracking-wider ${
+                                idx === 0
+                                  ? "text-left text-cyan-300"
+                                  : "text-center text-gray-300"
+                              }`}
                             >
                               {header}
                             </th>
@@ -391,29 +342,20 @@ export default function BestOdds() {
                         )}
                       </tr>
                     </thead>
-
                     <tbody className="divide-y divide-gray-700/50">
                       {Object.keys(filteredOdds).map((category) => (
-                        <React.Fragment key={category}>
-                          {/* Category Header Row */}
+                        <>
                           <tr
                             onClick={() => toggleCategory(category)}
-                            className=" group cursor-pointer hover:bg-gray-800/40 transition-colors duration-200"
+                            className="bg-gray-800/40 hover:bg-gray-800/60 cursor-pointer transition-colors"
                           >
-                            <td colSpan={4} className="px-6 py-4">
-                              <div
-                                className={`flex items-center space-x-3 ${
-                                  expandedCategory === category
-                                    ? "text-cyan-400"
-                                    : "text-gray-200"
-                                }`}
-                              >
+                            <td colSpan={5} className="px-6 py-3">
+                              <div className="flex items-center gap-3 font-semibold text-cyan-300">
                                 <svg
-                                  xmlns="http://www.w3.org/2000/svg"
-                                  className={`h-5 w-5 transform transition-all duration-300 ${
+                                  className={`h-5 w-5 transform transition-transform duration-300 ${
                                     expandedCategory === category
-                                      ? "-rotate-90"
-                                      : ""
+                                      ? "rotate-0"
+                                      : "-rotate-90"
                                   }`}
                                   viewBox="0 0 20 20"
                                   fill="currentColor"
@@ -424,72 +366,62 @@ export default function BestOdds() {
                                     clipRule="evenodd"
                                   />
                                 </svg>
-                                <span className="text-lg font-semibold tracking-tight">
-                                  {filteredOdds[category].name}
-                                </span>
+                                <span>{filteredOdds[category].name}</span>
                               </div>
                             </td>
                           </tr>
-
-                          {/* Expanded Content */}
                           {expandedCategory === category &&
                             Object.values(filteredOdds[category]).map(
-                              (bet: any, idx) => {
+                              (bet, idx) => {
+                                if (!bet.reference || bet.reference === "name")
+                                  return null;
                                 const odds = {
-                                  soccerBet: bet.soccerBet ?? 0,
-                                  mozzartBet: bet.mozzartBet ?? 0,
-                                  maxBet: bet.maxBet ?? 0,
-
-                                  oktagon: bet.oktagon ?? 0,
+                                  soccerBet: bet.soccerBet || 0,
+                                  mozzartBet: bet.mozzartBet || 0,
+                                  maxBet: bet.maxBet || 0,
+                                  oktagon: bet.oktagon || 0,
                                 };
                                 const highestOdd = Math.max(
                                   ...Object.values(odds)
                                 );
-
                                 return (
-                                  bet.reference &&
-                                  bet.reference !== "name" && (
-                                    <tr
-                                      key={idx}
-                                      className="hover:bg-gray-800/20 even:bg-gray-900/10  transition-colors duration-150"
+                                  <tr
+                                    key={idx}
+                                    className="hover:bg-gray-800/20 transition-colors"
+                                  >
+                                    <td
+                                      onClick={() => addToSlip(bet)}
+                                      className="px-6 py-3 font-semibold text-cyan-300 cursor-pointer hover:text-white sticky left-0 bg-gray-900/50"
                                     >
-                                      <td
-                                        onClick={() => addToSlip(bet)}
-                                        className="px-6 py-3 text-center font-medium text-cyan-300 cursor-pointer sticky left-0  hover:bg-gray-800/70 bg-gray-800/50 backdrop-blur-sm z-10"
-                                      >
-                                        {bet.reference}
-                                      </td>
-
-                                      {Object.entries(odds).map(
-                                        ([key, value]) => (
-                                          <td
-                                            key={key}
-                                            className={`
-                          px-6 py-3 text-center text-lg font-medium
-                          ${
-                            value === highestOdd
-                              ? "bg-green-600/40 text-green-200"
-                              : "text-gray-300"
-                          }
-                          transition-all duration-200
-                        `}
+                                      {bet.reference}
+                                    </td>
+                                    {Object.entries(odds).map(
+                                      ([key, value]) => (
+                                        <td
+                                          key={key}
+                                          className="px-6 py-3 text-center"
+                                        >
+                                          <span
+                                            className={`inline-block min-w-[50px] px-3 py-1 rounded-md text-lg font-mono font-semibold transition-all ${
+                                              value === highestOdd && value > 0
+                                                ? "bg-green-500/20 text-green-300 shadow-sm shadow-green-500/20"
+                                                : "text-gray-300"
+                                            }`}
                                           >
-                                            <span className="inline-block min-w-[40px] px-2 py-1 rounded-md">
-                                              {value || (
-                                                <span className="text-gray-500">
-                                                  -
-                                                </span>
-                                              )}
-                                            </span>
-                                          </td>
-                                        )
-                                      )}
-                                    </tr>
-                                  )
+                                            {value || (
+                                              <span className="text-gray-600">
+                                                -
+                                              </span>
+                                            )}
+                                          </span>
+                                        </td>
+                                      )
+                                    )}
+                                  </tr>
                                 );
                               }
                             )}
-                        </React.Fragment>
+                        </>
                       ))}
                     </tbody>
                   </table>
@@ -499,24 +431,38 @@ export default function BestOdds() {
           </div>
         )}
       </div>
-      <div className={`absolute bottom-0 right-2 w-80`}>
-        {/* Toggle Button (unchanged) */}
+
+      {/* Floating Bet Slip */}
+      <div
+        className={`fixed bottom-0 right-0 sm:right-4 w-full sm:w-96 z-50 transition-transform duration-500 ease-in-out ${
+          isSlipVisible
+            ? "translate-y-0"
+            : "translate-y-[calc(100%-4rem)] sm:translate-y-[calc(100%-3.5rem)]"
+        }`}
+      >
         <button
           onClick={() => setIsSlipVisible(!isSlipVisible)}
-          className={`
-      w-full  py-2 px-4 flex items-center justify-between
-      bg-gray-800 hover:bg-gray-700 rounded-t-md
-      border border-gray-700/50 border-b-0
-      transition-colors duration-200
-    `}
+          className="w-full py-3 sm:py-2.5 px-4 flex items-center justify-between bg-gradient-to-r from-cyan-600 to-blue-700 hover:from-cyan-500 hover:to-blue-600 sm:rounded-t-xl shadow-lg"
         >
-          <span className="text-cyan-400 font-medium">
+          <span className="text-white font-bold text-lg flex items-center gap-2">
+            <svg
+              className="w-6 h-6"
+              fill="none"
+              stroke="currentColor"
+              viewBox="0 0 24 24"
+            >
+              <path
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                strokeWidth={2}
+                d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-3 7h3m-3 4h3m-6-4h.01M9 16h.01"
+              ></path>
+            </svg>
             Tiket ({betslip.length})
           </span>
           <svg
-            xmlns="http://www.w3.org/2000/svg"
-            className={`h-5 w-5 text-cyan-400 transform transition-transform duration-200 ${
-              isSlipVisible ? "rotate-180" : ""
+            className={`h-6 w-6 text-white transform transition-transform duration-300 ${
+              isSlipVisible ? "" : "rotate-180"
             }`}
             viewBox="0 0 20 20"
             fill="currentColor"
@@ -528,149 +474,94 @@ export default function BestOdds() {
             />
           </svg>
         </button>
-
-        {/* Betslip Content */}
-        {isSlipVisible && (
-          <div className="bg-gray-900 rounded-b-md rounded-tl-md border border-gray-700/50">
-            <div className="max-h-96 overflow-y-auto p-2 space-y-3">
-              {betslip.length === 0 ? (
-                <div className="text-center py-6 text-gray-500 italic">
-                  Nema opklada. Dodajte opkladu tako sto pretrazite mec i
-                  kliknete na tip.
-                </div>
-              ) : (
-                <>
-                  {betslip.map((bet, index) => (
-                    <div
-                      key={index}
-                      className={`
-                  relative overflow-hidden
-                  bg-gradient-to-br from-gray-800/90 to-gray-900/80
-                  border border-gray-700/50
-                  rounded-xl p-4
-                  shadow-lg shadow-black/10
-                  transition-all duration-300
-                  hover:shadow-cyan-500/10 hover:border-cyan-500/30
-                  group
-                `}
+        <div className="bg-gray-900/80 backdrop-blur-xl border-x border-b border-cyan-500/20 sm:rounded-b-xl max-h-[70vh] flex flex-col">
+          <div className="flex-1 overflow-y-auto p-3 space-y-2">
+            {betslip.length === 0 ? (
+              <div className="text-center py-10 text-gray-500">
+                Tiket je prazan.
+              </div>
+            ) : (
+              betslip.map((bet, index) => (
+                <div
+                  key={index}
+                  className="bg-gray-800/70 p-3 rounded-lg border border-gray-700/50"
+                >
+                  <div className="flex justify-between items-start">
+                    <div className="flex-1">
+                      <p className="font-semibold text-cyan-300 text-sm">
+                        {bet.home} vs {bet.away}
+                      </p>
+                      <p className="text-lg font-bold text-white mt-1">
+                        {bet.tip}
+                      </p>
+                    </div>
+                    <button
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        removeFromSlip(bet);
+                      }}
+                      className="p-1 text-gray-500 hover:text-red-400 transition-colors"
                     >
-                      <div className="absolute inset-0 bg-cyan-500/5 opacity-0 group-hover:opacity-100 transition-opacity duration-500 rounded-xl" />
-
-                      <div className="relative z-10">
-                        <div className="flex justify-between items-start">
-                          <div className="flex-1">
-                            <div className="flex items-center gap-2">
-                              <span className="font-medium text-cyan-400">
-                                {bet.home}
-                              </span>
-                              <span className="text-gray-400 text-xs">vs</span>
-                              <span className="font-medium text-cyan-400">
-                                {bet.away}
-                              </span>
-                            </div>
-                            <div className="mt-1 flex items-center gap-2">
-                              <span className="px-2 py-1 bg-gray-700/50 text-xs rounded-md text-gray-300">
-                                {bet.tip}
-                              </span>
-                            </div>
-                          </div>
-
-                          <button
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              removeFromSlip(bet);
-                            }}
-                            className={`
-                        p-2 rounded-lg
-                        text-gray-400 hover:text-red-400
-                        hover:bg-gray-700/50
-                        transition-all duration-200
-                      `}
-                            aria-label="Remove bet"
-                          >
-                            <svg
-                              xmlns="http://www.w3.org/2000/svg"
-                              className="h-5 w-5"
-                              fill="none"
-                              viewBox="0 0 24 24"
-                              stroke="currentColor"
-                            >
-                              <path
-                                strokeLinecap="round"
-                                strokeLinejoin="round"
-                                strokeWidth={1.5}
-                                d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"
-                              />
-                            </svg>
-                          </button>
-                        </div>
-
-                        {/* Odds Comparison - Minimalist Version */}
-                        <div className="mt-3 flex flex-wrap gap-1">
-                          {Object.entries(bet.odds).map(([bookie, odd]) => (
-                            <div
-                              key={bookie}
-                              className={`text-xs px-2 py-1 rounded ${
-                                odd === Math.max(...Object.values(bet.odds))
-                                  ? "bg-green-900/30 text-green-400"
-                                  : "bg-gray-800/30 text-gray-400"
-                              }`}
-                            >
-                              {bookie}: <span className="font-mono">{odd}</span>
-                            </div>
-                          ))}
-                        </div>
-                      </div>
-                    </div>
-                  ))}
-
-                  {/* Best Parlay Summary */}
-                  <div className="sticky bottom-0  backdrop-blur-sm border-t border-gray-700 p-3 z-50">
-                    <div className="text-sm text-cyan-400 mb-1">
-                      Najveca kvota:
-                    </div>
-                    <div className="grid grid-cols-4 gap-1 text-xs">
-                      {Object.keys(betslip[0].odds).map((bookie) => {
-                        const totalOdds = betslip.reduce(
-                          (total, bet) => total * bet.odds[bookie],
-                          1
-                        );
-                        const isBest =
-                          totalOdds ===
-                          Math.max(
-                            ...Object.keys(betslip[0].odds).map((b) =>
-                              betslip.reduce(
-                                (total, bet) => total * bet.odds[b],
-                                1
-                              )
-                            )
-                          );
-
-                        return (
-                          <div
-                            key={bookie}
-                            className={`p-1 rounded text-center ${
-                              isBest
-                                ? "bg-green-900/40 text-green-300"
-                                : "bg-gray-900/20 text-gray-400"
-                            }`}
-                          >
-                            <div className="font-mono text-sm">
-                              {totalOdds.toFixed(2)}
-                            </div>
-                            <div className="text-[0.6rem] opacity-80">
-                              {bookie}
-                            </div>
-                          </div>
-                        );
-                      })}
-                    </div>
+                      <svg
+                        className="h-5 w-5"
+                        fill="none"
+                        viewBox="0 0 24 24"
+                        stroke="currentColor"
+                      >
+                        <path
+                          strokeLinecap="round"
+                          strokeLinejoin="round"
+                          strokeWidth={2}
+                          d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"
+                        />
+                      </svg>
+                    </button>
                   </div>
-                </>
-              )}
-            </div>
+                </div>
+              ))
+            )}
           </div>
-        )}
+          {betslip.length > 0 && (
+            <div className="border-t border-cyan-500/20 p-4 bg-gray-900/50">
+              <p className="text-sm text-cyan-300 mb-2">
+                Najbolja ukupna kvota:
+              </p>
+              <div className="grid grid-cols-2 md:grid-cols-4 gap-2 text-xs">
+                {Object.keys(betslip[0].odds).map((bookie) => {
+                  const totalOdds = betslip.reduce(
+                    (total, bet) => total * (bet.odds[bookie] || 1),
+                    1
+                  );
+                  const isBest =
+                    totalOdds ===
+                    Math.max(
+                      ...Object.keys(betslip[0].odds).map((b) =>
+                        betslip.reduce(
+                          (total, bet) => total * (bet.odds[b] || 1),
+                          1
+                        )
+                      )
+                    );
+                  return (
+                    <div
+                      key={bookie}
+                      className={`p-2 rounded-md text-center ${
+                        isBest
+                          ? "bg-green-500/20 text-green-300"
+                          : "bg-gray-800/50 text-gray-400"
+                      }`}
+                    >
+                      <div className="font-mono text-base font-bold">
+                        {totalOdds.toFixed(2)}
+                      </div>
+                      <div className="text-[0.65rem] opacity-80">{bookie}</div>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+          )}
+        </div>
       </div>
     </div>
   );

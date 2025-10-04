@@ -128,9 +128,8 @@ export default function Homepage(): React.ReactNode {
                     Kompletna analiza
                   </h3>
                   <p className="text-gray-300">
-                    Naši tipseri su veoma iskusni u sportovima i analiziraju
-                    svaku utakmicu detaljno, na Vama je samo da postavite
-                    opkladu.
+                    Svaka utakmica je detaljno analizirana, na Vama je samo da
+                    postavite opkladu.
                   </p>
                 </div>
               </div>
@@ -272,8 +271,8 @@ export default function Homepage(): React.ReactNode {
                     Liverpool vs Manchester City
                   </h3>
                   <div className="flex flex-col sm:flex-row justify-between text-sm text-gray-300 mt-1 gap-1">
-                    <span>Premier League • 10.03.2024</span>
-                    <span>20:45</span>
+                    <span>Premier League • 21.09.2025</span>
+                    <span>17:30</span>
                   </div>
                 </div>
 
@@ -284,39 +283,38 @@ export default function Homepage(): React.ReactNode {
                       <span className="font-medium text-white">TIP:</span>
                     </div>
                     <div className="text-lg font-bold text-center py-2 bg-gray-900 rounded">
-                      Manchester City 2 @ 1.85
+                      Manchester City X @ 3.90
                     </div>
                     <div className="text-xs text-gray-400 mt-2">
-                      Najvisu kvotu ima MozzartBet.
+                      Najvisu kvotu ima MozzartBet. [LINK]
                     </div>
                   </div>
 
-                  {/* Analysis */}
-                  {/* Analysis */}
                   <div>
                     <h4 className="text-lg font-semibold text-white mb-3">
                       KLJUČNA ANALIZA:
                     </h4>
-                    <ul className="space-y-3 text-gray-300 blur-sm">
-                      {" "}
-                      {/* Blur only applied here */}
+                    {/* Added `select-none` to prevent copying */}
+                    <ul className="space-y-3 text-gray-300 blur-sm select-none">
+                      {/* Text has been replaced with generic placeholders */}
                       <li className="flex items-start gap-2">
                         <span className="text-blue-400 mt-1">•</span>
-                        Liverpool bez 3 ključna igrača (Salah, Van Dijk,
-                        Alisson)
+                        Lorem ipsum dolor sit amet, consectetur adipiscing elit.
                       </li>
                       <li className="flex items-start gap-2">
                         <span className="text-blue-400 mt-1">•</span>
-                        City ima 7 pobeda u poslednjih 8 gostovanja na Anfieldu
+                        Sed do eiusmod tempor incididunt ut labore et dolore
+                        magna.
                       </li>
                       <li className="flex items-start gap-2">
                         <span className="text-blue-400 mt-1">•</span>
-                        Haaland u formi - 5 golova u poslednje 3 utakmice
+                        Ut enim ad minim veniam, quis nostrud exercitation
+                        ullamco.
                       </li>
                       <li className="flex items-start gap-2">
                         <span className="text-blue-400 mt-1">•</span>
-                        Liverpool samo 1 pobeda u poslednja 4 susreta sa top 5
-                        timovima
+                        Duis aute irure dolor in reprehenderit in voluptate
+                        velit esse.
                       </li>
                     </ul>
                   </div>

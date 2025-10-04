@@ -36,17 +36,12 @@ export default function AboutUs(): React.ReactNode {
     {
       title: "Kako funkcioniše ova platforma?",
       content:
-        "Insajder platforma omogućava korisnicima pristup različitim funkcijama u zavisnosti od vrste naloga. Besplatni korisnici mogu pratiti samo besplatne tipove. Lite korisnici dobijaju pristup premium tipovima, dok Premium korisnici imaju pun pristup svim funkcijama uključujući bankroll menadžment, pregled kvota, arbitražni kalkulator i detaljne analize.",
+        "Insajder platforma omogućava korisnicima pristup različitim funkcijama u zavisnosti od vrste naloga. Besplatni korisnici mogu pratiti samo besplatne tipove. Premium korisnici imaju pun pristup svim funkcijama uključujući bankroll menadžment, pregled kvota, arbitražni kalkulator i detaljne analize.",
     },
     {
       title: "Šta je arbitražno klađenje?",
       content:
         "Arbitražno klađenje (sure betting) je strategija koja omogućava siguran profit iskorišćavanjem razlika u kvotama kod različitih kladionica. Premium korisnici imaju pristup našem arbitražnom kalkulatoru koji automatski pronalazi sigurne opklade i izračunava optimalne uloge za maksimalan profit.",
-    },
-    {
-      title: "Kako mogu da upravljam svojim bankrollom na Insajder platformi?",
-      content:
-        "Premium korisnici mogu unositi detalje o svakoj opkladi. Sistem automatski ažurira bankroll i statistiku nakon završetka utakmica, pružajući tačan uvid u stanje računa i pomažući optimizaciju klađenja.",
     },
     {
       title: "Kako mogu da kupim članstvo na Insajder platformi?",
@@ -62,6 +57,10 @@ export default function AboutUs(): React.ReactNode {
             vam odobriti pristup u kratkom roku.
           </div>
           <div className="border-l-2 pl-3 bg-gray-900/20 rounded-sm border-emerald-500/30 hover:border-emerald-400/50 transition-colors">
+            <strong>Western Union:</strong> Nakon uplate unesite MTCN kod na
+            sajtu i nakon provere dobijate Premium status.
+          </div>
+          <div className="border-l-2 pl-3 bg-gray-900/20 rounded-sm border-emerald-500/30 hover:border-emerald-400/50 transition-colors">
             Ako imate problema, kontaktirajte nas putem Instagrama ili forme na
             sajtu.
           </div>
@@ -71,68 +70,85 @@ export default function AboutUs(): React.ReactNode {
   ];
 
   return (
-    <div className="w-full mx-auto flex flex-col items-center justify-center p-4 sm:p-6 min-h-screen bg-transparent">
+    <div className="w-full mx-auto flex flex-col items-center justify-center p-4 sm:p-6 min-h-screen bg-transparent relative isolate">
+      {/* Background Glow Effect - Adjusted for darker purple and centering */}
+      <div
+        aria-hidden="true"
+        className="absolute inset-0 -z-10 transform-gpu overflow-hidden blur-3xl"
+      >
+        <div
+          className="relative left-1/2 -z-10 aspect-[1155/678] w-[36.125rem] max-w-none -translate-x-1/2 rotate-[30deg] bg-gradient-to-tr from-[#6a0dad] to-[#8a2be2] opacity-20 sm:left-[calc(50%-30rem)] sm:w-[72.1875rem]"
+          style={{
+            clipPath:
+              "polygon(74.1% 44.1%, 100% 61.6%, 97.5% 26.9%, 85.5% 0.1%, 80.7% 2%, 72.5% 32.5%, 60.2% 62.4%, 52.4% 68.1%, 47.5% 58.3%, 45.2% 34.5%, 27.5% 76.7%, 0.1% 64.9%, 17.9% 100%, 27.6% 76.8%, 76.1% 97.7%, 74.1% 44.1%)",
+          }}
+        ></div>
+      </div>
+
+      {/* Header Section */}
       <div className="flex flex-col items-center justify-center py-8 sm:py-12 relative z-10">
-        {/* Title with a vibrant gradient and hover effect */}
         <h1
           className="raceFont text-4xl sm:text-5xl md:text-6xl text-center 
-               transition-all duration-700 delay-300 ease 
-               bg-clip-text text-transparent bg-gradient-to-r from-blue-300 via-purple-300 to-pink-300 
-                 mt-6 font-extrabold tracking-wide drop-shadow-lg 
-                 hover:scale-105 hover:tracking-widest cursor-pointer
-                 initial-opacity-0 initial-translate-y-[-20px]"
+                     transition-all duration-700 ease-in-out
+                     bg-clip-text text-transparent bg-gradient-to-r from-blue-400 via-purple-400 to-fuchsia-400 
+                     mt-6 font-extrabold tracking-wide drop-shadow-[0_2px_4px_rgba(0,0,0,0.4)]
+                     hover:scale-105 hover:tracking-widest hover:drop-shadow-[0_4px_15px_rgba(192,132,252,0.4)] cursor-pointer"
         >
           INSAJDERTIPS
         </h1>
       </div>
 
-      {/* Accordion Container: The main glassmorphism element */}
+      {/* Accordion Container */}
       <div
-        className="mt-8 mb-12 bg-white/10 backdrop-blur-xl border border-white/20 
-                  rounded-3xl p-4 sm:p-6 md:p-8 w-full max-w-xl lg:max-w-3xl xl:max-w-4xl mx-auto 
-                  shadow-2xl shadow-black/30 transform transition-all duration-1000 delay-500 ease 
-                  initial-opacity-0 initial-translate-y-[20vh] space-y-4 sm:space-y-5"
+        className="mt-8 mb-12 bg-gray-900/20 backdrop-blur-2xl border border-purple-500/20 
+                    rounded-3xl p-4 sm:p-6 md:p-8 w-full max-w-xl lg:max-w-3xl xl:max-w-4xl mx-auto 
+                    shadow-2xl shadow-purple-500/10 space-y-4"
       >
         {accordionData.map((item, index) => (
           <div
             key={index}
-            className="flex flex-col p-4 rounded-xl cursor-pointer 
-                   bg-white/5 border border-white/10 
-                   hover:bg-white/15 hover:border-white/20 
-                   transition-all duration-300 group"
+            className={`rounded-2xl border border-white/10 transition-all duration-300 ease-in-out
+                      ${
+                        openSections[index]
+                          ? "bg-white/10"
+                          : "bg-white/5 hover:bg-white/10"
+                      } 
+                      hover:-translate-y-1 hover:border-white/20`}
             onClick={() => toggleAccordionItem(index)}
           >
-            <div className="flex justify-between items-center text-slate-100 group-hover:text-white">
-              <span className="text-base sm:text-lg font-semibold group-hover:font-bold transition-all duration-200">
-                {item.title}
-              </span>
-              <svg
-                xmlns="http://www.w3.org/2000/svg"
-                className={`size-6 sm:size-7 text-blue-300 group-hover:text-blue-200 transform transition-transform duration-300 ${
-                  openSections[index] ? "rotate-90" : ""
+            <div className="flex flex-col p-4 cursor-pointer group">
+              <div className="flex justify-between items-center text-slate-100 group-hover:text-white">
+                <span className="text-base sm:text-lg font-semibold">
+                  {item.title}
+                </span>
+                <div className="flex-shrink-0 ml-4 p-1 rounded-full bg-white/5 group-hover:bg-white/10">
+                  <svg
+                    xmlns="http://www.w3.org/2000/svg"
+                    className={`size-6 text-purple-400 group-hover:text-fuchsia-400 transform transition-transform duration-500 ease-in-out ${
+                      openSections[index] ? "rotate-90" : ""
+                    }`}
+                    fill="none"
+                    viewBox="0 0 24 24"
+                    stroke="currentColor"
+                    strokeWidth="2.5"
+                  >
+                    <path
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      d="m8.25 4.5 7.5 7.5-7.5 7.5"
+                    />
+                  </svg>
+                </div>
+              </div>
+              <div
+                className={`overflow-hidden transition-all duration-500 ease-in-out ${
+                  openSections[index] ? "max-h-screen mt-4" : "max-h-0 mt-0"
                 }`}
-                fill="none"
-                viewBox="0 0 24 24"
-                stroke="currentColor"
-                strokeWidth="2"
               >
-                <path
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  d="m8.25 4.5 7.5 7.5-7.5 7.5"
-                />
-              </svg>
-            </div>
-            <div
-              className={`${
-                openSections[index]
-                  ? "max-h-96 opacity-100 pt-3"
-                  : "max-h-0 opacity-0 pt-0"
-              } text-slate-200 text-sm sm:text-base mt-2 
-             overflow-hidden transition-all duration-500 ease-in-out
-             border-l-2 border-blue-400/50 pl-4`}
-            >
-              {item.content}
+                <div className="text-gray-300 text-sm sm:text-base border-l-2 border-purple-400/50 pl-4 leading-relaxed">
+                  {item.content}
+                </div>
+              </div>
             </div>
           </div>
         ))}

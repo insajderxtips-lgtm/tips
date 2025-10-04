@@ -25,7 +25,7 @@ const Verifikacija: React.FC = () => {
     }
 
     try {
-      const res = await fetch("http://localhost:1337/verification", {
+      const res = await fetch("/verification", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ email, code }),
@@ -41,7 +41,7 @@ const Verifikacija: React.FC = () => {
 
       setStatus("success");
       setMessage("✅ Uspešno ste verifikovali nalog!");
-      dispatch(setUser({...user, isVerified: true}));
+      dispatch(setUser({ ...user, isVerified: true }));
       nav("/");
     } catch (err) {
       console.error("Greška:", err);
