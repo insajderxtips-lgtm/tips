@@ -1,15 +1,11 @@
 import { useLocation, useNavigate } from "react-router";
 import { useState, FC, ReactNode } from "react";
+import { useDispatch } from "react-redux";
 
 // --- Mocking Redux and Assets for self-contained example ---
 
 // In your actual app, you would import these from 'react-redux'
 // For this example, we mock them to make the component runnable.
-const useDispatch = () => {
-  return (action: any) => {
-    console.log("Dispatched Action:", action);
-  };
-};
 
 const useSelector = (selector: (state: any) => any) => {
   // Mock state that would come from your Redux store
@@ -228,7 +224,7 @@ export default function Sidebar(): ReactNode {
         </nav>
 
         <div className="p-4 mt-auto border-t border-cyan-500/20 space-y-4 shrink-0">
-          {currentUser.tier === "free" && (
+          {currentUser.tier === "FREE" && (
             <button
               onClick={() => nav("/kupi")}
               className="w-full bg-gradient-to-r from-amber-500 to-orange-600 text-white font-bold py-3 px-4 rounded-lg flex items-center justify-center gap-3 transition-all duration-300 hover:shadow-lg hover:shadow-amber-500/30 hover:scale-105"

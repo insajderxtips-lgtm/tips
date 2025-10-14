@@ -19,8 +19,8 @@ export default function Homepage(): React.ReactNode {
     );
   } else {
     return (
-      <div className=" h-max  w-full flex flex-col absolute top-0 left">
-        <div className=" min-h-screen w-full pt-22 flex flex-col min-[880px]:flex-row items-center justify-center xl:justify-between bg-[radial-gradient(rgba(36,33,80,1)_0%,rgba(2,3,27,1)_0%)] overflow-hidden">
+      <div className="h-max w-full flex flex-col absolute top-0 left overflow-x-hidden">
+        <div className="min-h-screen min-w-full pt-22 flex flex-col min-[880px]:flex-row items-center justify-center xl:justify-between  overflow-x-hidden">
           {/* Text Content (Left Side) - Enhanced Slide-in */}
           <div
             className="flex flex-col  raceFont text-xl p-6 rounded-lg shadow-lg max-w-[600px] w-full text-center text-white lg:ml-12 
@@ -347,7 +347,7 @@ export default function Homepage(): React.ReactNode {
                 <div className="bg-gray-900/80 border-t border-gray-800 p-4 text-center">
                   <button
                     className="bg-gradient-to-r from-blue-600 to-blue-800 hover:from-blue-500 hover:to-blue-700 text-white font-medium py-2 px-6 rounded-lg text-sm transition-all w-full sm:w-auto"
-                    onClick={() => nav("/kupi")}
+                    onClick={() => nav("/login")}
                   >
                     POSTANI CLAN
                   </button>

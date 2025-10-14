@@ -424,323 +424,241 @@ export default function UserBets({
 
   return (
     <div className="relative max-h-[calc(100vh-200px)] overflow-auto select-none scrollbar-thin scrollbar-track-transparent scrollbar-thumb-gray-700/50">
-      <table className="w-full bg-gradient-to-br from-gray-800 to-gray-900 border border-gray-700  shadow-2xl shadow-black/50 overflow-hidden">
-        <thead className="bg-gradient-to-r from-gray-900 to-gray-800 backdrop-blur-sm sticky top-0 z-10">
-          <tr className="border-b border-cyan-500/30">
-            <th className="px-6 py-4 text-left text-gray-300 font-semibold text-sm uppercase tracking-wider sticky left-0 bg-gray-900/95 z-20 group">
-              <div className="flex items-center space-x-1">
-                <span>Meč</span>
-                <svg
-                  className="w-3 h-3 opacity-0 group-hover:opacity-100 transition-opacity text-cyan-400"
-                  fill="none"
-                  viewBox="0 0 24 24"
-                  stroke="currentColor"
-                >
-                  <path
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                    strokeWidth={2}
-                    d="M7 16V4m0 0L3 8m4-4l4 4m6 0v12m0 0l4-4m-4 4l-4-4"
-                  />
-                </svg>
-              </div>
-            </th>
-            <th className="px-6 py-4 text-left text-gray-300 font-semibold text-sm uppercase tracking-wider group">
-              <div className="flex items-center space-x-1">
-                <span>Tip</span>
-                <svg
-                  className="w-3 h-3 opacity-0 group-hover:opacity-100 transition-opacity text-cyan-400"
-                  fill="none"
-                  viewBox="0 0 24 24"
-                  stroke="currentColor"
-                >
-                  <path
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                    strokeWidth={2}
-                    d="M7 16V4m0 0L3 8m4-4l4 4m6 0v12m0 0l4-4m-4 4l-4-4"
-                  />
-                </svg>
-              </div>
-            </th>
-            <th className="px-6 py-4 text-left text-gray-300 font-semibold text-sm uppercase tracking-wider group">
-              <div className="flex items-center space-x-1">
-                <span>Kvota</span>
-                <svg
-                  className="w-3 h-3 opacity-0 group-hover:opacity-100 transition-opacity text-cyan-400"
-                  fill="none"
-                  viewBox="0 0 24 24"
-                  stroke="currentColor"
-                >
-                  <path
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                    strokeWidth={2}
-                    d="M7 16V4m0 0L3 8m4-4l4 4m6 0v12m0 0l4-4m-4 4l-4-4"
-                  />
-                </svg>
-              </div>
-            </th>
-            <th className="px-6 py-4 text-left text-gray-300 font-semibold text-sm uppercase tracking-wider group">
-              <div className="flex items-center space-x-1">
-                <span>Ulog</span>
-                <svg
-                  className="w-3 h-3 opacity-0 group-hover:opacity-100 transition-opacity text-cyan-400"
-                  fill="none"
-                  viewBox="0 0 24 24"
-                  stroke="currentColor"
-                >
-                  <path
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                    strokeWidth={2}
-                    d="M7 16V4m0 0L3 8m4-4l4 4m6 0v12m0 0l4-4m-4 4l-4-4"
-                  />
-                </svg>
-              </div>
-            </th>
-            <th className="px-6 py-4 text-left text-gray-300 font-semibold text-sm uppercase tracking-wider group">
-              <div className="flex items-center space-x-1">
-                <span>Status</span>
-                <svg
-                  className="w-3 h-3 opacity-0 group-hover:opacity-100 transition-opacity text-cyan-400"
-                  fill="none"
-                  viewBox="0 0 24 24"
-                  stroke="currentColor"
-                >
-                  <path
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                    strokeWidth={2}
-                    d="M7 16V4m0 0L3 8m4-4l4 4m6 0v12m0 0l4-4m-4 4l-4-4"
-                  />
-                </svg>
-              </div>
-            </th>
-            <th className="px-6 py-4 text-left text-gray-300 font-semibold text-sm uppercase tracking-wider group">
-              <div className="flex items-center space-x-1">
-                <span>Datum</span>
-                <svg
-                  className="w-3 h-3 opacity-0 group-hover:opacity-100 transition-opacity text-cyan-400"
-                  fill="none"
-                  viewBox="0 0 24 24"
-                  stroke="currentColor"
-                >
-                  <path
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                    strokeWidth={2}
-                    d="M7 16V4m0 0L3 8m4-4l4 4m6 0v12m0 0l4-4m-4 4l-4-4"
-                  />
-                </svg>
-              </div>
-            </th>
-            <th className="px-6 py-4"></th>
-          </tr>
-        </thead>
+      <div className="w-full overflow-hidden rounded-2xl border border-slate-800 bg-slate-900/50 shadow-lg">
+        <div className="w-full overflow-hidden rounded-2xl border border-slate-800 bg-slate-900/50 shadow-lg">
+          <div className="overflow-x-auto">
+            <table className="min-w-full divide-y divide-slate-800">
+              <thead className="sticky top-0 z-10 bg-slate-900/80 backdrop-blur-sm">
+                <tr>
+                  <th
+                    scope="col"
+                    className="sticky left-0 z-20 bg-slate-900/80 py-4 pl-6 pr-4 text-left text-base font-semibold text-white backdrop-blur-sm"
+                  >
+                    Meč
+                  </th>
+                  <th
+                    scope="col"
+                    className="px-4 py-4 text-left text-base font-semibold text-white"
+                  >
+                    Tip
+                  </th>
+                  <th
+                    scope="col"
+                    className="px-4 py-4 text-left text-base font-semibold text-white"
+                  >
+                    Kvota
+                  </th>
+                  <th
+                    scope="col"
+                    className="px-4 py-4 text-left text-base font-semibold text-white"
+                  >
+                    Ulog
+                  </th>
+                  <th
+                    scope="col"
+                    className="px-4 py-4 text-left text-base font-semibold text-white"
+                  >
+                    Status
+                  </th>
+                  <th
+                    scope="col"
+                    className="px-4 py-4 text-left text-base font-semibold text-white"
+                  >
+                    Datum
+                  </th>
+                  <th scope="col" className="relative py-4 pl-4 pr-6">
+                    <span className="sr-only">Delete</span>
+                  </th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-slate-800">
+                {bets?.map((bet, index) => {
+                  const isParlay = Array.isArray(bet) && bet[0];
+                  const mainBet = isParlay ? bet[0] : bet;
+                  const status = mainBet?.status;
 
-        <tbody className="divide-y divide-gray-700/40">
-          {bets?.map((bet, index) =>
-            !Array.isArray(bet) ? (
-              <tr
-                key={index}
-                className="hover:bg-gray-700/20 transition-colors duration-150 group"
-              >
-                <td
-                  className={`px-6 py-4 whitespace-nowrap relative after:absolute after:left-0 after:top-0 after:h-full after:w-1.5 ${
-                    bet.status === "win"
-                      ? "after:bg-green-500 after:shadow-green-500/50"
-                      : bet.status === "active"
-                      ? "after:bg-cyan-500 after:shadow-cyan-500/50"
-                      : "after:bg-red-500 after:shadow-red-500/50"
-                  } after:shadow-lg`}
-                >
-                  <span className="text-gray-200 group-hover:text-white transition-colors font-medium">
-                    {bet.match}
-                  </span>
-                </td>
-                <td className="px-6 py-4 text-gray-300">{bet.tip}</td>
-                <td className="px-6 py-4">
-                  <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-gray-700 text-cyan-300">
-                    {bet.odds}
-                  </span>
-                </td>
-                <td className="px-6 py-4 text-gray-100 font-medium">
-                  {bet.stake}
-                </td>
-                <td
-                  onClick={() => openEditor(bet)}
-                  className={`px-6 py-4 font-medium cursor-pointer transition-all ${
-                    bet.status === "loss"
-                      ? "text-red-400 hover:text-red-300 bg-red-900/30"
-                      : bet.status === "active"
-                      ? "text-cyan-400 hover:text-cyan-300 bg-cyan-900/30"
-                      : "text-green-400 hover:text-green-300 bg-green-900/30"
-                  } rounded-md whitespace-nowrap`}
-                >
-                  <span className="inline-flex items-center">
-                    {bet.status}
-                    {bet.status === "active" && (
-                      <svg
-                        className="ml-1.5 h-2 w-2 animate-pulse text-cyan-400"
-                        fill="currentColor"
-                        viewBox="0 0 8 8"
+                  let statusBorderClass = "";
+                  if (status === "win") statusBorderClass = "border-green-500";
+                  else if (status === "loss")
+                    statusBorderClass = "border-red-500";
+                  else if (status === "active")
+                    statusBorderClass = "border-sky-500";
+
+                  let statusBadgeClass = "";
+                  if (status === "win")
+                    statusBadgeClass =
+                      "bg-green-500/10 text-green-400 ring-1 ring-inset ring-green-500/20";
+                  else if (status === "loss")
+                    statusBadgeClass =
+                      "bg-red-500/10 text-red-400 ring-1 ring-inset ring-red-500/20";
+                  else if (status === "active")
+                    statusBadgeClass =
+                      "bg-sky-500/10 text-sky-400 ring-1 ring-inset ring-sky-500/20";
+
+                  return !isParlay ? (
+                    <tr
+                      key={index}
+                      className="transition-colors hover:bg-slate-800/40"
+                    >
+                      <td
+                        className={`whitespace-nowrap py-5 pl-6 pr-4 text-base font-medium text-white sticky left-0 bg-slate-900/50 border-l-4 ${statusBorderClass}`}
                       >
-                        <circle cx="4" cy="4" r="3" />
-                      </svg>
-                    )}
-                  </span>
-                </td>
-                <td className="px-6 py-4 text-gray-400 text-sm">{bet.date}</td>
-                <td className="px-4 py-4 text-right">
-                  <button
-                    onClick={() => removeBet(bet)}
-                    className=" transition-opacity text-gray-400 hover:text-red-400 p-1 rounded-full hover:bg-gray-700/50"
-                    aria-label="Delete"
-                  >
-                    <svg
-                      className="w-4 h-4"
-                      fill="none"
-                      stroke="currentColor"
-                      viewBox="0 0 24 24"
-                    >
-                      <path
-                        strokeLinecap="round"
-                        strokeLinejoin="round"
-                        strokeWidth="2"
-                        d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"
-                      />
-                    </svg>
-                  </button>
-                </td>
-              </tr>
-            ) : (
-              bet[0] && (
-                <React.Fragment key={index}>
-                  <tr
-                    className="hover:bg-cyan-900/20 cursor-pointer transition-colors bg-gray-800/50"
-                    onClick={() => toggleParlay(index)}
-                  >
-                    <td
-                      className={`px-6 py-4 relative after:absolute after:left-0 after:top-0 after:h-full after:w-1.5 ${
-                        bet[0].status === "win"
-                          ? "after:bg-green-500 after:shadow-green-500/50"
-                          : bet[0].status === "active"
-                          ? "after:bg-cyan-500 after:shadow-cyan-500/50"
-                          : "after:bg-red-500 after:shadow-red-500/50"
-                      } after:shadow-lg`}
-                    >
-                      <div className="flex items-center text-cyan-300 font-medium">
-                        <span>[Sistem {bet.length - 1} meča]</span>
-                        <svg
-                          className={`ml-2 w-4 h-4 transform transition-transform ${
-                            openParlayIndex === index ? "rotate-180" : ""
-                          }`}
-                          fill="none"
-                          stroke="currentColor"
-                          viewBox="0 0 24 24"
+                        {bet.match}
+                      </td>
+                      <td className="whitespace-nowrap px-4 py-5 text-base text-slate-400">
+                        {bet.tip}
+                      </td>
+                      <td className="whitespace-nowrap px-4 py-5 text-base text-slate-400">
+                        <span className="inline-flex items-center rounded-lg bg-slate-700/60 px-2.5 py-1.5 text-sm font-semibold text-sky-300">
+                          {bet.odds}
+                        </span>
+                      </td>
+                      <td className="whitespace-nowrap px-4 py-5 text-base font-semibold text-white">
+                        {bet.stake}
+                      </td>
+                      <td className="whitespace-nowrap px-4 py-5 text-base">
+                        <button
+                          onClick={() => openEditor(bet)}
+                          className={`inline-flex items-center gap-x-2 rounded-lg px-2.5 py-1.5 text-sm font-semibold ${statusBadgeClass}`}
                         >
-                          <path
-                            strokeLinecap="round"
-                            strokeLinejoin="round"
-                            strokeWidth="2"
-                            d="M19 9l-7 7-7-7"
-                          />
-                        </svg>
-                      </div>
-                    </td>
-                    <td className="px-6 py-4 text-gray-400">-</td>
-                    <td className="px-6 py-4">
-                      <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-gray-700 text-cyan-300">
-                        {bet[0].totalOdds}
-                      </span>
-                    </td>
-                    <td className="px-6 py-4 text-gray-100 font-medium">
-                      {bet[0].stake}
-                    </td>
-                    <td
-                      onClick={() => openEditor(bet)}
-                      className={`px-6 py-4 font-medium cursor-pointer transition-all ${
-                        bet[0].status === "loss"
-                          ? "text-red-400 hover:text-red-300 bg-red-900/30"
-                          : bet[0].status === "active"
-                          ? "text-cyan-400 hover:text-cyan-300 bg-cyan-900/30"
-                          : "text-green-400 hover:text-green-300 bg-green-900/30"
-                      } rounded-md whitespace-nowrap`}
-                    >
-                      {bet[0].status}
-                    </td>
-                    <td className="px-6 py-4 text-gray-400 text-sm">
-                      {bet[0].date}
-                    </td>
-                    <td className="px-4 py-4"></td>
-                  </tr>
-
-                  {openParlayIndex === index &&
-                    bet.map(
-                      (parlayGame, parlayIndex) =>
-                        parlayIndex > 0 && (
-                          <tr
-                            key={parlayIndex}
-                            className="bg-gray-850/80 text-sm border-l-4 border-gray-700"
+                          {status === "active" && (
+                            <div className="h-2 w-2 rounded-full bg-sky-400 animate-pulse"></div>
+                          )}
+                          {status}
+                        </button>
+                      </td>
+                      <td className="whitespace-nowrap px-4 py-5 text-base text-slate-500">
+                        {bet.date}
+                      </td>
+                      <td className="relative whitespace-nowrap py-5 pl-4 pr-6 text-right text-base font-medium">
+                        <button
+                          onClick={() => removeBet(bet)}
+                          className="p-1 rounded-full text-slate-500 transition-colors hover:text-red-400 hover:bg-slate-800"
+                        >
+                          <svg
+                            className="h-5 w-5"
+                            fill="none"
+                            viewBox="0 0 24 24"
+                            strokeWidth="1.5"
+                            stroke="currentColor"
                           >
-                            <td className="px-8 py-3 whitespace-nowrap text-gray-300">
-                              <div className="flex items-center">
-                                <svg
-                                  className="w-3 h-3 mr-2 text-gray-500"
-                                  fill="none"
-                                  stroke="currentColor"
-                                  viewBox="0 0 24 24"
+                            <path
+                              strokeLinecap="round"
+                              strokeLinejoin="round"
+                              d="M14.74 9l-.346 9m-4.788 0L9.26 9m9.968-3.21c.342.052.682.107 1.022.166m-1.022-.165L18.16 19.673a2.25 2.25 0 01-2.244 2.077H8.084a2.25 2.25 0 01-2.244-2.077L4.772 5.79m14.456 0a48.108 48.108 0 00-3.478-.397m-12 .562c.34-.059.68-.114 1.022-.165m0 0a48.11 48.11 0 013.478-.397m7.5 0v-.916c0-1.18-.91-2.134-2.09-2.201a51.964 51.964 0 00-3.32 0c-1.18.067-2.09 1.022-2.09 2.201v.916m7.5 0a48.667 48.667 0 00-7.5 0"
+                            />
+                          </svg>
+                        </button>
+                      </td>
+                    </tr>
+                  ) : (
+                    <React.Fragment key={index}>
+                      <tr
+                        onClick={() => toggleParlay(index)}
+                        className="cursor-pointer bg-slate-800/20 transition-colors hover:bg-slate-800/50"
+                      >
+                        <td
+                          className={`whitespace-nowrap py-5 pl-6 pr-4 text-base font-medium text-sky-300 sticky left-0 bg-slate-900/50 border-l-4 ${statusBorderClass}`}
+                        >
+                          <div className="flex items-center gap-2">
+                            <span>[Sistem {bet.length - 1} meča]</span>
+                            <svg
+                              className={`h-5 w-5 transition-transform ${
+                                openParlayIndex === index ? "rotate-180" : ""
+                              }`}
+                              fill="none"
+                              viewBox="0 0 24 24"
+                              strokeWidth="2"
+                              stroke="currentColor"
+                            >
+                              <path
+                                strokeLinecap="round"
+                                strokeLinejoin="round"
+                                d="M19 9l-7 7-7-7"
+                              />
+                            </svg>
+                          </div>
+                        </td>
+                        <td className="whitespace-nowrap px-4 py-5 text-base text-slate-500">
+                          -
+                        </td>
+                        <td className="whitespace-nowrap px-4 py-5 text-base text-slate-400">
+                          <span className="inline-flex items-center rounded-lg bg-slate-700/60 px-2.5 py-1.5 text-sm font-semibold text-sky-300">
+                            {mainBet.totalOdds}
+                          </span>
+                        </td>
+                        <td className="whitespace-nowrap px-4 py-5 text-base font-semibold text-white">
+                          {mainBet.stake}
+                        </td>
+                        <td className="whitespace-nowrap px-4 py-5 text-base">
+                          <button
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              openEditor(bet);
+                            }}
+                            className={`inline-flex items-center gap-x-2 rounded-lg px-2.5 py-1.5 text-sm font-semibold ${statusBadgeClass}`}
+                          >
+                            {status === "active" && (
+                              <div className="h-2 w-2 rounded-full bg-sky-400 animate-pulse"></div>
+                            )}
+                            {status}
+                          </button>
+                        </td>
+                        <td className="whitespace-nowrap px-4 py-5 text-base text-slate-500">
+                          {mainBet.date}
+                        </td>
+                        <td className="relative whitespace-nowrap py-5 pl-4 pr-6 text-right text-base font-medium"></td>
+                      </tr>
+                      {openParlayIndex === index &&
+                        bet.map(
+                          (parlayGame, parlayIndex) =>
+                            parlayIndex > 0 && (
+                              <tr key={parlayIndex} className="bg-slate-800/10">
+                                <td
+                                  colSpan={4}
+                                  className="py-4 pl-12 pr-4 text-base text-slate-300"
                                 >
-                                  <path
-                                    strokeLinecap="round"
-                                    strokeLinejoin="round"
-                                    strokeWidth="2"
-                                    d="M13 5l7 7-7 7M5 5l7 7-7 7"
-                                  />
-                                </svg>
-                                {parlayGame.match}
-                              </div>
-                            </td>
-                            <td className="px-6 py-3 text-gray-400">
-                              {parlayGame.tip}
-                            </td>
-                            <td className="px-6 py-3">
-                              <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-gray-700/50 text-gray-300">
-                                {parlayGame.odds}
-                              </span>
-                            </td>
-                            <td colSpan="3"></td>
-                            <td className="px-4 py-3 text-right">
-                              <button
-                                onClick={() => removeBet(parlayGame)}
-                                className="text-gray-500 hover:text-red-400 transition-colors p-1 rounded-full hover:bg-gray-700/50"
-                                aria-label="Delete"
-                              >
-                                <svg
-                                  className="w-3.5 h-3.5"
-                                  fill="none"
-                                  stroke="currentColor"
-                                  viewBox="0 0 24 24"
-                                >
-                                  <path
-                                    strokeLinecap="round"
-                                    strokeLinejoin="round"
-                                    strokeWidth="2"
-                                    d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"
-                                  />
-                                </svg>
-                              </button>
-                            </td>
-                          </tr>
-                        )
-                    )}
-                </React.Fragment>
-              )
-            )
-          )}
-        </tbody>
-      </table>
+                                  {parlayGame.match}
+                                </td>
+                                <td className="px-4 py-4 text-base text-slate-400">
+                                  {parlayGame.tip}
+                                </td>
+                                <td className="px-4 py-4 text-base">
+                                  <span className="inline-flex items-center rounded-lg bg-slate-700/60 px-2.5 py-1.5 text-sm font-semibold text-sky-300">
+                                    {parlayGame.odds}
+                                  </span>
+                                </td>
+                                <td className="relative py-4 pl-4 pr-6 text-right text-base">
+                                  <button
+                                    onClick={() => removeBet(parlayGame)}
+                                    className="p-1 rounded-full text-slate-500 transition-colors hover:text-red-400 hover:bg-slate-800"
+                                  >
+                                    <svg
+                                      className="h-5 w-5"
+                                      fill="none"
+                                      viewBox="0 0 24 24"
+                                      strokeWidth="1.5"
+                                      stroke="currentColor"
+                                    >
+                                      <path
+                                        strokeLinecap="round"
+                                        strokeLinejoin="round"
+                                        d="M14.74 9l-.346 9m-4.788 0L9.26 9m9.968-3.21c.342.052.682.107 1.022.166m-1.022-.165L18.16 19.673a2.25 2.25 0 01-2.244 2.077H8.084a2.25 2.25 0 01-2.244-2.077L4.772 5.79m14.456 0a48.108 48.108 0 00-3.478-.397m-12 .562c.34-.059.68-.114 1.022-.165m0 0a48.11 48.11 0 013.478-.397m7.5 0v-.916c0-1.18-.91-2.134-2.09-2.201a51.964 51.964 0 00-3.32 0c-1.18.067-2.09 1.022-2.09 2.201v.916m7.5 0a48.667 48.667 0 00-7.5 0"
+                                      />
+                                    </svg>
+                                  </button>
+                                </td>
+                              </tr>
+                            )
+                        )}
+                    </React.Fragment>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>
 
       {/* Modal portal remains unchanged */}
       {editor.visible &&

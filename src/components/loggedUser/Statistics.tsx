@@ -139,6 +139,133 @@ export default function Statistics(): React.ReactNode {
       return updatedParlay;
     });
   };
+  const chartOptions = {
+    maintainAspectRatio: false,
+    responsive: true,
+    scales: {
+      x: {
+        grid: {
+          color: "rgba(255, 255, 255, 0.1)",
+          drawOnChartArea: false,
+        },
+        ticks: {
+          color: "#94a3b8", // slate-400
+          font: {
+            size: 12,
+            weight: "500",
+          },
+          padding: 4,
+          autoSkipPadding: 10,
+        },
+      },
+      y: {
+        position: "left",
+        grid: {
+          color: "rgba(255, 255, 255, 0.05)",
+        },
+        ticks: {
+          color: "#7dd3fc", // sky-300
+          font: {
+            size: 12,
+            weight: "600",
+          },
+          callback: (value) => `${value}%`,
+          padding: 5,
+        },
+      },
+      y2: {
+        position: "right",
+        grid: {
+          drawOnChartArea: false,
+        },
+        ticks: {
+          color: "#f87171", // red-400
+          font: {
+            size: 12,
+            weight: "600",
+          },
+          callback: (value) => `${Number(value).toFixed(0)}`,
+          padding: 5,
+        },
+      },
+    },
+    plugins: {
+      legend: {
+        display: true,
+        position: "top",
+        align: "center",
+        labels: {
+          color: "#e2e8f0", // slate-200
+          font: {
+            size: 14,
+            weight: "bold",
+          },
+          padding: 16,
+          boxWidth: 16,
+          usePointStyle: true,
+        },
+      },
+      tooltip: {
+        // Your existing tooltip configuration can go here
+      },
+    },
+    layout: {
+      padding: {
+        top: 15,
+        bottom: 5,
+        left: 15,
+        right: 15,
+      },
+    },
+  };
+  const StatCard = ({ icon, title, value, variant = "neutral" }) => {
+    const styles = {
+      neutral: {
+        glow: "from-sky-500/10 via-transparent",
+        hoverBorder: "hover:border-sky-500/40",
+        iconColor: "text-sky-400",
+        valueColor: "text-white",
+      },
+      success: {
+        glow: "from-green-500/10 via-transparent",
+        hoverBorder: "hover:border-green-500/40",
+        iconColor: "text-green-400",
+        valueColor: "text-green-400",
+      },
+      danger: {
+        glow: "from-red-500/10 via-transparent",
+        hoverBorder: "hover:border-red-500/40",
+        iconColor: "text-red-400",
+        valueColor: "text-red-400",
+      },
+    };
+
+    const selectedStyle = styles[variant] || styles.neutral;
+
+    return (
+      <div
+        className={`group relative overflow-hidden rounded-2xl border border-slate-800 bg-slate-900/50 p-4 sm:p-5 transition-all duration-300 ${selectedStyle.hoverBorder}`}
+      >
+        <div
+          className={`absolute -right-1/4 -top-1/4 h-1/2 w-1/2 rounded-full bg-gradient-radial ${selectedStyle.glow} opacity-0 transition-opacity duration-500 group-hover:opacity-100`}
+        ></div>
+
+        <div className="relative z-10 flex items-center gap-4">
+          <div className={`flex-shrink-0 text-3xl ${selectedStyle.iconColor}`}>
+            {icon}
+          </div>
+          <div className="flex-1">
+            <p className="text-xs font-semibold uppercase text-slate-500">
+              {title}
+            </p>
+            <p className={`text-2xl font-bold ${selectedStyle.valueColor}`}>
+              {value}
+            </p>
+          </div>
+        </div>
+      </div>
+    );
+  };
   const removeParlayItem = (index: number) => {
     // Removes an item from the parlay bet.
     setParlay((prev) =>
@@ -681,533 +808,371 @@ export default function Statistics(): React.ReactNode {
                   Moje Statistike kladjenja
                 </span>
               </div>
-              <div className="grid grid-cols-1 min-[1000px]:grid-cols-2 gap-4 p-4">
-                {/* Total Bets Card */}
-                <div className="relative bg-gradient-to-br from-gray-800 to-gray-900 p-4 rounded-xl border border-gray-700/50 hover:border-cyan-500/50 transition-all duration-300 group overflow-hidden">
-                  {/* Glow effect */}
-                  <div className="absolute inset-0 bg-gradient-to-r from-cyan-500/5 via-transparent to-purple-500/5 opacity-0 group-hover:opacity-100 transition-opacity duration-500"></div>
-
-                  <div className="flex items-center gap-4">
-                    {/* Icon with gradient background */}
-                    <div className="flex-shrink-0 p-3 rounded-lg bg-gradient-to-br from-blue-800/60 to-blue-900/60 group-hover:from-cyan-700/60 group-hover:to-blue-800/60 transition-all duration-300">
-                      <svg
-                        xmlns="http://www.w3.org/2000/svg"
-                        fill="none"
-                        viewBox="0 0 24 24"
-                        strokeWidth="1.5"
-                        stroke="currentColor"
-                        className="w-7 h-7 text-cyan-300"
-                      >
-                        <path
-                          strokeLinecap="round"
-                          strokeLinejoin="round"
-                          d="M19.5 14.25v-2.625a3.375 3.375 0 00-3.375-3.375h-1.5A1.125 1.125 0 0113.5 7.125v-1.5a3.375 3.375 0 00-3.375-3.375H8.25M9 16.5v.75m3-3v3M15 12v5.25m-4.5-15H5.625c-.621 0-1.125.504-1.125 1.125v17.25c0 .621.504 1.125 1.125 1.125h12.75c.621 0 1.125-.504 1.125-1.125V11.25a9 9 0 00-9-9z"
-                        />
-                      </svg>
-                    </div>
-
-                    {/* Content */}
-                    <div className="flex-1">
-                      <div className="text-3xl font-bold text-white">
-                        {userStats?.statistics?.totalBets}
-                      </div>
-                      <div className="text-sm font-medium text-gray-400 mt-1">
-                        Ukupno opklada
-                      </div>
-                    </div>
-                  </div>
-
-                  {/* Decorative corner */}
-                  <div className="absolute top-0 right-0 w-16 h-16 bg-gradient-to-bl from-cyan-500/10 to-transparent rounded-bl-xl pointer-events-none"></div>
-                </div>
-
-                {/* Total Balance Card */}
-                <div className="relative bg-gradient-to-br from-gray-800 to-gray-900 p-4 rounded-xl border border-gray-700/50 hover:border-green-500/50 transition-all duration-300 group overflow-hidden">
-                  {/* Conditional glow effect */}
-                  <div
-                    className={`absolute inset-0 bg-gradient-to-r ${
-                      userStats?.statistics?.initialInvestment > 0
-                        ? "from-green-500/5 via-transparent to-emerald-500/5"
-                        : "from-red-500/5 via-transparent to-rose-500/5"
-                    } opacity-0 group-hover:opacity-100 transition-opacity duration-500`}
-                  ></div>
-
-                  <div className="flex items-center gap-4">
-                    {/* Icon with conditional background */}
-                    <div
-                      className={`flex-shrink-0 p-3 rounded-lg bg-gradient-to-br ${
-                        userStats?.statistics?.initialInvestment > 0
-                          ? "from-green-800/60 to-emerald-900/60 group-hover:from-green-700/60 group-hover:to-emerald-800/60"
-                          : "from-red-800/60 to-rose-900/60 group-hover:from-red-700/60 group-hover:to-rose-800/60"
-                      } transition-all duration-300`}
+              <div className="grid grid-cols-1 gap-4 p-4 md:grid-cols-2">
+                <StatCard
+                  title="Ukupno opklada"
+                  value={userStats?.statistics?.totalBets || 0}
+                  variant="neutral"
+                  icon={
+                    <svg
+                      xmlns="http://www.w3.org/2000/svg"
+                      fill="none"
+                      viewBox="0 0 24 24"
+                      strokeWidth={1.5}
+                      stroke="currentColor"
+                      className="h-8 w-8"
                     >
-                      <svg
-                        xmlns="http://www.w3.org/2000/svg"
-                        fill="none"
-                        viewBox="0 0 24 24"
-                        strokeWidth="1.5"
-                        stroke="currentColor"
-                        className={`w-7 h-7 ${
-                          userStats?.statistics?.initialInvestment > 0
-                            ? "text-green-300"
-                            : "text-red-300"
-                        }`}
-                      >
-                        <path
-                          strokeLinecap="round"
-                          strokeLinejoin="round"
-                          d="M19.5 14.25v-2.625a3.375 3.375 0 00-3.375-3.375h-1.5A1.125 1.125 0 0113.5 7.125v-1.5a3.375 3.375 0 00-3.375-3.375H8.25M9 16.5v.75m3-3v3M15 12v5.25m-4.5-15H5.625c-.621 0-1.125.504-1.125 1.125v17.25c0 .621.504 1.125 1.125 1.125h12.75c.621 0 1.125-.504 1.125-1.125V11.25a9 9 0 00-9-9z"
-                        />
-                      </svg>
-                    </div>
+                      <path
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                        d="M9 12h3.75M9 15h3.75M9 18h3.75m3 .75H18a2.25 2.25 0 002.25-2.25V6.108c0-1.135-.845-2.098-1.976-2.192a48.424 48.424 0 00-1.123-.08m-5.801 0c-.065.21-.1.433-.1.664 0 .414.336.75.75.75h4.5a.75.75 0 00.75-.75 2.25 2.25 0 00-.1-.664m-5.8 0A2.251 2.251 0 0113.5 2.25H15c1.012 0 1.867.668 2.15 1.586m-5.8 0c-.376.023-.75.05-1.124.08C9.095 4.01 8.25 4.973 8.25 6.108V8.25m0 0H4.875c-1.125 0-2.062.938-1.976 2.062a48.424 48.424 0 001.123 5.801c.065.21.1.433.1.664 0 .414.336.75.75.75h4.5a.75.75 0 00.75-.75c0-.231-.035-.454-.1-.664M6.75 15H4.875c-1.125 0-2.062.938-1.976 2.062a48.424 48.424 0 001.123 5.801c.065.21.1.433.1.664 0 .414.336.75.75.75h4.5a.75.75 0 00.75-.75c0-.231-.035-.454-.1-.664M13.5 15H12"
+                      />
+                    </svg>
+                  }
+                />
 
-                    {/* Content */}
-                    <div className="flex-1">
-                      <div
-                        className={`text-3xl font-bold ${
-                          userStats?.statistics?.initialInvestment > 0
-                            ? "text-green-400"
-                            : "text-red-400"
-                        }`}
-                      >
-                        {Math.round(userStats?.statistics?.initialInvestment)}{" "}
-                        {defaultCurrency}
-                      </div>
-                      <div className="text-sm font-medium text-gray-400 mt-1">
-                        Ukupno Stanje
-                      </div>
-                    </div>
-                  </div>
-
-                  {/* Decorative corner */}
-                  <div
-                    className={`absolute top-0 right-0 w-16 h-16 bg-gradient-to-bl ${
-                      userStats?.statistics?.initialInvestment > 0
-                        ? "from-green-500/10 to-transparent"
-                        : "from-red-500/10 to-transparent"
-                    } rounded-bl-xl pointer-events-none`}
-                  ></div>
-                </div>
+                <StatCard
+                  title="Ukupno Stanje"
+                  value={`${Math.round(
+                    userStats?.statistics?.initialInvestment || 0
+                  )} ${defaultCurrency}`}
+                  variant={
+                    userStats?.statistics?.initialInvestment > 0
+                      ? "success"
+                      : "danger"
+                  }
+                  icon={
+                    <svg
+                      xmlns="http://www.w3.org/2000/svg"
+                      fill="none"
+                      viewBox="0 0 24 24"
+                      strokeWidth={1.5}
+                      stroke="currentColor"
+                      className="h-8 w-8"
+                    >
+                      <path
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                        d="M2.25 18.75a60.07 60.07 0 0115.797 2.101c.727.198 1.453-.342 1.453-1.096V18.75M3.75 4.5v.75A.75.75 0 013 6h-.75m0 0v-.375c0-.621.504-1.125 1.125-1.125H20.25M2.25 6v9m18-10.5v.75c0 .414-.336.75-.75.75h-.75m0-1.5h.375c.621 0 1.125.504 1.125 1.125v9.75c0 .621-.504 1.125-1.125 1.125h-.375m1.5-1.5H21a.75.75 0 00-.75-.75v-.75m0 0l-3.75-3.75M3 12h18"
+                      />
+                    </svg>
+                  }
+                />
               </div>
 
               <div className="flex flex-col w-full  mx-auto  gap-2 0 p-1 md:p-4 ">
                 <div className="min-w-full h-fit flex gap-2  flex-col min-[1230px]:flex-row">
-                  <div className="h-full w-full flex flex-col bg-gray-900 p-1 md:p-4 rounded-sm ">
-                    <div className="flex justify-between items-center ">
-                      <div className="font-bold text-base md:text-lg lg:text-xl my-2 w-full flex gap-4 flex-col md:flex-row md:justify-center items-center md:w-max bg-gradient-to-r from-gray-800 to-gray-900 p-4 rounded-xl border-2 border-gray-700/40 shadow-lg">
-                        <span className="text-cyan-400 whitespace-nowrap">
-                          Statistike meseca&nbsp;
-                        </span>
-
-                        <div className="w-full flex flex-col md:flex-row gap-3 md:gap-4">
-                          <select
-                            className="w-full md:w-auto bg-gray-900/50 border-2 border-gray-700/40 rounded-lg px-4 py-2 text-gray-300 focus:outline-none focus:border-cyan-400 focus:ring-2 focus:ring-cyan-900/30 transition-all cursor-pointer"
-                            onChange={(e: any) =>
-                              setLineMode((prev) => ({
-                                ...prev,
-                                month: e.target.value,
-                              }))
-                            }
-                          >
+                  <div className="flex h-full w-full flex-col space-y-4 rounded-2xl border border-slate-800 bg-slate-900/50 p-4 shadow-lg sm:p-6">
+                    <div className="flex flex-wrap items-center justify-between gap-4 border-b border-slate-800 pb-4">
+                      <h2 className="text-xl font-bold text-sky-400 sm:text-2xl">
+                        Mesečni pregled
+                      </h2>
+                      <div className="flex w-full flex-col gap-3 sm:w-auto sm:flex-row">
+                        <select
+                          className="w-full  cursor-pointer rounded-lg border-2 border-slate-700 bg-slate-800/60 px-4 py-2.5 text-slate-300 transition-all placeholder:text-slate-500 focus:border-sky-500 focus:outline-none focus:ring-2 focus:ring-sky-500/30 sm:w-auto"
+                          onChange={(e) =>
+                            setLineMode((prev) => ({
+                              ...prev,
+                              month: e.target.value,
+                            }))
+                          }
+                          value={lineMode.month}
+                        >
+                          {Array.from({ length: 12 }, (_, index) => (
                             <option
-                              value={currentMonth}
-                              className="bg-gray-800 text-gray-300"
+                              key={index}
+                              value={index}
+                              className="bg-slate-800 text-slate-300"
                             >
-                              {Month[currentMonth]}
+                              {Month[index]}
                             </option>
-                            {Array.from(
-                              { length: currentMonth },
-                              (_, index) => (
-                                <option
-                                  key={index}
-                                  value={index}
-                                  className="bg-gray-800 text-gray-300"
-                                >
-                                  {Month[index]}
-                                </option>
-                              )
-                            )}
-                          </select>
-
-                          <select
-                            className="w-full md:w-auto bg-gray-900/50 border-2 border-gray-700/40 rounded-lg px-4 py-2 text-gray-300 focus:outline-none focus:border-cyan-400 focus:ring-2 focus:ring-cyan-900/30 transition-all cursor-pointer"
-                            value={lineMode.day}
-                            onChange={(e: any) => {
-                              const newDay = parseInt(e.target.value, 10);
-                              setLineMode((prev) => ({
-                                ...prev,
-                                day: newDay,
-                              }));
-                            }}
+                          ))}
+                        </select>
+                        <select
+                          className="w-full cursor-pointer rounded-lg border-2 border-slate-700 bg-slate-800/60 px-4 py-2.5 text-slate-300 transition-all placeholder:text-slate-500 focus:border-sky-500 focus:outline-none focus:ring-2 focus:ring-sky-500/30 sm:w-auto"
+                          value={lineMode.day}
+                          onChange={(e) => {
+                            const newDay = parseInt(e.target.value, 10);
+                            setLineMode((prev) => ({ ...prev, day: newDay }));
+                          }}
+                        >
+                          <option
+                            value={0}
+                            className="bg-slate-800 text-slate-300"
                           >
-                            <option
-                              value={0}
-                              className="bg-gray-800 text-gray-300"
-                            >
-                              Ceo mesec
-                            </option>
-                            {Array.from({ length: daysInMonth }).map(
-                              (_, index) => (
-                                <option
-                                  key={index}
-                                  value={index + 1}
-                                  className="bg-gray-800 text-gray-300"
-                                >
-                                  {index + 1} {Month[lineMode.month]}
-                                </option>
-                              )
-                            )}
-                          </select>
-                        </div>
+                            Ceo mesec
+                          </option>
+                          {Array.from({ length: daysInMonth }).map(
+                            (_, index) => (
+                              <option
+                                key={index + 1}
+                                value={index + 1}
+                                className="bg-slate-800 text-slate-300"
+                              >
+                                {index + 1}. {Month[lineMode.month]}
+                              </option>
+                            )
+                          )}
+                        </select>
                       </div>
                     </div>
-                    <div className="h-full w-full  ">
-                      {userStats?.statistics?.monthlyStats[lineMode.month]
+
+                    <div className="h-full w-full">
+                      {!userStats?.statistics?.monthlyStats[lineMode.month] ||
+                      userStats.statistics.monthlyStats[lineMode.month]
                         .totalBets <= 0 ? (
-                        <div className="w-full h-full flex justify-center items-center bg-gray-900">
-                          <div className="transform  text-xl font-semibold text-gray-300 bg-gray-800 p-8 rounded-lg shadow-lg border-2 border-gray-600">
-                            NEMATE OPKLADA ZA OVAJ MESEC.
-                          </div>
+                        <div className="flex min-h-[400px] w-full flex-col items-center justify-center rounded-2xl bg-slate-900/50 p-6 text-center">
+                          <svg
+                            xmlns="http://www.w3.org/2000/svg"
+                            fill="none"
+                            viewBox="0 0 24 24"
+                            strokeWidth={1.5}
+                            stroke="currentColor"
+                            className="h-16 w-16 text-slate-700"
+                          >
+                            <path
+                              strokeLinecap="round"
+                              strokeLinejoin="round"
+                              d="M19.5 14.25v-2.625a3.375 3.375 0 00-3.375-3.375h-1.5A1.125 1.125 0 0113.5 7.125v-1.5a3.375 3.375 0 00-3.375-3.375H8.25m0 12.75h7.5m-7.5 3H12M10.5 2.25H5.625c-.621 0-1.125.504-1.125 1.125v17.25c0 .621.504 1.125 1.125 1.125h12.75c.621 0 1.125-.504 1.125-1.125V11.25a9 9 0 00-9-9z"
+                            />
+                          </svg>
+                          <h3 className="mt-4 text-xl font-semibold text-slate-400">
+                            Nemate Opklada
+                          </h3>
+                          <p className="text-slate-500">
+                            Nema unetih opklada za izabrani mesec.
+                          </p>
                         </div>
                       ) : lineMode.day === 0 ? (
-                        <div className="min-h-[500px] h-full p-1 md:p-4 bg-gray-900 rounded-2xl border-2 border-gray-700/40 shadow-xl overflow-x-auto">
-                          <Line
-                            data={chartData}
-                            options={{
-                              maintainAspectRatio: false,
-                              responsive: true,
-                              scales: {
-                                x: {
-                                  grid: {
-                                    color: "rgba(255, 255, 255, 0.15)",
-                                    drawOnChartArea: false, // Cleaner look
-                                  },
-                                  ticks: {
-                                    color: "rgba(255, 255, 255, 0.9)",
-                                    font: {
-                                      size: 12, // Smaller for mobile
-                                      weight: "500",
-                                    },
-                                    padding: 2, // Reduce space under labels
-                                    autoSkipPadding: 10, // Better label spacing
-                                  },
-                                  offset: false, // Removes extra space under axis
-                                },
-                                y: {
-                                  position: "left",
-                                  grid: {
-                                    color: "rgba(255, 255, 255, 0.1)",
-                                  },
-                                  ticks: {
-                                    color: "skyblue",
-                                    font: {
-                                      size: 12,
-                                      weight: "600",
-                                    },
-                                    callback: (value) => `${value}%`,
-                                    padding: 5,
-                                  },
-                                },
-                                y2: {
-                                  position: "right", // Force right side
-                                  grid: {
-                                    drawOnChartArea: false, // Avoid double grid
-                                  },
-                                  ticks: {
-                                    color: "orangered",
-                                    font: {
-                                      size: 12,
-                                      weight: "600",
-                                    },
-                                    callback: (value) =>
-                                      `${Number(value).toFixed(0)}`,
-                                    padding: 5,
-                                  },
-                                },
-                              },
-                              plugins: {
-                                legend: {
-                                  display: true,
-                                  position: "top",
-                                  align: "center", // Center legend
-                                  labels: {
-                                    color: "rgba(255, 255, 255, 1)",
-                                    font: {
-                                      size: 14,
-                                      weight: "bold",
-                                    },
-                                    padding: 16,
-                                    boxWidth: 16,
-                                    usePointStyle: true,
-                                  },
-                                },
-                                // ... keep your existing tooltip config
-                              },
-                              // ... rest of your existing options
-                              layout: {
-                                padding: {
-                                  top: 15,
-                                  bottom: 0, // Remove bottom padding
-                                  left: 15,
-                                  right: 15,
-                                },
-                              },
-                            }}
-                            className="min-w-[300px]" // Better mobile handling
-                          />
+                        <div className="relative h-[350px] w-full md:h-[500px]">
+                          <Line data={chartData} options={chartOptions} />
                         </div>
-                      ) : chartData.datasets[0].data[0] > 0 ? (
-                        chartData.datasets && (
-                          <div className="flex flex-col w-full h-full  p-2">
-                            <div className="flex items-center justify-center flex-col">
-                              <div className="w-full h-full">
-                                <Bar
-                                  data={{
-                                    labels: [""],
-                                    datasets: [
-                                      {
-                                        label: "Dobitni",
-                                        data: [dailyStats.totalWins],
-                                        backgroundColor: "green",
-                                      },
-                                      dailyStats.totalActives > 0
-                                        ? {
-                                            label: "Aktivni",
-                                            data: [dailyStats.totalActives],
-                                            backgroundColor: "gray",
-                                          }
-                                        : null,
-                                      {
-                                        label: "Gubitni",
-                                        data: [dailyStats.totalLosses],
-                                        backgroundColor: "red",
-                                      },
-                                    ].filter(Boolean), // Removes null values
-                                  }}
-                                  options={{
-                                    scales: {
-                                      y: {
-                                        beginAtZero: true,
-                                        position: "left",
-                                      },
-                                    },
+                      ) : chartData.datasets[0].data.length > 0 &&
+                        chartData.datasets[0].data.some((d) => d > 0) ? (
+                        <div className="flex flex-col gap-6">
+                          <div className="grid grid-cols-1 gap-6 xl:grid-cols-5">
+                            <div className="h-[350px] xl:col-span-2">
+                              <Bar
+                                data={barChartData}
+                                options={barChartOptions}
+                              />
+                            </div>
+                            <div className="overflow-x-auto rounded-lg border border-slate-800 bg-slate-800/30 xl:col-span-3">
+                              <table className="min-w-full table-auto text-sm">
+                                <thead className="bg-slate-700/50">
+                                  <tr>
+                                    <th className="px-4 py-3 text-left font-semibold text-slate-300">
+                                      Statistika za {lineMode.day}.{" "}
+                                      {Month[lineMode.month]}
+                                    </th>
+                                    <th className="px-4 py-3 text-left font-semibold text-slate-300">
+                                      Vrednost
+                                    </th>
+                                  </tr>
+                                </thead>
+                                <tbody className="divide-y divide-slate-700/60">
+                                  <tr className="transition-colors hover:bg-slate-700/40">
+                                    <td className="px-4 py-3 font-medium">
+                                      Ukupno opklada
+                                    </td>
+                                    <td className="px-4 py-3">
+                                      {userStats?.statistics?.monthlyStats[
+                                        lineMode.month
+                                      ]?.bets[lineMode.day]?.length || 0}
+                                    </td>
+                                  </tr>
+                                  <tr className="transition-colors hover:bg-slate-700/40">
+                                    <td className="px-4 py-3 font-medium">
+                                      Dobitnih opklada
+                                    </td>
+                                    <td className="px-4 py-3 text-green-400">
+                                      {dailyStats.totalWins}
+                                    </td>
+                                  </tr>
+                                  <tr className="transition-colors hover:bg-slate-700/40">
+                                    <td className="px-4 py-3 font-medium">
+                                      Gubitnih opklada
+                                    </td>
+                                    <td className="px-4 py-3 text-red-400">
+                                      {dailyStats.totalLosses}
+                                    </td>
+                                  </tr>
+                                  <tr className="transition-colors hover:bg-slate-700/40">
+                                    <td className="px-4 py-3 font-medium">
+                                      Ostvaren profit
+                                    </td>
+                                    <td
+                                      className={`px-4 py-3 font-semibold ${
+                                        dailyStats.profit <= 0
+                                          ? "text-red-400"
+                                          : "text-green-400"
+                                      }`}
+                                    >
+                                      {dailyStats.profit.toFixed(2)}{" "}
+                                      {defaultCurrency}
+                                    </td>
+                                  </tr>
+                                  <tr className="transition-colors hover:bg-slate-700/40">
+                                    <td className="px-4 py-3 font-medium">
+                                      Procenat prolaza
+                                    </td>
+                                    <td className="px-4 py-3">
+                                      {dailyStats.winPercentage.toFixed(2)}%
+                                    </td>
+                                  </tr>
+                                </tbody>
+                              </table>
+                            </div>
+                          </div>
 
-                                    responsive: true,
-                                    maintainAspectRatio: false,
-                                  }}
-                                  className="w-full h-80 rounded-lg shadow-lg"
+                          <div className="overflow-hidden rounded-lg border border-slate-800 bg-slate-800/30">
+                            <button
+                              onClick={() =>
+                                setAreTodayBetsVisible(!areTodayBetsVisible)
+                              }
+                              className="flex w-full items-center justify-between bg-slate-700/50 p-4 text-left font-bold text-slate-200 transition-colors hover:bg-slate-700/80 focus:outline-none"
+                            >
+                              <span>Opklade ovog dana</span>
+                              <svg
+                                xmlns="http://www.w3.org/2000/svg"
+                                viewBox="0 0 20 20"
+                                fill="currentColor"
+                                className={`h-5 w-5 transform transition-transform duration-300 ${
+                                  areTodayBetsVisible ? "rotate-180" : ""
+                                }`}
+                              >
+                                <path
+                                  fillRule="evenodd"
+                                  d="M5.22 8.22a.75.75 0 011.06 0L10 11.94l3.72-3.72a.75.75 0 111.06 1.06l-4.25 4.25a.75.75 0 01-1.06 0L5.22 9.28a.75.75 0 010-1.06z"
+                                  clipRule="evenodd"
                                 />
-                              </div>
-                              <div className="w-full ">
-                                <div className="overflow-x-auto bg-bg-blue-900 rounded-lg shadow-lg">
-                                  <table className="min-w-full table-auto text-sm border-2 rounded-lg mt-4">
-                                    <thead className="bg-gray-800 text-white rounded-lg">
-                                      <tr>
-                                        <th className="py-2 px-4 text-left">
-                                          <span>
-                                            {`Statistike za ${lineMode.day} ${
-                                              Month[lineMode.month]
-                                            }`}
-                                          </span>
-                                        </th>
-                                        <th className="py-2 px-4 text-left">
-                                          Vrednost
-                                        </th>
-                                      </tr>
-                                    </thead>
-                                    <tbody className="divide-y divide-gray-200">
-                                      {/* Total Bets Row */}
-                                      <tr>
-                                        <td className="py-2 px-4 font-semibold">
-                                          Ukupno opklada
-                                        </td>
-                                        <td className="py-2 px-4">
-                                          {
-                                            userStats?.statistics?.monthlyStats[
-                                              lineMode?.month
-                                            ].bets[lineMode?.day].length
-                                          }
-                                        </td>
-                                      </tr>
-                                      {/* Win Percentage Row */}
-                                      <tr>
-                                        <td className="py-2 px-4 font-semibold">
-                                          Dobitnih opklada
-                                        </td>
-                                        <td className="py-2 px-4">
-                                          {dailyStats.totalWins}
-                                        </td>
-                                      </tr>
-                                      <tr>
-                                        <td className="py-2 px-4 font-semibold">
-                                          Gubitnih opklada
-                                        </td>
-
-                                        <td className="py-2 px-4">
-                                          {dailyStats.totalLosses}
-                                        </td>
-                                      </tr>
-
-                                      <tr>
-                                        <td className="py-2 px-4 font-semibold">
-                                          Ostvaren profit
-                                        </td>
-
-                                        <td
-                                          className={`py-2 px-4 ${
-                                            dailyStats.profit <= 0
-                                              ? "text-red-500"
-                                              : "text-green-500"
-                                          }`}
-                                        >
-                                          {dailyStats.profit} {defaultCurrency}
-                                        </td>
-                                      </tr>
-                                      <tr>
-                                        <td className="py-2 px-4 font-semibold">
-                                          Procenat prolaza
-                                        </td>
-                                        <td className="py-2 px-4">
-                                          {dailyStats.winPercentage}%
-                                        </td>
-                                      </tr>
-                                    </tbody>
-                                  </table>
+                              </svg>
+                            </button>
+                            <div
+                              className={`grid transition-[grid-template-rows] duration-500 ease-in-out ${
+                                areTodayBetsVisible
+                                  ? "grid-rows-[1fr]"
+                                  : "grid-rows-[0fr]"
+                              }`}
+                            >
+                              <div className="overflow-hidden">
+                                <div className="max-h-[400px] overflow-y-auto p-4">
+                                  <UserBets
+                                    userStats={userStats?.statistics || {}}
+                                    bets={getBets(
+                                      lineMode.month,
+                                      lineMode.day,
+                                      null
+                                    )}
+                                    setBets={null}
+                                    setUserStats={setUserStats}
+                                  />
                                 </div>
                               </div>
                             </div>
-
-                            <div className=" p-2 overflow-x-auto max-h-[400px] flex flex-col w-full mt-3  relative">
-                              <span
-                                className="left-0 text-xl font-bold cursor-pointer bg-gray-800  p-2  hover:bg-gray-700 transition-colors duration-300 ease  flex justify-between text-gray-200 tracking-wide  py-3 sticky top-0 z-10"
-                                onClick={() =>
-                                  setAreTodayBetsVisible(!areTodayBetsVisible)
-                                }
-                              >
-                                Opklade ovog dana
-                                <span
-                                  className={`${
-                                    areTodayBetsVisible
-                                      ? "rotate-90"
-                                      : "rotate-0"
-                                  } transition-transform duration-300 ease`}
-                                >{`<`}</span>
-                              </span>
-
-                              <div
-                                className={`w-full  overflow-y-auto transition-[max-height] duration-500 ease ${
-                                  areTodayBetsVisible
-                                    ? "max-h-[500px]"
-                                    : "max-h-0"
-                                }`}
-                              >
-                                <UserBets
-                                  userStats={userStats?.statistics || {}} // Fallback to an empty object
-                                  bets={getBets(
-                                    lineMode.month,
-                                    lineMode.day,
-                                    null
-                                  )}
-                                  setBets={null}
-                                  setUserStats={setUserStats}
-                                />
-                              </div>
-                            </div>
                           </div>
-                        )
+                        </div>
                       ) : (
-                        <div className="flex font-bold text-xl justify-center items-center w-full h-full  min-h-[200px]">
-                          <span className=" shadow-md ">
-                            Nemate opklada za ovaj dan.
-                          </span>
+                        <div className="flex min-h-[400px] w-full flex-col items-center justify-center rounded-2xl bg-slate-900/50 p-6 text-center">
+                          <svg
+                            xmlns="http://www.w3.org/2000/svg"
+                            fill="none"
+                            viewBox="0 0 24 24"
+                            strokeWidth={1.5}
+                            stroke="currentColor"
+                            className="h-16 w-16 text-slate-700"
+                          >
+                            <path
+                              strokeLinecap="round"
+                              strokeLinejoin="round"
+                              d="M19.5 14.25v-2.625a3.375 3.375 0 00-3.375-3.375h-1.5A1.125 1.125 0 0113.5 7.125v-1.5a3.375 3.375 0 00-3.375-3.375H8.25m6.75 12.75h-7.5"
+                            />
+                          </svg>
+                          <h3 className="mt-4 text-xl font-semibold text-slate-400">
+                            Nema Podataka
+                          </h3>
+                          <p className="text-slate-500">
+                            Nema unetih opklada za izabrani dan.
+                          </p>
                         </div>
                       )}
                     </div>
                   </div>
 
-                  <div className="flex flex-col h-full bg-gradient-to-br from-gray-800 to-gray-900 p-6 rounded-2xl border-2 border-gray-700/40 hover:border-cyan-500/30 transition-colors duration-300 shadow-2xl shadow-black/30">
-                    <div className="space-y-6">
-                      {/* Header */}
-                      <div className="flex justify-between items-center pb-4 border-b-2 border-gray-700/40">
-                        <h2 className="text-2xl font-bold bg-gradient-to-r from-cyan-400 to-blue-400 bg-clip-text text-transparent">
-                          {(() => {
-                            const data =
-                              userStats?.statistics?.monthlyStats[
-                                lineMode.month
-                              ]?.monthlyProfit;
-                            return (
-                              <>
-                                <span>Statistike ovog meseca </span>
-                                <span
-                                  className={`block text-sm font-semibold mt-1 ${
-                                    data >= 0
-                                      ? "text-green-400"
-                                      : "text-red-400"
-                                  }`}
-                                >
-                                  {`${data >= 0 ? "+" : "-"}${Math.abs(
-                                    data
-                                  )} ${defaultCurrency}`}
-                                </span>
-                              </>
-                            );
-                          })()}
-                        </h2>
+                  <div className="group relative flex h-full flex-col rounded-2xl border border-slate-800 bg-slate-900/50 p-4 shadow-lg transition-all duration-300 hover:border-sky-500/30 sm:p-6">
+                    <div className="absolute inset-0 rounded-2xl bg-gradient-to-br from-sky-500/20 via-transparent to-transparent opacity-0 transition-opacity duration-300 group-hover:opacity-100"></div>
+
+                    <div className="relative z-10 flex flex-col space-y-6">
+                      <div className="border-b border-slate-800 pb-4">
+                        <h3 className="text-xl font-bold bg-gradient-to-r from-sky-400 to-cyan-300 bg-clip-text text-transparent">
+                          Statistike meseca
+                        </h3>
+                        <p
+                          className={`mt-1 text-3xl font-bold ${
+                            currentMonthStats?.monthlyProfit >= 0
+                              ? "text-green-400"
+                              : "text-red-400"
+                          }`}
+                        >
+                          {currentMonthStats?.monthlyProfit >= 0 ? "+" : ""}
+                          {currentMonthStats?.monthlyProfit?.toFixed(2) ||
+                            "0.00"}{" "}
+                          {defaultCurrency}
+                        </p>
                       </div>
 
-                      {/* Doughnut Chart */}
-                      <div className="relative h-64 bg-gray-900/50 rounded-xl border border-cyan-500/20 p-4">
-                        <Doughnut
-                          data={doughMonthly}
-                          options={{
-                            maintainAspectRatio: false,
-                            responsive: true,
-                            plugins: {
-                              legend: {
-                                labels: {
-                                  color: "#9CA3AF",
-                                  font: { size: 14 },
-                                },
-                              },
-                            },
-                          }}
-                        />
-                      </div>
-
-                      {/* Stats Grid */}
-                      <div className="grid gap-4">
-                        <div className="bg-gradient-to-br from-gray-800 to-gray-900 p-4 rounded-xl border-2 border-gray-700/40 hover:border-cyan-500/30 transition-colors group">
-                          <p className="text-lg font-semibold text-cyan-400">
-                            {currentMonthStats?.totalBets} opklada. (
+                      <div className="relative flex h-56 items-center justify-center sm:h-60">
+                        <Doughnut data={doughMonthly} options={null} />
+                        <div className="absolute flex flex-col items-center justify-center text-center">
+                          <span className="text-3xl font-bold text-sky-300">
                             {currentMonthStats?.totalBets
-                              ? `${Math.round(
+                              ? Math.round(
                                   (currentMonthStats.totalWins /
                                     currentMonthStats.totalBets) *
                                     100
-                                )}% prolaz`
-                              : "0% WR"}
-                            )
+                                )
+                              : 0}
+                            %
+                          </span>
+                          <span className="text-sm font-medium text-slate-500">
+                            Prolaz
+                          </span>
+                        </div>
+                      </div>
+
+                      <div className="grid grid-cols-2 gap-4">
+                        <div className="rounded-lg border border-slate-800 bg-slate-800/40 p-3 text-center">
+                          <p className="text-2xl font-semibold text-sky-400">
+                            {currentMonthStats?.totalBets || 0}
+                          </p>
+                          <p className="text-xs font-semibold uppercase text-slate-500">
+                            Ukupno
                           </p>
                         </div>
-
-                        <div className="bg-gradient-to-br from-gray-800 to-gray-900 p-4 rounded-xl border-2 border-gray-700/40 hover:border-cyan-500/30 transition-colors group">
-                          <p className="text-sm text-gray-400">
+                        <div className="rounded-lg border border-slate-800 bg-slate-800/40 p-3 text-center">
+                          <p className="text-2xl font-semibold text-slate-400">
                             {currentMonthStats?.totalBets -
                               currentMonthStats?.totalWins -
-                              currentMonthStats?.totalLosses}{" "}
-                            aktivnih opklada.
+                              currentMonthStats?.totalLosses || 0}
+                          </p>
+                          <p className="text-xs font-semibold uppercase text-slate-500">
+                            Aktivnih
                           </p>
                         </div>
-
-                        <div className="bg-gradient-to-br from-green-900/40 to-green-800/30 p-4 rounded-xl border-2 border-green-500/30 hover:border-green-400/50 transition-colors group">
-                          <p className="text-sm text-green-400">
-                            {currentMonthStats?.totalWins} dobitnih opklada.
+                        <div className="rounded-lg border border-green-500/20 bg-green-900/30 p-3 text-center">
+                          <p className="text-2xl font-semibold text-green-400">
+                            {currentMonthStats?.totalWins || 0}
+                          </p>
+                          <p className="text-xs font-semibold uppercase text-slate-500">
+                            Dobitnih
                           </p>
                         </div>
-
-                        <div className="bg-gradient-to-br from-red-900/40 to-red-800/30 p-4 rounded-xl border-2 border-red-500/30 hover:border-red-400/50 transition-colors group">
-                          <p className="text-sm text-red-400">
-                            {currentMonthStats?.totalLosses} gubitnih opklada.
+                        <div className="rounded-lg border border-red-500/20 bg-red-900/30 p-3 text-center">
+                          <p className="text-2xl font-semibold text-red-400">
+                            {currentMonthStats?.totalLosses || 0}
+                          </p>
+                          <p className="text-xs font-semibold uppercase text-slate-500">
+                            Gubitnih
                           </p>
                         </div>
                       </div>
@@ -1215,16 +1180,14 @@ export default function Statistics(): React.ReactNode {
                   </div>
                 </div>
 
-                <div className="overflow-x-auto max-h-[400px] overflow-hidden w-full relative">
-                  {/* Sticky Header */}
-                  <div className="sticky top-0 bg-gradient-to-r from-gray-800 to-gray-700 shadow-md rounded-t-lg z-10 flex justify-center items-center py-4">
-                    <span className="text-xl font-bold text-gray-200 tracking-wide ">
-                      Poslednje opklade
-                    </span>
+                <div className="flex h-max w-full flex-col overflow-hidden rounded-2xl border border-slate-800 bg-slate-900/50 shadow-lg">
+                  <div className="sticky top-0 z-10 border-b border-slate-800 bg-slate-900/70 p-4 backdrop-blur-sm">
+                    <h3 className="text-center text-base font-bold uppercase tracking-wider text-sky-400 sm:text-lg">
+                      Poslednje Opklade
+                    </h3>
                   </div>
 
-                  {/* Scrollable Content */}
-                  <div className="overflow-y-auto max-h-[360px] ">
+                  <div className="flex-1 space-y-3 overflow-y-auto p-4">
                     <UserBets
                       bets={getBets("", "", true)}
                       userStats={userStats?.statistics}
@@ -1237,17 +1200,31 @@ export default function Statistics(): React.ReactNode {
           )}
         </div>
         {userStats?.statistics?.initialInvestment && (
-          <button
-            className="cursor-pointer fixed bottom-4 right-6 flex items-center gap-2 rounded-lg px-4 py-2 bg-blue-500/80 hover:bg-blue-600 text-white font-semibold shadow-lg hover:shadow-xl transition-all duration-300 ease-in-out transform hover:scale-105 group z-50"
-            onClick={() =>
-              !betBuilder.visible &&
-              setBetBuilder((prev) => ({ ...prev, visible: true }))
-            }
-          >
-            <span className="transition-all duration-300 group-hover:mr-1">
-              Dodaj Opkladu
-            </span>
-          </button>
+          <div className="fixed bottom-6 right-6 z-50 pointer-events-none">
+            <div className="relative flex items-center">
+              <button
+                onClick={() =>
+                  !betBuilder.visible &&
+                  setBetBuilder((prev) => ({ ...prev, visible: true }))
+                }
+                className="group opacity-50 hover:opacity-100 pointer-events-auto flex items-center justify-center gap-2 whitespace-nowrap rounded-full bg-gradient-to-br from-sky-500 to-cyan-400 px-5 py-3 font-semibold text-white shadow-lg shadow-sky-900/40 transition-all duration-300 ease-in-out hover:scale-105 hover:shadow-xl hover:shadow-sky-800/50 focus:outline-none focus:ring-4 focus:ring-sky-500/50"
+              >
+                <svg
+                  xmlns="http://www.w3.org/2000/svg"
+                  viewBox="0 0 24 24"
+                  fill="currentColor"
+                  className="h-6 w-6 transition-transform duration-300 group-hover:rotate-90"
+                >
+                  <path
+                    fillRule="evenodd"
+                    d="M12 2.25c-5.385 0-9.75 4.365-9.75 9.75s4.365 9.75 9.75 9.75 9.75-4.365 9.75-9.75S17.385 2.25 12 2.25zM12.75 9a.75.75 0 00-1.5 0v2.25H9a.75.75 0 000 1.5h2.25V15a.75.75 0 001.5 0v-2.25H15a.75.75 0 000-1.5h-2.25V9z"
+                    clipRule="evenodd"
+                  />
+                </svg>
+                <span>Dodaj Opkladu</span>
+              </button>
+            </div>
+          </div>
         )}
 
         {betBuilder.visible && (
