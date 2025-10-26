@@ -1,5 +1,5 @@
 import { useLocation, useNavigate } from "react-router";
-import { useState, FC, ReactNode } from "react";
+import { useState, FC, ReactNode, useEffect } from "react";
 import { useDispatch } from "react-redux";
 
 // --- Mocking Redux and Assets for self-contained example ---
@@ -35,6 +35,7 @@ const logo = "https://placehold.co/100x100/0E7490/FFFFFF?text=I";
 
 export default function Sidebar(): ReactNode {
   const currentUser = useSelector((state: RootState) => state.user);
+
   const nav = useNavigate();
   const dispatch = useDispatch();
   const [sidebarVisible, setSidebarVisible] = useState(false);
@@ -223,63 +224,80 @@ export default function Sidebar(): ReactNode {
           })}
         </nav>
 
-        <div className="p-4 mt-auto border-t border-cyan-500/20 space-y-4 shrink-0">
-          {currentUser.tier === "FREE" && (
-            <button
-              onClick={() => nav("/kupi")}
-              className="w-full bg-gradient-to-r from-amber-500 to-orange-600 text-white font-bold py-3 px-4 rounded-lg flex items-center justify-center gap-3 transition-all duration-300 hover:shadow-lg hover:shadow-amber-500/30 hover:scale-105"
-            >
-              <svg className="w-6 h-6" fill="currentColor" viewBox="0 0 20 20">
-                <path d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.07 3.292a1 1 0 00.95.69h3.462c.969 0 1.371 1.24.588 1.81l-2.8 2.034a1 1 0 00-.364 1.118l1.07 3.292c.3.921-.755 1.688-1.54 1.118l-2.8-2.034a1 1 0 00-1.175 0l-2.8 2.034c-.784.57-1.838-.197-1.539-1.118l1.07-3.292a1 1 0 00-.364-1.118L2.98 8.72c-.783-.57-.38-1.81.588-1.81h3.461a1 1 0 00.951-.69l1.07-3.292z" />
-              </svg>
-              <span>Postani Član</span>
-            </button>
+        <>
+          {/* The button is now correctly hidden for users with "PREMIUM" or "premium" tier */}
+          {console.log("Tier value:", currentUser?.tier)}
+          {currentUser?.tier?.trim().toLowerCase() === "free" && (
+            <div className="p-4">
+              <button
+                onClick={() => nav("/kupi")}
+                className="w-full bg-gradient-to-r from-amber-500 via-orange-500 to-red-500 text-white font-bold py-3 px-4 rounded-xl flex items-center justify-center gap-3 transition-all duration-300 ease-in-out transform hover:shadow-lg hover:shadow-amber-500/40 hover:scale-105 group"
+              >
+                <svg
+                  xmlns="http://www.w3.org/2000/svg"
+                  className="h-6 w-6 transition-transform duration-300 group-hover:rotate-12"
+                  viewBox="0 0 20 20"
+                  fill="currentColor"
+                >
+                  <path d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.07 3.292a1 1 0 00.95.69h3.462c.969 0 1.371 1.24.588 1.81l-2.8 2.034a1 1 0 00-.364 1.118l1.07 3.292c.3.921-.755 1.688-1.54 1.118l-2.8-2.034a1 1 0 00-1.175 0l-2.8 2.034c-.784.57-1.838-.197-1.539-1.118l1.07-3.292a1 1 0 00-.364-1.118L2.98 8.72c-.783-.57-.38-1.81.588-1.81h3.461a1 1 0 00.951-.69l1.07-3.292z" />
+                </svg>
+                <span className="text-lg">Kupi Premium</span>
+              </button>
+            </div>
           )}
 
-          <div className="flex items-center gap-2">
-            <button
-              onClick={() => nav("/my-account")}
-              className="flex-1 bg-gray-800/60 text-gray-300 font-medium py-2 px-3 rounded-md hover:bg-gray-700/80 hover:text-white transition-colors flex items-center justify-center gap-2"
-            >
-              <svg
-                className="w-5 h-5"
-                fill="none"
-                stroke="currentColor"
-                viewBox="0 0 24 24"
+          {/* Redesigned Footer Section */}
+          <div className="p-4 mt-auto border-t-2 border-blue-500/10 space-y-4 shrink-0">
+            <div className="flex items-center gap-2">
+              <button
+                onClick={() => nav("/my-account")}
+                className="flex-1 bg-slate-800/60 text-slate-300 font-medium py-2.5 px-3 rounded-lg hover:bg-slate-700/80 hover:text-white transition-colors flex items-center justify-center gap-2 group"
               >
-                <path
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  strokeWidth={2}
-                  d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z"
-                />
-              </svg>
-              <span>Nalog</span>
-            </button>
-            <button
-              onClick={LogOff}
-              className="bg-red-600/20 text-red-400 p-2 rounded-md hover:bg-red-600/40 hover:text-red-300 transition-colors"
-              aria-label="Odjavi se"
-            >
-              <svg
-                className="w-5 h-5"
-                fill="none"
-                stroke="currentColor"
-                viewBox="0 0 24 24"
+                <svg
+                  className="w-5 h-5 transition-transform duration-300 group-hover:scale-110"
+                  fill="none"
+                  stroke="currentColor"
+                  viewBox="0 0 24 24"
+                >
+                  <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    strokeWidth={2}
+                    d="M15.75 6a3.75 3.75 0 11-7.5 0 3.75 3.75 0 017.5 0zM4.501 20.118a7.5 7.5 0 0114.998 0A17.933 17.933 0 0112 21.75c-2.676 0-5.216-.584-7.499-1.632z"
+                  />
+                </svg>
+                <span>Nalog</span>
+              </button>
+              <button
+                onClick={LogOff}
+                className="bg-red-900/40 text-red-400 p-2.5 rounded-lg hover:bg-red-800/60 hover:text-red-300 transition-colors group"
+                aria-label="Odjavi se"
               >
-                <path
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  strokeWidth={2}
-                  d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1"
-                />
-              </svg>
-            </button>
+                <svg
+                  className="w-5 h-5 transition-transform duration-300 group-hover:scale-110"
+                  fill="none"
+                  stroke="currentColor"
+                  viewBox="0 0 24 24"
+                >
+                  <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    strokeWidth={2}
+                    d="M15.75 9V5.25A2.25 2.25 0 0013.5 3h-6a2.25 2.25 0 00-2.25 2.25v13.5A2.25 2.25 0 007.5 21h6a2.25 2.25 0 002.25-2.25V15m3 0l3-3m0 0l-3-3m3 3H9"
+                  />
+                </svg>
+              </button>
+            </div>
+            <div className="text-center text-slate-500 text-xs pt-2">
+              <a
+                href="mailto:podrska@insajder.tips"
+                className="hover:text-slate-300 transition-colors"
+              >
+                podrska@insajder.tips
+              </a>
+            </div>
           </div>
-          <div className="text-center text-gray-500 text-xs">
-            podrska@insajder.tips
-          </div>
-        </div>
+        </>
       </div>
     </>
   );

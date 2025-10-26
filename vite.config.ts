@@ -26,6 +26,7 @@ export default defineConfig({
       "/updateCapital": "http://localhost:1337",
       "/updateStatistics": "http://localhost:1337",
       "/updateBet": "http://localhost:1337",
+      "/resend-code": "http://localhost:1337",
 
       // Special configuration for WebSockets
       "/socket.io": {

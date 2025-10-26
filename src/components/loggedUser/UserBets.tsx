@@ -45,20 +45,17 @@ export default function UserBets({
       const odds = isParlay ? Number(bet.totalOdds) : Number(bet.odds);
       const betId = isParlay ? bet.parlayId : bet.betId;
       const status = bet.status;
-
       const dateParts = bet.date.split("/").map(Number);
-      if (dateParts.length < 2 || isNaN(dateParts[0]) || isNaN(dateParts[1])) {
-        throw new Error("Invalid bet date format: " + bet.date);
-      }
-      const [month] = dateParts;
+      const [month, day] = dateParts;
       const monthIndex = month - 1;
+
+      const profit = stake * (odds - 1);
 
       let balanceChange = 0;
       let profitChange = 0;
       let winCountChange = 0;
       let lossCountChange = 0;
       let activeCountChange = 0;
-      const profit = stake * (odds - 1);
 
       if (status === "win") {
         balanceChange = -profit;
@@ -66,7 +63,7 @@ export default function UserBets({
         winCountChange = -1;
       } else if (status === "loss") {
         balanceChange = stake;
-        profitChange = 0;
+        profitChange = stake;
         lossCountChange = -1;
       } else {
         balanceChange = stake;
@@ -75,21 +72,27 @@ export default function UserBets({
       }
 
       const updates = [];
-      if (balanceChange !== 0) {
-        updates.push({
-          updatePath: "statistics.initialInvestment",
-          newValue:
-            status === "win" ? balanceChange + stake : balanceChange - stake,
-          increment: true,
-        });
-      }
-      if (profitChange !== 0) {
+
+      // For settled bets (win/loss), we assume the /removeBet endpoint handles the profit.
+      // So, we ONLY send the profit update to /updateStatistics for an "active" bet.
+      // Since profitChange is 0 for active bets, this effectively sends no financial data.
+      if (status !== "win" && status !== "loss") {
         updates.push({
           updatePath: `statistics.monthlyStats.${monthIndex}.monthlyProfit`,
-          newValue: profitChange + stake,
+          newValue: profitChange,
           increment: true,
         });
       }
+
+      updates.push(
+        { updatePath: "statistics.totalBets", newValue: -1, increment: true },
+        {
+          updatePath: `statistics.monthlyStats.${monthIndex}.totalBets`,
+          newValue: -1,
+          increment: true,
+        }
+      );
+
       if (winCountChange !== 0) {
         updates.push(
           {
@@ -126,16 +129,14 @@ export default function UserBets({
         });
       }
 
-      if (updates.length > 0) {
-        await fetch("/updateStatistics", {
-          method: "PUT",
-          headers: {
-            "Content-Type": "application/json",
-            Authorization: "Bearer " + JWT,
-          },
-          body: JSON.stringify({ updates }),
-        });
-      }
+      await fetch("/updateStatistics", {
+        method: "PUT",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: "Bearer " + JWT,
+        },
+        body: JSON.stringify({ updates }),
+      });
 
       await fetch("/removeBet", {
         method: "PUT",
@@ -147,32 +148,24 @@ export default function UserBets({
       });
 
       setUserStats((prev) => {
-        if (!prev || !prev.statistics) return prev;
-
+        if (!prev || !prev.statistics) {
+          return prev;
+        }
         const newState = JSON.parse(JSON.stringify(prev));
         const stats = newState.statistics;
         const monthly = stats.monthlyStats[monthIndex];
-        const day = dateParts[1];
 
-        stats.initialInvestment =
-          status === "win"
-            ? Number(stats.initialInvestment) -
-              (Number(stake) * Number(odds) - Number(stake))
-            : status === "loss"
-            ? Number(stats.initialInvestment) + Number(stake)
-            : stats.initialInvestment;
-
-        stats.totalWins = (Number(stats.totalWins) || 0) + winCountChange;
-        stats.totalLosses = (Number(stats.totalLosses) || 0) + lossCountChange;
-        stats.totalBets = Number(stats.totalBets - 1);
+        stats.initialInvestment += balanceChange;
+        stats.totalBets = Math.max(0, (stats.totalBets || 0) - 1);
+        stats.totalWins += winCountChange;
+        stats.totalLosses += lossCountChange;
 
         if (monthly) {
-          monthly.monthlyProfit = monthly.totalWins =
-            (Number(monthly.totalWins) || 0) + winCountChange;
-          monthly.totalLosses =
-            (Number(monthly.totalLosses) || 0) + lossCountChange;
-          monthly.totalActive =
-            (Number(monthly.totalActive) || 0) + activeCountChange;
+          monthly.monthlyProfit += profitChange;
+          monthly.totalBets = Math.max(0, (monthly.totalBets || 0) - 1);
+          monthly.totalWins += winCountChange;
+          monthly.totalLosses += lossCountChange;
+          monthly.totalActive += activeCountChange;
 
           if (monthly.bets && monthly.bets[day]) {
             monthly.bets[day] = monthly.bets[day].filter((b) => {
@@ -181,246 +174,217 @@ export default function UserBets({
             });
           }
         }
-
         return newState;
       });
     } catch (error) {
       console.error("Error removing bet:", error);
     }
   };
-
   const closeEditor = () => {
     setEditor((prev) => ({ ...prev, bet: null, visible: false }));
   };
-  /**
-   * Saves changes to a bet's status and updates all relevant user statistics
-   * on both the client and the server.
-   *
-   * This function implements a clear, centralized logic for calculating financial changes
-   * to prevent data inconsistencies.
-   *
-   * @param {object} editor - State object containing the bet being edited.
-   * @param {object} userStats - The user's current statistics object.
-   * @param {function} setUserStats - The state setter for user statistics.
-   * @param {function} setEditor - The state setter for the editor.
-   * @param {string} JWT - The JSON Web Token for authorization.
-   */
-  const saveChanges = () => {
-    // Extract key information about the bet from the editor state.
+
+  async function saveChanges() {
     const isParlay = editor.parlay;
     const betData = isParlay ? editor.bet[0] : editor.bet;
     const previousStatus = betData.status;
     const newStatus = editor.newStatus;
 
-    // Proceed only if the status has actually changed.
-    if (newStatus && newStatus !== previousStatus) {
-      const stake = betData.stake;
-      const odds = isParlay ? betData.totalOdds : betData.odds;
-      const betId = isParlay ? betData.parlayId : betData.betId;
-      const [month, day] = betData.date.split("/").map(Number);
-      const monthIndex = month - 1;
+    if (!newStatus || newStatus === previousStatus) {
+      setEditor((prev) => ({
+        ...prev,
+        editorStatus: "This is already the current status.",
+      }));
+      console.log("abort: no status change", { previousStatus, newStatus });
+      return;
+    }
 
-      // --- Centralized Calculation Logic ---
-      // Instead of "undoing" and "redoing", we calculate the net change needed.
-      let balanceChange = 0;
-      let profitChange = 0;
-      let winCountChange = 0;
-      let lossCountChange = 0;
+    const stake = Number(betData.stake);
+    const odds = Number(isParlay ? betData.totalOdds : betData.odds);
+    const betId = isParlay ? betData.parlayId : betData.betId;
+    const [monthNum, dayNum] = (betData.date || "1/1").split("/").map(Number);
+    const monthIndex = Math.max(0, (monthNum || 1) - 1);
+    const dayIndex = Math.max(1, dayNum || 1);
 
-      const profit = stake * (odds - 1); // The net profit from a win.
-      const totalReturn = stake * odds; // The full amount returned on a win (stake + profit).
+    console.log("saveChanges start", {
+      betId,
+      previousStatus,
+      newStatus,
+      stake,
+      odds,
+      monthIndex,
+      dayIndex,
+    });
 
-      // Scenario 1: Transitioning from LOST to WON
-      if (previousStatus === "loss" && newStatus === "win") {
-        // The balance needs the full winnings added.
-        balanceChange = totalReturn;
-        // The profit was negative (-stake), now it's positive (profit).
-        // The change is profit - (-stake) => profit + stake => totalReturn.
-        profitChange = totalReturn;
-        winCountChange = 1;
-        lossCountChange = -1;
-      }
-      // Scenario 2: Transitioning from WON to LOST
-      else if (previousStatus === "win" && newStatus === "loss") {
-        // Balance had the winnings, now they must be removed.
-        balanceChange = -totalReturn;
-        // Profit had the net profit, now it must be a loss of -stake.
-        // The change is -stake - profit => -(stake + profit) => -totalReturn.
-        profitChange = -totalReturn;
-        winCountChange = -1;
-        lossCountChange = 1;
-      }
-      // Scenario 3: A pending/active bet becomes a WIN
-      // (This also covers changing a void/refunded bet to a win)
-      else if (previousStatus !== "win" && newStatus === "win") {
-        balanceChange = totalReturn;
-        profitChange = profit;
-        winCountChange = 1;
-      }
-      // Scenario 4: A pending/active bet becomes a LOSS
-      else if (previousStatus !== "loss" && newStatus === "loss") {
-        // Balance is unaffected as the stake was already removed when the bet was placed.
-        balanceChange = 0;
-        profitChange = -stake;
-        lossCountChange = 1;
-      }
-      // Scenario 5: A WIN is reverted to pending/void
-      else if (previousStatus === "win" && newStatus !== "loss") {
-        balanceChange = -totalReturn;
-        profitChange = -profit;
-        winCountChange = -1;
-      }
-      // Scenario 6: A LOSS is reverted to pending/void
-      else if (previousStatus === "loss" && newStatus !== "win") {
-        // Balance is unaffected.
-        balanceChange = 0;
-        // The recorded loss of `stake` is reversed.
-        profitChange = stake;
-        lossCountChange = -1;
-      }
+    const contributionFor = (status) => {
+      const profit = stake * (odds - 1);
+      if (status === "active")
+        return { initialInvestment: -stake, monthlyProfit: 0 };
+      if (status === "loss")
+        return { initialInvestment: -stake, monthlyProfit: -stake };
+      if (status === "win")
+        return { initialInvestment: profit, monthlyProfit: profit };
+      return { initialInvestment: 0, monthlyProfit: 0 };
+    };
 
-      // --- Prepare Server Updates ---
-      // Create an array of update operations based on the calculated changes.
-      const updates = [];
-      if (balanceChange !== 0) {
-        updates.push({
-          updatePath: "statistics.initialInvestment",
-          newValue: balanceChange,
-          increment: true,
-        });
-      }
-      if (profitChange !== 0) {
-        updates.push({
-          updatePath: `statistics.monthlyStats.${monthIndex}.monthlyProfit`,
-          newValue: profitChange,
-          increment: true,
-        });
-      }
-      if (winCountChange !== 0) {
-        updates.push(
-          {
-            updatePath: "statistics.totalWins",
-            newValue: winCountChange,
-            increment: true,
-          },
-          {
-            updatePath: `statistics.monthlyStats.${monthIndex}.totalWins`,
-            newValue: winCountChange,
-            increment: true,
-          }
-        );
-      }
-      if (lossCountChange !== 0) {
-        updates.push(
-          {
-            updatePath: "statistics.totalLosses",
-            newValue: lossCountChange,
-            increment: true,
-          },
-          {
-            updatePath: `statistics.monthlyStats.${monthIndex}.totalLosses`,
-            newValue: lossCountChange,
-            increment: true,
-          }
-        );
-      }
+    const prevContrib = contributionFor(previousStatus);
+    const newContrib = contributionFor(newStatus);
 
-      // --- Update Local State ---
-      // Apply the exact same calculated changes to the local state for a responsive UI.
-      setUserStats((prev) => {
-        if (!prev || !prev.statistics) return prev;
+    const balanceChange =
+      newContrib.initialInvestment - prevContrib.initialInvestment;
+    const profitChange = newContrib.monthlyProfit - prevContrib.monthlyProfit;
 
-        // Deep copy to avoid direct state mutation.
-        const newState = JSON.parse(JSON.stringify(prev));
-        const stats = newState.statistics;
-        const monthly = stats.monthlyStats[monthIndex];
+    let winCountChange = 0;
+    let lossCountChange = 0;
+    if (previousStatus !== "win" && newStatus === "win") winCountChange = 1;
+    if (previousStatus === "win" && newStatus !== "win") winCountChange = -1;
+    if (previousStatus !== "loss" && newStatus === "loss") lossCountChange = 1;
+    if (previousStatus === "loss" && newStatus !== "loss") lossCountChange = -1;
 
-        stats.initialInvestment += balanceChange;
-        stats.totalWins += winCountChange;
-        stats.totalLosses += lossCountChange;
+    console.log("computed deltas", {
+      prevContrib,
+      newContrib,
+      balanceChange,
+      profitChange,
+      winCountChange,
+      lossCountChange,
+    });
 
-        if (monthly) {
-          monthly.monthlyProfit += profitChange;
-          monthly.totalWins += winCountChange;
-          monthly.totalLosses += lossCountChange;
-        }
-
-        // Also update the status of the specific bet in the local array.
-        const localBet = monthly.bets[day]?.find((bet) =>
-          isParlay ? bet[0]?.parlayId === betId : bet?.betId === betId
-        );
-
-        if (localBet) {
-          if (isParlay) {
-            localBet[0].status = newStatus;
-          } else {
-            localBet.status = newStatus;
-          }
-        }
-
-        return newState;
+    const updates = [];
+    if (balanceChange !== 0)
+      updates.push({
+        updatePath: "statistics.initialInvestment",
+        newValue: balanceChange,
+        increment: true,
       });
+    if (profitChange !== 0)
+      updates.push({
+        updatePath: `statistics.monthlyStats.${monthIndex}.monthlyProfit`,
+        newValue: profitChange,
+        increment: true,
+      });
+    if (winCountChange !== 0) {
+      updates.push({
+        updatePath: "statistics.totalWins",
+        newValue: winCountChange,
+        increment: true,
+      });
+      updates.push({
+        updatePath: `statistics.monthlyStats.${monthIndex}.totalWins`,
+        newValue: winCountChange,
+        increment: true,
+      });
+    }
+    if (lossCountChange !== 0) {
+      updates.push({
+        updatePath: "statistics.totalLosses",
+        newValue: lossCountChange,
+        increment: true,
+      });
+      updates.push({
+        updatePath: `statistics.monthlyStats.${monthIndex}.totalLosses`,
+        newValue: lossCountChange,
+        increment: true,
+      });
+    }
 
-      // --- Perform API Calls ---
-      // Chain the API calls to first update statistics, then the bet itself.
-      fetch("/updateStatistics", {
+    console.log("updates payload", updates);
+
+    setUserStats((prev) => {
+      if (!prev || !prev.statistics) {
+        console.log("setUserStats aborted: missing prev.stats");
+        return prev;
+      }
+
+      const newState = JSON.parse(JSON.stringify(prev));
+      const stats = newState.statistics;
+      const monthly = stats.monthlyStats && stats.monthlyStats[monthIndex];
+
+      stats.initialInvestment += balanceChange;
+      stats.totalWins += winCountChange;
+      stats.totalLosses += lossCountChange;
+
+      if (monthly) {
+        monthly.monthlyProfit += profitChange;
+        monthly.totalWins += winCountChange;
+        monthly.totalLosses += lossCountChange;
+      } else {
+        console.log("warning: monthly stat missing for monthIndex", monthIndex);
+      }
+
+      const localBet = monthly?.bets?.[dayIndex]?.find((bet) =>
+        isParlay ? bet[0]?.parlayId === betId : bet?.betId === betId
+      );
+
+      if (localBet) {
+        if (isParlay) localBet[0].status = newStatus;
+        else localBet.status = newStatus;
+      } else {
+        console.log("warning: localBet not found", {
+          monthIndex,
+          dayIndex,
+          betId,
+        });
+      }
+
+      console.log("local state updated", {
+        balanceChange,
+        profitChange,
+        winCountChange,
+        lossCountChange,
+      });
+      return newState;
+    });
+
+    try {
+      const statRes = await fetch("/updateStatistics", {
         method: "PUT",
         headers: {
           "Content-Type": "application/json",
           Authorization: "Bearer " + JWT,
         },
         body: JSON.stringify({ updates }),
-      })
-        .then((response) => {
-          if (!response.ok)
-            throw new Error(`HTTP error! Status: ${response.status}`);
-          return response.json();
-        })
-        .then(() => {
-          // After successfully updating stats, update the bet's status.
-          return fetch("/updateBet", {
-            method: "PUT",
-            headers: {
-              "Content-Type": "application/json",
-              Authorization: "Bearer " + JWT,
-            },
-            body: JSON.stringify({
-              bet: {
-                betId: betId,
-                date: betData.date,
-                newStatus: newStatus,
-                isParlay: isParlay,
-              },
-            }),
-          });
-        })
-        .then((response) => {
-          if (!response.ok)
-            throw new Error(`HTTP error! Status: ${response.status}`);
-          return response.json();
-        })
-        .then(() => {
-          // Finally, update the editor state to reflect the change and reset.
-          setEditor((prev) => ({
-            ...prev,
-            bet: isParlay
-              ? [{ ...prev.bet[0], status: newStatus }]
-              : { ...prev.bet, status: newStatus },
-            newStatus: "", // Clear newStatus after successful update.
-          }));
-        })
-        .catch((error) => {
-          console.error("Error updating bet:", error);
-          // Here you could add logic to revert the local state change on API failure.
-        });
-    } else {
-      // If the status hasn't changed, notify the user.
+      });
+      const statJson = await statRes.json().catch(() => ({}));
+      console.log("updateStatistics response", {
+        ok: statRes.ok,
+        status: statRes.status,
+        body: statJson,
+      });
+      if (!statRes.ok)
+        throw new Error(`updateStatistics failed ${statRes.status}`);
+
+      const betRes = await fetch("/updateBet", {
+        method: "PUT",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: "Bearer " + JWT,
+        },
+        body: JSON.stringify({
+          bet: { betId, date: betData.date, newStatus, isParlay },
+        }),
+      });
+      const betJson = await betRes.json().catch(() => ({}));
+      console.log("updateBet response", {
+        ok: betRes.ok,
+        status: betRes.status,
+        body: betJson,
+      });
+      if (!betRes.ok) throw new Error(`updateBet failed ${betRes.status}`);
+
       setEditor((prev) => ({
         ...prev,
-        editorStatus: "This is already the current status.",
+        bet: isParlay
+          ? [{ ...prev.bet[0], status: newStatus }]
+          : { ...prev.bet, status: newStatus },
+        newStatus: "",
       }));
+
+      console.log("saveChanges finished successfully", { betId, newStatus });
+    } catch (err) {
+      console.error("saveChanges error", err);
     }
-  };
+  }
 
   return (
     <div className="relative max-h-[calc(100vh-200px)] overflow-auto select-none scrollbar-thin scrollbar-track-transparent scrollbar-thumb-gray-700/50">

@@ -9,7 +9,8 @@ const socketIo = require("socket.io");
 const rateLimit = require("express-rate-limit");
 const nodemailer = require("nodemailer");
 const { v4: uuidv4 } = require("uuid");
-
+const cookieParser = require("cookie-parser");
+app.use(cookieParser());
 app.use(express.json());
 app.use(cors());
 const server = http.createServer(app);
@@ -187,15 +188,99 @@ io.on("connection", (socket) => {
 });
 
 app.post("/login", async (req, res) => {
-  const { email, password } = req.body;
-  const user = await User.findOne({ email: email, password: password }).lean();
+  try {
+    const { email, password, rememberMe } = req.body; // Read the flag
 
-  if (!user) {
-    return res.status(404).json({ message: "Pogresan email ili sifra." });
+    // This is your original user lookup method, kept intact
+    const user = await User.findOne({
+      email: email,
+      password: password,
+    }).lean();
+
+    if (!user) {
+      return res.status(404).json({ message: "Pogresan email ili sifra." });
+    }
+
+    // --- "Remember Me" Logic ---
+    // Set the token's lifetime based on the flag
+    const expiresIn = rememberMe ? "30d" : "1h";
+
+    const payload = { userId: user._id, email: user.email, tier: user.tier };
+
+    // Create the token with the correct expiration
+    const token = jwt.sign(payload, JWT_SECRET, { expiresIn });
+    // --- End of "Remember Me" Logic ---
+
+    // Send the token back in the JSON response, as your client expects
+    res.send({ token });
+  } catch (error) {
+    console.error("Login error:", error);
+    res.status(500).json({ message: "Greška na serveru." });
   }
-  const payload = { userId: user._id, email: user.email, tier: user.tier };
-  const token = jwt.sign(payload, JWT_SECRET);
-  res.send({ token });
+});
+app.post("/resend-code", async (req, res) => {
+  // Only need the email for resending the code
+  const { email } = req.body;
+
+  // Check if the required field is present
+  if (!email) {
+    return res
+      .status(401)
+      .json({ message: "Doslo je do greske. Unesite email." });
+  }
+
+  try {
+    // 1. Find the existing user by email
+    // (Assumes User model is available in scope)
+    const existingUser = await User.findOne({ email });
+
+    if (!existingUser) {
+      return res
+        .status(404)
+        .json({ message: "Korisnik sa tim emailom nije pronadjen." });
+    }
+
+    // 2. Generate new verification code and expiration time
+    const verificationCode = Math.floor(
+      100000 + Math.random() * 900000
+    ).toString();
+    const codeExpiresAt = new Date(Date.now() + 10 * 60 * 1000); // Code expires in 10 minutes
+
+    // 3. Update the existing user's verification fields
+    existingUser.verificationCode = verificationCode;
+    existingUser.codeExpiresAt = codeExpiresAt;
+    existingUser.isVerified = false; // Ensure verification status is reset upon resend
+
+    // Save the updated user object to the database
+    await existingUser.save();
+
+    // 4. Set up email transport and send the new code
+    // (Replicating the transport setup from your register function)
+    const transport = nodemailer.createTransport({
+      service: "gmail",
+      auth: {
+        user: "insajderxtips@gmail.com",
+        pass: "uyvb dtaf wyma lrdr",
+      },
+    });
+
+    await transport.sendMail({
+      from: "Insajder verifikacija (:",
+      to: email,
+      subject: "InsajderTips | NOVI Verifikacioni Kod",
+      text: "Vaš novi verifikacioni kod je: " + verificationCode,
+    });
+
+    // 5. Send success response
+    res
+      .status(200)
+      .json({ message: "Novi verifikacioni kod je uspesno poslat!" });
+  } catch (err) {
+    console.error("Greska pri ponovnom slanju koda:", err);
+    res
+      .status(500)
+      .json({ message: "Doslo je do greske na serveru prilikom slanja koda." });
+  }
 });
 app.post("/register", async (req, res) => {
   const { email, password, username, defaultCurrency } = req.body;
@@ -318,8 +403,8 @@ app.post("/register", async (req, res) => {
       const transport = nodemailer.createTransport({
         service: "gmail",
         auth: {
-          user: "bogdandjakovic123@gmail.com",
-          pass: "xxrs arbb nioh nmzm",
+          user: "insajderxtips@gmail.com",
+          pass: "uyvb dtaf wyma lrdr",
         },
       });
       await transport.sendMail({
@@ -851,13 +936,13 @@ app.post("/requestPasswordResetCode", async (req, res) => {
   const transport = nodemailer.createTransport({
     service: "gmail",
     auth: {
-      user: "bogdandjakovic123@gmail.com",
-      pass: "xxrs arbb nioh nmzm",
+      user: "insajderxtips@gmail.com",
+      pass: "krdp zpun xpku cdmk",
     },
   });
 
   await transport.sendMail({
-    from: "Insajder verifikacija (:",
+    from: "InsajderTips | Resetujte sifru",
     to: email,
     subject: "InsajderTips | Resetujte Sifru",
     text: `Da biste resetovali sifru, kliknite na sledeći link: ${resetLink}\n\nAko niste vi zahtevali, ignorisite ovaj email.`,
@@ -1743,4 +1828,5 @@ app.post("/addPayment", wuLimiter, async (req, res) => {
   });
   res.status(200).json(payment);
 });
+
 server.listen(1337, () => console.log("Listening on port 1337."));

@@ -17,10 +17,17 @@ export default function Login({ mode }: { mode: string }): React.ReactNode {
   const [isPasswordVisible, setIsPasswordVisible] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const [resetStatus, setResetStatus] = useState(null);
-
+  const [rememberMe, setRememberMe] = useState(false);
   const nav = useNavigate();
   const dispatch = useDispatch();
-
+  const handleKeyDown = (event: KeyboardEvent<HTMLInputElement>) => {
+    if (event.key === "Enter") {
+      // Prevent the default Enter key behavior (like adding a new line)
+      event.preventDefault();
+      // Trigger the same function that your main button calls
+      handleAuth(currentView === "login" ? "login" : "register");
+    }
+  };
   const validateForm = (): boolean => {
     if (currentView === "register") {
       if (
@@ -77,9 +84,15 @@ export default function Login({ mode }: { mode: string }): React.ReactNode {
 
     try {
       const endpoint = action === "login" ? "login" : "register";
+
+      // The ONLY change is adding the 'rememberMe' flag here
       const body =
         action === "login"
-          ? { email: formData.email, password: formData.password }
+          ? {
+              email: formData.email,
+              password: formData.password,
+              rememberMe: rememberMe, // This is the required change
+            }
           : {
               email: formData.email,
               password: formData.password,
@@ -104,6 +117,8 @@ export default function Login({ mode }: { mode: string }): React.ReactNode {
       }
 
       const data = await res.json();
+
+      // This line will now work correctly
       localStorage.setItem("insajder_token", data.token);
 
       const userRes = await fetch("/user", {
@@ -167,12 +182,16 @@ export default function Login({ mode }: { mode: string }): React.ReactNode {
           <div className="absolute inset-0 bg-gradient-to-br from-gray-900/80 via-gray-900/40 to-transparent"></div>
         </div>
 
-        {/* Form Section */}
         <div className="w-full lg:w-1/2 p-6 sm:p-10 flex flex-col justify-center text-white">
           {currentView === "passreset" ? (
             <RequestPasswordReset view={currentView} setView={setCurrentView} />
           ) : (
-            <>
+            <form
+              onSubmit={(e) => {
+                e.preventDefault();
+                handleAuth(currentView === "login" ? "login" : "register");
+              }}
+            >
               <h2 className="text-3xl sm:text-4xl font-bold mb-1 text-white">
                 {currentView === "login" ? "Dobrodošao Nazad" : "Kreiraj Nalog"}
               </h2>
@@ -272,6 +291,7 @@ export default function Login({ mode }: { mode: string }): React.ReactNode {
                         email: e.target.value,
                       }))
                     }
+                    onKeyDown={handleKeyDown}
                   />
                 </div>
 
@@ -303,6 +323,7 @@ export default function Login({ mode }: { mode: string }): React.ReactNode {
                           username: e.target.value,
                         }))
                       }
+                      onKeyDown={handleKeyDown}
                     />
                   </div>
                 )}
@@ -334,8 +355,10 @@ export default function Login({ mode }: { mode: string }): React.ReactNode {
                         password: e.target.value,
                       }))
                     }
+                    onKeyDown={handleKeyDown}
                   />
                   <button
+                    type="button" // Add type="button" to prevent form submission
                     onClick={() => setIsPasswordVisible(!isPasswordVisible)}
                     className="absolute right-3 top-1/2 -translate-y-1/2 text-cyan-500 hover:text-cyan-300 transition-colors p-1"
                   >
@@ -377,7 +400,27 @@ export default function Login({ mode }: { mode: string }): React.ReactNode {
                   </button>
                 </div>
 
-                <div className="text-right">
+                <div className="flex items-center justify-between">
+                  <label
+                    htmlFor="rememberMe"
+                    className="flex items-center gap-3 cursor-pointer select-none"
+                  >
+                    <div className="relative">
+                      <input
+                        type="checkbox"
+                        id="rememberMe"
+                        className="sr-only peer"
+                        checked={rememberMe}
+                        onChange={() => setRememberMe(!rememberMe)}
+                      />
+                      <div className="w-11 h-6 bg-slate-700 rounded-full transition-colors duration-300 peer-checked:bg-gradient-to-r peer-checked:from-cyan-500 peer-checked:to-blue-500"></div>
+                      <div className="absolute left-0.5 top-0.5 w-5 h-5 bg-white rounded-full transition-transform duration-300 transform peer-checked:translate-x-5 shadow"></div>
+                    </div>
+                    <span className="text-sm font-medium text-slate-300">
+                      Zapamti me
+                    </span>
+                  </label>
+
                   <span
                     className="text-cyan-400 hover:text-cyan-200 cursor-pointer text-sm font-semibold transition-colors"
                     onClick={() => setCurrentView("passreset")}
@@ -385,7 +428,6 @@ export default function Login({ mode }: { mode: string }): React.ReactNode {
                     Zaboravljena lozinka?
                   </span>
                 </div>
-
                 {formData.errorMessage && (
                   <div className="flex items-center gap-x-3 p-3 bg-red-900/30 rounded-xl border border-red-700/50 text-sm text-red-300">
                     <svg
@@ -406,9 +448,7 @@ export default function Login({ mode }: { mode: string }): React.ReactNode {
 
               <div className="flex flex-col gap-4 mt-8">
                 <button
-                  onClick={() =>
-                    handleAuth(currentView === "login" ? "login" : "register")
-                  }
+                  type="submit" // Changed to type="submit"
                   disabled={isLoading}
                   className={`w-full py-3.5 rounded-xl font-bold text-white transition-all duration-300 flex items-center justify-center gap-2 text-base transform active:scale-[0.98] ${
                     isLoading
@@ -461,7 +501,7 @@ export default function Login({ mode }: { mode: string }): React.ReactNode {
                   {currentView === "login" ? "Registruj se" : "Uloguj se"}
                 </span>
               </p>
-            </>
+            </form>
           )}
         </div>
       </div>

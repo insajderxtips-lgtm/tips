@@ -393,13 +393,13 @@ export default function Statistics(): React.ReactNode {
       return;
     }
 
-    currentMonthStats.totalBets += 1;
-    userStats.statistics.totalBets += 1;
-
     const todayDate = new Date().toLocaleDateString("en-us");
     const uuid = uuidv4();
 
-    userStats?.statistics.monthlyStats[currentMonth].bets[today]?.push({
+    // Ensure today's array exists
+    const todayBets =
+      userStats?.statistics.monthlyStats[currentMonth].bets[today] || [];
+    todayBets.push({
       match: currentBet?.match,
       tip: currentBet?.tip,
       stake: currentBet?.stake,
@@ -408,6 +408,7 @@ export default function Statistics(): React.ReactNode {
       date: todayDate,
       betId: uuid,
     });
+    userStats.statistics.monthlyStats[currentMonth].bets[today] = todayBets;
 
     // Single bet logic
     let investmentChange = 0;
@@ -417,10 +418,13 @@ export default function Statistics(): React.ReactNode {
       investmentChange = -stake;
       monthlyProfitChange = currentBet.status === "loss" ? -stake : 0;
     } else if (currentBet.status === "win") {
-      investmentChange = stake * (odds - 1); // net profit
-      monthlyProfitChange = stake * (odds - 1); // correct monthly profit
+      investmentChange = stake * (odds - 1);
+      monthlyProfitChange = stake * (odds - 1);
     }
 
+    // ✅ Manually increment locally (once)
+    userStats.statistics.totalBets += 1;
+    userStats.statistics.monthlyStats[currentMonth].totalBets += 1;
     userStats.statistics.initialInvestment += investmentChange;
     userStats.statistics.monthlyStats[currentMonth].monthlyProfit +=
       monthlyProfitChange;
@@ -430,8 +434,6 @@ export default function Statistics(): React.ReactNode {
     } else if (currentBet.status === "loss") {
       userStats.statistics.monthlyStats[currentMonth].totalLosses += 1;
     }
-
-    userStats.statistics.monthlyStats[currentMonth].totalBets += 1;
 
     try {
       const response = await fetch("/updateStatistics", {
@@ -444,41 +446,38 @@ export default function Statistics(): React.ReactNode {
           updates: [
             {
               updatePath: "statistics.totalBets",
-              newValue: 1,
-              increment: true,
+              newValue: userStats.statistics.totalBets,
+              increment: false, // send full value, not increment
             },
             {
               updatePath: "statistics.initialInvestment",
-              newValue: investmentChange,
-              increment: true,
+              newValue: userStats.statistics.initialInvestment,
+              increment: false,
             },
             {
               updatePath: `statistics.monthlyStats.${currentMonth}.monthlyProfit`,
-              newValue: monthlyProfitChange,
-              increment: true,
+              newValue:
+                userStats.statistics.monthlyStats[currentMonth].monthlyProfit,
+              increment: false,
             },
             {
               updatePath: `statistics.monthlyStats.${currentMonth}.totalBets`,
-              newValue: 1,
-              increment: true,
+              newValue:
+                userStats.statistics.monthlyStats[currentMonth].totalBets,
+              increment: false,
             },
-            ...(currentBet.status === "win"
-              ? [
-                  {
-                    updatePath: `statistics.monthlyStats.${currentMonth}.totalWins`,
-                    newValue: 1,
-                    increment: true,
-                  },
-                ]
-              : currentBet.status === "loss"
-              ? [
-                  {
-                    updatePath: `statistics.monthlyStats.${currentMonth}.totalLosses`,
-                    newValue: 1,
-                    increment: true,
-                  },
-                ]
-              : []),
+            {
+              updatePath: `statistics.monthlyStats.${currentMonth}.totalWins`,
+              newValue:
+                userStats.statistics.monthlyStats[currentMonth].totalWins,
+              increment: false,
+            },
+            {
+              updatePath: `statistics.monthlyStats.${currentMonth}.totalLosses`,
+              newValue:
+                userStats.statistics.monthlyStats[currentMonth].totalLosses,
+              increment: false,
+            },
             {
               updatePath: `statistics.monthlyStats.${currentMonth}.bets.${today}`,
               newValue: {
@@ -945,7 +944,14 @@ export default function Statistics(): React.ReactNode {
                         </div>
                       ) : lineMode.day === 0 ? (
                         <div className="relative h-[350px] w-full md:h-[500px]">
-                          <Line data={chartData} options={chartOptions} />
+                          <Line
+                            data={chartData}
+                            options={{
+                              maintainAspectRatio: false,
+                              responsive: true,
+                            }}
+                            className="min-h-[300px]"
+                          />
                         </div>
                       ) : chartData.datasets[0].data.length > 0 &&
                         chartData.datasets[0].data.some((d) => d > 0) ? (
@@ -953,8 +959,35 @@ export default function Statistics(): React.ReactNode {
                           <div className="grid grid-cols-1 gap-6 xl:grid-cols-5">
                             <div className="h-[350px] xl:col-span-2">
                               <Bar
-                                data={barChartData}
-                                options={barChartOptions}
+                                data={{
+                                  labels: [""],
+                                  datasets: [
+                                    {
+                                      label: "Dobitni",
+                                      data: [dailyStats?.totalWins],
+                                      backgroundColor: "rgba(34, 197, 94, 0.7)",
+                                    },
+                                    dailyStats?.totalActives > 0
+                                      ? {
+                                          label: "Aktivni",
+                                          data: [dailyStats?.totalActives],
+                                          backgroundColor:
+                                            "rgba(107, 114, 128, 0.7)",
+                                        }
+                                      : null,
+                                    {
+                                      label: "Gubitni",
+                                      data: [dailyStats?.totalLosses],
+                                      backgroundColor: "rgba(239, 68, 68, 0.7)",
+                                    },
+                                  ].filter(Boolean),
+                                }}
+                                options={{
+                                  scales: { y: { beginAtZero: true } },
+                                  responsive: true,
+                                  maintainAspectRatio: false,
+                                }}
+                                className="w-full h-80"
                               />
                             </div>
                             <div className="overflow-x-auto rounded-lg border border-slate-800 bg-slate-800/30 xl:col-span-3">
@@ -986,7 +1019,7 @@ export default function Statistics(): React.ReactNode {
                                       Dobitnih opklada
                                     </td>
                                     <td className="px-4 py-3 text-green-400">
-                                      {dailyStats.totalWins}
+                                      {dailyStats?.totalWins}
                                     </td>
                                   </tr>
                                   <tr className="transition-colors hover:bg-slate-700/40">
@@ -994,7 +1027,7 @@ export default function Statistics(): React.ReactNode {
                                       Gubitnih opklada
                                     </td>
                                     <td className="px-4 py-3 text-red-400">
-                                      {dailyStats.totalLosses}
+                                      {dailyStats?.totalLosses}
                                     </td>
                                   </tr>
                                   <tr className="transition-colors hover:bg-slate-700/40">
@@ -1003,12 +1036,14 @@ export default function Statistics(): React.ReactNode {
                                     </td>
                                     <td
                                       className={`px-4 py-3 font-semibold ${
-                                        dailyStats.profit <= 0
+                                        dailyStats?.profit <= 0
                                           ? "text-red-400"
                                           : "text-green-400"
                                       }`}
                                     >
-                                      {dailyStats.profit.toFixed(2)}{" "}
+                                      {Number(dailyStats?.profit || 0).toFixed(
+                                        2
+                                      )}{" "}
                                       {defaultCurrency}
                                     </td>
                                   </tr>
@@ -1017,7 +1052,10 @@ export default function Statistics(): React.ReactNode {
                                       Procenat prolaza
                                     </td>
                                     <td className="px-4 py-3">
-                                      {dailyStats.winPercentage.toFixed(2)}%
+                                      {Number(
+                                        dailyStats?.winPercentage || 0
+                                      ).toFixed(2)}
+                                      %
                                     </td>
                                   </tr>
                                 </tbody>
@@ -1336,7 +1374,7 @@ export default function Statistics(): React.ReactNode {
                           className="peer w-full bg-gray-800/70 border border-gray-700/50 focus:border-cyan-500/50 text-white rounded-lg p-3.5 focus:outline-none focus:ring-2 focus:ring-cyan-500/30 placeholder-transparent transition-all"
                           placeholder=" "
                           step="0.01"
-                          min="1.00"
+                          min="1.01"
                         />
                         <label className="absolute left-3.5 top-2 text-gray-400 text-xs pointer-events-none transition-all peer-placeholder-shown:text-sm peer-placeholder-shown:text-gray-500 peer-placeholder-shown:top-3.5 peer-focus:top-2 peer-focus:text-xs peer-focus:text-cyan-400">
                           Kvota

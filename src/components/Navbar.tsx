@@ -51,7 +51,7 @@ export default function Navbar(): React.ReactNode {
         >
           <span>Kupi Premium</span>
         </div>
-        <div className=" absolute right-3" onClick={() => nav("/login")}>
+        <div className="absolute right-3" onClick={() => nav("/login")}>
           <svg
             xmlns="http://www.w3.org/2000/svg"
             fill="none"
