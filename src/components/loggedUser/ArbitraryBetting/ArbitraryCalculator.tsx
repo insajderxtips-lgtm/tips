@@ -1,13 +1,16 @@
+"use client";
 import { useState } from "react";
+import { motion, AnimatePresence } from "framer-motion";
+import { Calculator, CheckCircle2, AlertTriangle } from "lucide-react";
 
-export default function ArbitrageCalculator(): React.ReactNode {
+export default function ArbitrageCalculator(): JSX.Element {
   const [arbData, setArbData] = useState({
     odds1: "",
     odds2: "",
     stake: "",
-    statusMessage: null,
-    statusCode: null,
-    result: null,
+    statusMessage: null as string | null,
+    statusCode: null as number | null,
+    result: null as { stake1: number; stake2: number; profit: number } | null,
   });
 
   const calculate = (): void => {
@@ -20,7 +23,6 @@ export default function ArbitrageCalculator(): React.ReactNode {
 
     const { odds1, odds2, stake } = arbData;
 
-    // Check if inputs are valid
     if (
       !odds1 ||
       !odds2 ||
@@ -31,18 +33,16 @@ export default function ArbitrageCalculator(): React.ReactNode {
     ) {
       setArbData((prev) => ({
         ...prev,
-        statusMessage: "Molimo, unesite obe kvote kao i ulog.",
+        statusMessage: "Molimo unesite obe kvote i ulog.",
         statusCode: 0,
       }));
       return;
     }
 
-    // Parse input values to numbers
     const odds1Num = parseFloat(odds1);
     const odds2Num = parseFloat(odds2);
     const stakeNum = parseFloat(stake);
 
-    // Calculate total probability
     const totalProbability = 1 / odds1Num + 1 / odds2Num;
 
     if (totalProbability >= 1) {
@@ -54,184 +54,166 @@ export default function ArbitrageCalculator(): React.ReactNode {
       return;
     }
 
-    // Calculate proportional stakes
     const stake1 = (1 / odds1Num / totalProbability) * stakeNum;
     const stake2 = (1 / odds2Num / totalProbability) * stakeNum;
-
-    // Calculate the returns for both bets
     const return1 = stake1 * odds1Num;
     const return2 = stake2 * odds2Num;
-
-    // Calculate profit
     const profit = Math.max(return1, return2) - stakeNum;
 
-    setArbData((prev: any) => ({
+    setArbData((prev) => ({
       ...prev,
-      statusMessage: `Na ovom meču je moguće sigurno klađenje!`,
+      statusMessage: "Na ovom meču je moguće sigurno klađenje!",
       statusCode: 1,
       result: { stake1, stake2, profit },
     }));
   };
 
   const handleKeyPress = (e: React.KeyboardEvent) => {
-    if (e.key === "Enter") {
-      calculate();
-    }
+    if (e.key === "Enter") calculate();
   };
 
   return (
-    <div className="w-full min-h-screen flex justify-center items-center p-6 bg-gray-950">
-      <div className="bg-gray-950 w-full max-w-3xl rounded-xl p-8 flex flex-col gap-y-6 shadow-xl border border-gray-700">
-        <div className="text-center">
-          <h1 className="text-2xl md:text-3xl font-bold text-white">
+    <div className="min-h-screen w-full flex justify-center items-center bg-gradient-to-br from-gray-950 via-gray-900 to-gray-950 p-6">
+      <motion.div
+        initial={{ opacity: 0, y: 40 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ duration: 0.6, ease: "easeOut" }}
+        className="w-full max-w-3xl bg-gray-900/60 backdrop-blur-md border border-gray-700/60 rounded-2xl shadow-2xl p-8"
+      >
+        {/* Header */}
+        <div className="text-center mb-8">
+          <motion.h1
+            initial={{ opacity: 0, y: 10 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ delay: 0.1 }}
+            className="text-3xl font-bold text-white tracking-tight"
+          >
             Kalkulator sigurnog klađenja
-          </h1>
-          <p className="text-gray-500 text-sm mt-2">
+          </motion.h1>
+          <p className="text-gray-400 text-sm mt-2">
             Unesite kvote iz različitih kladionica i izračunajte optimalan ulog
           </p>
         </div>
 
+        {/* Inputs */}
         <div className="grid md:grid-cols-3 gap-4">
-          <div>
-            <label
-              htmlFor="arb_odds1"
-              className="block text-sm font-medium text-gray-300 mb-1"
+          {[
+            { id: "odds1", label: "Kvota 1", value: arbData.odds1 },
+            { id: "odds2", label: "Kvota 2", value: arbData.odds2 },
+            { id: "stake", label: "Ukupan ulog", value: arbData.stake },
+          ].map((input, idx) => (
+            <motion.div
+              key={idx}
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ delay: 0.1 * idx }}
             >
-              Kvota 1
-            </label>
-            <input
-              type="number"
-              id="arb_odds1"
-              className="w-full p-3 rounded-lg border border-gray-600 bg-gray-900 text-white focus:outline-none focus:ring-2 focus:ring-blue-500 transition duration-200"
-              value={arbData.odds1}
-              onChange={(e) =>
-                setArbData((prev: any) => ({ ...prev, odds1: e.target.value }))
-              }
-              onKeyPress={handleKeyPress}
-              step="0.01"
-              min="1.01"
-            />
-          </div>
-
-          <div>
-            <label
-              htmlFor="arb_odds2"
-              className="block text-sm font-medium text-gray-300 mb-1"
-            >
-              Kvota 2
-            </label>
-            <input
-              type="number"
-              id="arb_odds2"
-              className="w-full p-3 rounded-lg border border-gray-600 bg-gray-900 text-white focus:outline-none focus:ring-2 focus:ring-blue-500 transition duration-200"
-              value={arbData.odds2}
-              onChange={(e) =>
-                setArbData((prev: any) => ({ ...prev, odds2: e.target.value }))
-              }
-              onKeyPress={handleKeyPress}
-              step="0.01"
-              min="1.01"
-            />
-          </div>
-
-          <div>
-            <label
-              htmlFor="arb_stake"
-              className="block text-sm font-medium text-gray-300 mb-1"
-            >
-              Ukupan ulog
-            </label>
-            <input
-              type="number"
-              id="arb_stake"
-              className="w-full p-3 rounded-lg border border-gray-600 bg-gray-900 text-white focus:outline-none focus:ring-2 focus:ring-blue-500 transition duration-200"
-              value={arbData.stake}
-              onChange={(e) =>
-                setArbData((prev: any) => ({ ...prev, stake: e.target.value }))
-              }
-              onKeyPress={handleKeyPress}
-              min="100"
-            />
-          </div>
+              <label
+                htmlFor={`arb_${input.id}`}
+                className="block text-sm font-medium text-gray-300 mb-1"
+              >
+                {input.label}
+              </label>
+              <input
+                type="number"
+                id={`arb_${input.id}`}
+                className="w-full p-3 rounded-lg border border-gray-700 bg-gray-800/60 text-white focus:outline-none focus:ring-2 focus:ring-blue-500 transition-all duration-200"
+                value={input.value}
+                onChange={(e) =>
+                  setArbData((prev) => ({
+                    ...prev,
+                    [input.id]: e.target.value,
+                  }))
+                }
+                onKeyPress={handleKeyPress}
+                step="0.01"
+                min="1"
+              />
+            </motion.div>
+          ))}
         </div>
 
-        <button
-          className="mt-4 px-6 py-3 rounded-lg bg-blue-600 text-white text-lg font-semibold hover:bg-blue-700 transition duration-200 cursor-pointer flex items-center justify-center gap-2"
+        {/* Button */}
+        <motion.button
+          whileHover={{ scale: 1.03 }}
+          whileTap={{ scale: 0.97 }}
           onClick={calculate}
+          className="mt-6 flex items-center justify-center gap-2 px-6 py-3 w-full md:w-auto mx-auto rounded-lg bg-gradient-to-r from-blue-600 to-cyan-500 text-white font-semibold shadow-lg hover:shadow-cyan-700/30 transition-all duration-300"
         >
-          <svg
-            xmlns="http://www.w3.org/2000/svg"
-            className="h-5 w-5"
-            viewBox="0 0 20 20"
-            fill="currentColor"
-          >
-            <path
-              fillRule="evenodd"
-              d="M11.3 1.046A1 1 0 0112 2v5h4a1 1 0 01.82 1.573l-7 10A1 1 0 018 18v-5H4a1 1 0 01-.82-1.573l7-10a1 1 0 011.12-.38z"
-              clipRule="evenodd"
-            />
-          </svg>
+          <Calculator size={20} />
           Izračunaj
-        </button>
+        </motion.button>
 
-        {arbData.statusMessage && (
-          <div className="mt-6">
-            <div
-              className={`p-4 rounded-lg ${
-                arbData?.statusCode === 0
-                  ? "bg-red-900/20 border border-red-800/50"
-                  : "bg-green-900/20 border border-green-800/50"
+        {/* Results */}
+        <AnimatePresence>
+          {arbData.statusMessage && (
+            <motion.div
+              key="result"
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: 20 }}
+              transition={{ duration: 0.4 }}
+              className={`mt-8 p-5 rounded-xl border ${
+                arbData.statusCode === 1
+                  ? "bg-green-900/20 border-green-800/40"
+                  : "bg-red-900/20 border-red-800/40"
               }`}
             >
               <div
-                className={`font-semibold ${
-                  arbData?.statusCode === 0 ? "text-red-400" : "text-green-400"
+                className={`flex items-center gap-2 font-semibold ${
+                  arbData.statusCode === 1 ? "text-green-400" : "text-red-400"
                 }`}
               >
+                {arbData.statusCode === 1 ? (
+                  <CheckCircle2 size={18} />
+                ) : (
+                  <AlertTriangle size={18} />
+                )}
                 {arbData.statusMessage}
               </div>
 
               {arbData.result && (
-                <div className="mt-4 space-y-3 text-gray-200">
-                  <div className="grid grid-cols-2 gap-4">
-                    <div className="bg-green-700/10 border-teal-500/20 border p-3 rounded-lg">
-                      <div className="text-sm text-gray-400">
-                        Ulog na kvotu 1
-                      </div>
-                      <div className="text-xl font-bold text-white">
-                        {arbData.result.stake1.toFixed(0)} RSD
-                      </div>
-                    </div>
-                    <div className="bg-green-700/10 border-teal-500/20 border p-3 rounded-lg">
-                      <div className="text-sm text-gray-400">
-                        Ulog na kvotu 2
-                      </div>
-                      <div className="text-xl font-bold text-white">
-                        {arbData.result.stake2.toFixed(0)} RSD
-                      </div>
-                    </div>
+                <motion.div
+                  initial={{ opacity: 0 }}
+                  animate={{ opacity: 1 }}
+                  transition={{ delay: 0.2 }}
+                  className="mt-5 grid md:grid-cols-3 gap-4 text-gray-200"
+                >
+                  <div className="bg-green-800/10 border border-green-700/30 rounded-lg p-4">
+                    <p className="text-sm text-gray-400 mb-1">
+                      Ulog na kvotu 1
+                    </p>
+                    <p className="text-xl font-bold text-white">
+                      {arbData.result.stake1.toFixed(0)} RSD
+                    </p>
                   </div>
-                  <div className="bg-green-700/10 border-teal-500/20 border p-3 rounded-lg">
-                    <div className="text-sm text-gray-400">
+                  <div className="bg-green-800/10 border border-green-700/30 rounded-lg p-4">
+                    <p className="text-sm text-gray-400 mb-1">
+                      Ulog na kvotu 2
+                    </p>
+                    <p className="text-xl font-bold text-white">
+                      {arbData.result.stake2.toFixed(0)} RSD
+                    </p>
+                  </div>
+                  <div className="bg-green-800/10 border border-green-700/30 rounded-lg p-4">
+                    <p className="text-sm text-gray-400 mb-1">
                       Očekivani profit
-                    </div>
-                    <div className="text-2xl font-bold text-green-400">
+                    </p>
+                    <p className="text-2xl font-bold text-green-400">
                       +{arbData.result.profit.toFixed(2)} RSD
-                    </div>
+                    </p>
                   </div>
-                </div>
+                </motion.div>
               )}
-            </div>
-          </div>
-        )}
+            </motion.div>
+          )}
+        </AnimatePresence>
 
-        <div className="mt-4 text-xs text-gray-500 text-center">
-          <p>
-            Kalkulator vam pomaže da ravnomerno rasporedite ulog kako biste
-            osigurali profit bez obzira na ishod.
-          </p>
-        </div>
-      </div>
+        <p className="text-xs text-gray-500 text-center mt-6">
+          Kalkulator vam pomaže da ravnomerno rasporedite ulog i osigurate
+          profit bez obzira na ishod.
+        </p>
+      </motion.div>
     </div>
   );
 }

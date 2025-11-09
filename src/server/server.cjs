@@ -1379,7 +1379,8 @@ app.post("/oddsChecker/getOdds/", async (req, res) => {
       const filteredGames = maxbetJson.esMatches.filter(
         (game) =>
           game.kickOffTime === date &&
-          game.leagueName != "Max Bonus Tip Fudbal "
+          game.leagueName != "Max Bonus Tip Fudbal " &&
+          game.leagueName != "UEFA Champions League 2025/2026,Winner"
       );
 
       // if we found the game we are lookingg for, append its odds in the container.

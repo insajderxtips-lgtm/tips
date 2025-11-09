@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useState, useMemo } from "react";
 import { createPortal } from "react-dom";
 
 export default function UserBets({
@@ -11,9 +11,9 @@ export default function UserBets({
   local: any;
   setUserStats: any;
 }): React.ReactNode {
-  // This component renders the <bets> inside of a table that also has Editor built in.
+  const [openParlayKey, setOpenParlayKey] = useState<string | null>(null);
+  const [openMonths, setOpenMonths] = useState({});
 
-  const [openParlayIndex, setOpenParlayIndex] = useState<number | null>(null);
   const [editor, setEditor] = useState({
     visible: false,
     parlay: false,
@@ -24,12 +24,61 @@ export default function UserBets({
 
   const JWT = localStorage.getItem("insajder_token") || "";
 
-  const toggleParlay = (index: number) => {
-    setOpenParlayIndex(openParlayIndex === index ? null : index);
+  const toggleParlay = (key: string) => {
+    setOpenParlayKey(openParlayKey === key ? null : key);
   };
 
+  const toggleMonth = (monthYear: string) => {
+    setOpenMonths((prev) => ({
+      ...prev,
+      [monthYear]: !prev[monthYear],
+    }));
+  };
+
+  const groupedBets = useMemo(() => {
+    if (!bets) return {};
+    const groups = {};
+
+    bets.forEach((bet) => {
+      const isParlay = Array.isArray(bet) && bet[0];
+      const mainBet = isParlay ? bet[0] : bet;
+      const dateStr = mainBet?.date;
+
+      if (!dateStr) {
+        const unknownGroup = "Nepoznat Datum";
+        if (!groups[unknownGroup]) {
+          groups[unknownGroup] = [];
+        }
+        groups[unknownGroup].push(bet);
+        return;
+      }
+
+      const parts = dateStr.split("/");
+      const month = parseInt(parts[0], 10) - 1;
+      const year =
+        parts.length === 3 ? parseInt(parts[2], 10) : new Date().getFullYear();
+
+      let monthYear;
+      if (isNaN(month) || isNaN(year)) {
+        monthYear = "Nepoznat Datum";
+      } else {
+        const dateObj = new Date(year, month, 1);
+        monthYear = dateObj.toLocaleString("sr-Latn", {
+          month: "long",
+          year: "numeric",
+        });
+      }
+
+      if (!groups[monthYear]) {
+        groups[monthYear] = [];
+      }
+      groups[monthYear].push(bet);
+    });
+
+    return groups;
+  }, [bets]);
+
   const openEditor = (bet) => {
-    // Opens the bet editor
     setEditor((prev) => ({
       ...prev,
       visible: true,
@@ -73,9 +122,6 @@ export default function UserBets({
 
       const updates = [];
 
-      // For settled bets (win/loss), we assume the /removeBet endpoint handles the profit.
-      // So, we ONLY send the profit update to /updateStatistics for an "active" bet.
-      // Since profitChange is 0 for active bets, this effectively sends no financial data.
       if (status !== "win" && status !== "loss") {
         updates.push({
           updatePath: `statistics.monthlyStats.${monthIndex}.monthlyProfit`,
@@ -435,196 +481,243 @@ export default function UserBets({
                   </th>
                 </tr>
               </thead>
-              <tbody className="divide-y divide-slate-800">
-                {bets?.map((bet, index) => {
-                  const isParlay = Array.isArray(bet) && bet[0];
-                  const mainBet = isParlay ? bet[0] : bet;
-                  const status = mainBet?.status;
 
-                  let statusBorderClass = "";
-                  if (status === "win") statusBorderClass = "border-green-500";
-                  else if (status === "loss")
-                    statusBorderClass = "border-red-500";
-                  else if (status === "active")
-                    statusBorderClass = "border-sky-500";
-
-                  let statusBadgeClass = "";
-                  if (status === "win")
-                    statusBadgeClass =
-                      "bg-green-500/10 text-green-400 ring-1 ring-inset ring-green-500/20";
-                  else if (status === "loss")
-                    statusBadgeClass =
-                      "bg-red-500/10 text-red-400 ring-1 ring-inset ring-red-500/20";
-                  else if (status === "active")
-                    statusBadgeClass =
-                      "bg-sky-500/10 text-sky-400 ring-1 ring-inset ring-sky-500/20";
-
-                  return !isParlay ? (
+              {Object.entries(groupedBets).map(([monthYear, monthBets]) => (
+                <React.Fragment key={monthYear}>
+                  <tbody className="divide-y divide-slate-800 border-t-2 border-slate-700">
                     <tr
-                      key={index}
-                      className="transition-colors hover:bg-slate-800/40"
+                      className="bg-slate-900/70 cursor-pointer sticky top-[57px] z-[5] transition-colors hover:bg-slate-800"
+                      onClick={() => toggleMonth(monthYear)}
                     >
                       <td
-                        className={`whitespace-nowrap py-5 pl-6 pr-4 text-base font-medium text-white sticky left-0 bg-slate-900/50 border-l-4 ${statusBorderClass}`}
+                        colSpan={7}
+                        className="py-3 px-6 text-base font-bold text-white tracking-wider"
                       >
-                        {bet.match}
-                      </td>
-                      <td className="whitespace-nowrap px-4 py-5 text-base text-slate-400">
-                        {bet.tip}
-                      </td>
-                      <td className="whitespace-nowrap px-4 py-5 text-base text-slate-400">
-                        <span className="inline-flex items-center rounded-lg bg-slate-700/60 px-2.5 py-1.5 text-sm font-semibold text-sky-300">
-                          {bet.odds}
-                        </span>
-                      </td>
-                      <td className="whitespace-nowrap px-4 py-5 text-base font-semibold text-white">
-                        {bet.stake}
-                      </td>
-                      <td className="whitespace-nowrap px-4 py-5 text-base">
-                        <button
-                          onClick={() => openEditor(bet)}
-                          className={`inline-flex items-center gap-x-2 rounded-lg px-2.5 py-1.5 text-sm font-semibold ${statusBadgeClass}`}
-                        >
-                          {status === "active" && (
-                            <div className="h-2 w-2 rounded-full bg-sky-400 animate-pulse"></div>
-                          )}
-                          {status}
-                        </button>
-                      </td>
-                      <td className="whitespace-nowrap px-4 py-5 text-base text-slate-500">
-                        {bet.date}
-                      </td>
-                      <td className="relative whitespace-nowrap py-5 pl-4 pr-6 text-right text-base font-medium">
-                        <button
-                          onClick={() => removeBet(bet)}
-                          className="p-1 rounded-full text-slate-500 transition-colors hover:text-red-400 hover:bg-slate-800"
-                        >
+                        <div className="flex items-center gap-3">
                           <svg
-                            className="h-5 w-5"
+                            className={`h-5 w-5 transition-transform ${
+                              openMonths[monthYear] ? "rotate-180" : ""
+                            }`}
                             fill="none"
                             viewBox="0 0 24 24"
-                            strokeWidth="1.5"
+                            strokeWidth="2"
                             stroke="currentColor"
                           >
                             <path
                               strokeLinecap="round"
                               strokeLinejoin="round"
-                              d="M14.74 9l-.346 9m-4.788 0L9.26 9m9.968-3.21c.342.052.682.107 1.022.166m-1.022-.165L18.16 19.673a2.25 2.25 0 01-2.244 2.077H8.084a2.25 2.25 0 01-2.244-2.077L4.772 5.79m14.456 0a48.108 48.108 0 00-3.478-.397m-12 .562c.34-.059.68-.114 1.022-.165m0 0a48.11 48.11 0 013.478-.397m7.5 0v-.916c0-1.18-.91-2.134-2.09-2.201a51.964 51.964 0 00-3.32 0c-1.18.067-2.09 1.022-2.09 2.201v.916m7.5 0a48.667 48.667 0 00-7.5 0"
+                              d="M19 9l-7 7-7-7"
                             />
                           </svg>
-                        </button>
+                          <span className="capitalize">{monthYear}</span>
+                          <span className="ml-auto text-sm font-normal text-slate-400">
+                            {monthBets.length} opklada
+                          </span>
+                        </div>
                       </td>
                     </tr>
-                  ) : (
-                    <React.Fragment key={index}>
-                      <tr
-                        onClick={() => toggleParlay(index)}
-                        className="cursor-pointer bg-slate-800/20 transition-colors hover:bg-slate-800/50"
-                      >
-                        <td
-                          className={`whitespace-nowrap py-5 pl-6 pr-4 text-base font-medium text-sky-300 sticky left-0 bg-slate-900/50 border-l-4 ${statusBorderClass}`}
-                        >
-                          <div className="flex items-center gap-2">
-                            <span>[Sistem {bet.length - 1} meča]</span>
-                            <svg
-                              className={`h-5 w-5 transition-transform ${
-                                openParlayIndex === index ? "rotate-180" : ""
-                              }`}
-                              fill="none"
-                              viewBox="0 0 24 24"
-                              strokeWidth="2"
-                              stroke="currentColor"
-                            >
-                              <path
-                                strokeLinecap="round"
-                                strokeLinejoin="round"
-                                d="M19 9l-7 7-7-7"
-                              />
-                            </svg>
-                          </div>
-                        </td>
-                        <td className="whitespace-nowrap px-4 py-5 text-base text-slate-500">
-                          -
-                        </td>
-                        <td className="whitespace-nowrap px-4 py-5 text-base text-slate-400">
-                          <span className="inline-flex items-center rounded-lg bg-slate-700/60 px-2.5 py-1.5 text-sm font-semibold text-sky-300">
-                            {mainBet.totalOdds}
-                          </span>
-                        </td>
-                        <td className="whitespace-nowrap px-4 py-5 text-base font-semibold text-white">
-                          {mainBet.stake}
-                        </td>
-                        <td className="whitespace-nowrap px-4 py-5 text-base">
-                          <button
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              openEditor(bet);
-                            }}
-                            className={`inline-flex items-center gap-x-2 rounded-lg px-2.5 py-1.5 text-sm font-semibold ${statusBadgeClass}`}
+                  </tbody>
+
+                  {openMonths[monthYear] && (
+                    <tbody className="divide-y divide-slate-800">
+                      {monthBets.map((bet, index) => {
+                        const uniqueKey = `${monthYear}-${index}`;
+                        const isParlay = Array.isArray(bet) && bet[0];
+                        const mainBet = isParlay ? bet[0] : bet;
+                        const status = mainBet?.status;
+
+                        let statusBorderClass = "";
+                        if (status === "win")
+                          statusBorderClass = "border-green-500";
+                        else if (status === "loss")
+                          statusBorderClass = "border-red-500";
+                        else if (status === "active")
+                          statusBorderClass = "border-sky-500";
+
+                        let statusBadgeClass = "";
+                        if (status === "win")
+                          statusBadgeClass =
+                            "bg-green-500/10 text-green-400 ring-1 ring-inset ring-green-500/20";
+                        else if (status === "loss")
+                          statusBadgeClass =
+                            "bg-red-500/10 text-red-400 ring-1 ring-inset ring-red-500/20";
+                        else if (status === "active")
+                          statusBadgeClass =
+                            "bg-sky-500/10 text-sky-400 ring-1 ring-inset ring-sky-500/20";
+
+                        return !isParlay ? (
+                          <tr
+                            key={uniqueKey}
+                            className="transition-colors hover:bg-slate-800/40"
                           >
-                            {status === "active" && (
-                              <div className="h-2 w-2 rounded-full bg-sky-400 animate-pulse"></div>
-                            )}
-                            {status}
-                          </button>
-                        </td>
-                        <td className="whitespace-nowrap px-4 py-5 text-base text-slate-500">
-                          {mainBet.date}
-                        </td>
-                        <td className="relative whitespace-nowrap py-5 pl-4 pr-6 text-right text-base font-medium"></td>
-                      </tr>
-                      {openParlayIndex === index &&
-                        bet.map(
-                          (parlayGame, parlayIndex) =>
-                            parlayIndex > 0 && (
-                              <tr key={parlayIndex} className="bg-slate-800/10">
-                                <td
-                                  colSpan={4}
-                                  className="py-4 pl-12 pr-4 text-base text-slate-300"
+                            <td
+                              className={`whitespace-nowrap py-5 pl-6 pr-4 text-base font-medium text-white sticky left-0 bg-slate-900/50 border-l-4 ${statusBorderClass}`}
+                            >
+                              {bet.match}
+                            </td>
+                            <td className="whitespace-nowrap px-4 py-5 text-base text-slate-400">
+                              {bet.tip}
+                            </td>
+                            <td className="whitespace-nowrap px-4 py-5 text-base text-slate-400">
+                              <span className="inline-flex items-center rounded-lg bg-slate-700/60 px-2.5 py-1.5 text-sm font-semibold text-sky-300">
+                                {bet.odds}
+                              </span>
+                            </td>
+                            <td className="whitespace-nowrap px-4 py-5 text-base font-semibold text-white">
+                              {bet.stake}
+                            </td>
+                            <td className="whitespace-nowrap px-4 py-5 text-base">
+                              <button
+                                onClick={() => openEditor(bet)}
+                                className={`inline-flex items-center gap-x-2 rounded-lg px-2.5 py-1.5 text-sm font-semibold ${statusBadgeClass}`}
+                              >
+                                {status === "active" && (
+                                  <div className="h-2 w-2 rounded-full bg-sky-400 animate-pulse"></div>
+                                )}
+                                {status}
+                              </button>
+                            </td>
+                            <td className="whitespace-nowrap px-4 py-5 text-base text-slate-500">
+                              {bet.date}
+                            </td>
+                            <td className="relative whitespace-nowrap py-5 pl-4 pr-6 text-right text-base font-medium">
+                              <button
+                                onClick={() => removeBet(bet)}
+                                className="p-1 rounded-full text-slate-500 transition-colors hover:text-red-400 hover:bg-slate-800"
+                              >
+                                <svg
+                                  className="h-5 w-5"
+                                  fill="none"
+                                  viewBox="0 0 24 24"
+                                  strokeWidth="1.5"
+                                  stroke="currentColor"
                                 >
-                                  {parlayGame.match}
-                                </td>
-                                <td className="px-4 py-4 text-base text-slate-400">
-                                  {parlayGame.tip}
-                                </td>
-                                <td className="px-4 py-4 text-base">
-                                  <span className="inline-flex items-center rounded-lg bg-slate-700/60 px-2.5 py-1.5 text-sm font-semibold text-sky-300">
-                                    {parlayGame.odds}
-                                  </span>
-                                </td>
-                                <td className="relative py-4 pl-4 pr-6 text-right text-base">
-                                  <button
-                                    onClick={() => removeBet(parlayGame)}
-                                    className="p-1 rounded-full text-slate-500 transition-colors hover:text-red-400 hover:bg-slate-800"
+                                  <path
+                                    strokeLinecap="round"
+                                    strokeLinejoin="round"
+                                    d="M14.74 9l-.346 9m-4.788 0L9.26 9m9.968-3.21c.342.052.682.107 1.022.166m-1.022-.165L18.16 19.673a2.25 2.25 0 01-2.244 2.077H8.084a2.25 2.25 0 01-2.244-2.077L4.772 5.79m14.456 0a48.108 48.108 0 00-3.478-.397m-12 .562c.34-.059.68-.114 1.022-.165m0 0a48.11 48.11 0 013.478-.397m7.5 0v-.916c0-1.18-.91-2.134-2.09-2.201a51.964 51.964 0 00-3.32 0c-1.18.067-2.09 1.022-2.09 2.201v.916m7.5 0a48.667 48.667 0 00-7.5 0"
+                                  />
+                                </svg>
+                              </button>
+                            </td>
+                          </tr>
+                        ) : (
+                          <React.Fragment key={uniqueKey}>
+                            <tr
+                              onClick={() => toggleParlay(uniqueKey)}
+                              className="cursor-pointer bg-slate-800/20 transition-colors hover:bg-slate-800/50"
+                            >
+                              <td
+                                className={`whitespace-nowrap py-5 pl-6 pr-4 text-base font-medium text-sky-300 sticky left-0 bg-slate-900/50 border-l-4 ${statusBorderClass}`}
+                              >
+                                <div className="flex items-center gap-2">
+                                  <span>[Sistem {bet.length - 1} meča]</span>
+                                  <svg
+                                    className={`h-5 w-5 transition-transform ${
+                                      openParlayKey === uniqueKey
+                                        ? "rotate-180"
+                                        : ""
+                                    }`}
+                                    fill="none"
+                                    viewBox="0 0 24 24"
+                                    strokeWidth="2"
+                                    stroke="currentColor"
                                   >
-                                    <svg
-                                      className="h-5 w-5"
-                                      fill="none"
-                                      viewBox="0 0 24 24"
-                                      strokeWidth="1.5"
-                                      stroke="currentColor"
+                                    <path
+                                      strokeLinecap="round"
+                                      strokeLinejoin="round"
+                                      d="M19 9l-7 7-7-7"
+                                    />
+                                  </svg>
+                                </div>
+                              </td>
+                              <td className="whitespace-nowrap px-4 py-5 text-base text-slate-500">
+                                -
+                              </td>
+                              <td className="whitespace-nowrap px-4 py-5 text-base text-slate-400">
+                                <span className="inline-flex items-center rounded-lg bg-slate-700/60 px-2.5 py-1.5 text-sm font-semibold text-sky-300">
+                                  {mainBet.totalOdds}
+                                </span>
+                              </td>
+                              <td className="whitespace-nowrap px-4 py-5 text-base font-semibold text-white">
+                                {mainBet.stake}
+                              </td>
+                              <td className="whitespace-nowrap px-4 py-5 text-base">
+                                <button
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    openEditor(bet);
+                                  }}
+                                  className={`inline-flex items-center gap-x-2 rounded-lg px-2.5 py-1.5 text-sm font-semibold ${statusBadgeClass}`}
+                                >
+                                  {status === "active" && (
+                                    <div className="h-2 w-2 rounded-full bg-sky-400 animate-pulse"></div>
+                                  )}
+                                  {status}
+                                </button>
+                              </td>
+                              <td className="whitespace-nowrap px-4 py-5 text-base text-slate-500">
+                                {mainBet.date}
+                              </td>
+                              <td className="relative whitespace-nowrap py-5 pl-4 pr-6 text-right text-base font-medium"></td>
+                            </tr>
+                            {openParlayKey === uniqueKey &&
+                              bet.map(
+                                (parlayGame, parlayIndex) =>
+                                  parlayIndex > 0 && (
+                                    <tr
+                                      key={parlayIndex}
+                                      className="bg-slate-800/10"
                                     >
-                                      <path
-                                        strokeLinecap="round"
-                                        strokeLinejoin="round"
-                                        d="M14.74 9l-.346 9m-4.788 0L9.26 9m9.968-3.21c.342.052.682.107 1.022.166m-1.022-.165L18.16 19.673a2.25 2.25 0 01-2.244 2.077H8.084a2.25 2.25 0 01-2.244-2.077L4.772 5.79m14.456 0a48.108 48.108 0 00-3.478-.397m-12 .562c.34-.059.68-.114 1.022-.165m0 0a48.11 48.11 0 013.478-.397m7.5 0v-.916c0-1.18-.91-2.134-2.09-2.201a51.964 51.964 0 00-3.32 0c-1.18.067-2.09 1.022-2.09 2.201v.916m7.5 0a48.667 48.667 0 00-7.5 0"
-                                      />
-                                    </svg>
-                                  </button>
-                                </td>
-                              </tr>
-                            )
-                        )}
-                    </React.Fragment>
-                  );
-                })}
-              </tbody>
+                                      <td
+                                        colSpan={4}
+                                        className="py-4 pl-12 pr-4 text-base text-slate-300"
+                                      >
+                                        {parlayGame.match}
+                                      </td>
+                                      <td className="px-4 py-4 text-base text-slate-400">
+                                        {parlayGame.tip}
+                                      </td>
+                                      <td className="px-4 py-4 text-base">
+                                        <span className="inline-flex items-center rounded-lg bg-slate-700/60 px-2.5 py-1.5 text-sm font-semibold text-sky-300">
+                                          {parlayGame.odds}
+                                        </span>
+                                      </td>
+                                      <td className="relative py-4 pl-4 pr-6 text-right text-base">
+                                        <button
+                                          onClick={() => removeBet(parlayGame)}
+                                          className="p-1 rounded-full text-slate-500 transition-colors hover:text-red-400 hover:bg-slate-800"
+                                        >
+                                          <svg
+                                            className="h-5 w-5"
+                                            fill="none"
+                                            viewBox="0 0 24 24"
+                                            strokeWidth="1.5"
+                                            stroke="currentColor"
+                                          >
+                                            <path
+                                              strokeLinecap="round"
+                                              strokeLinejoin="round"
+                                              d="M14.74 9l-.346 9m-4.788 0L9.26 9m9.968-3.21c.342.052.682.107 1.022.166m-1.022-.165L18.16 19.673a2.25 2.25 0 01-2.244 2.077H8.084a2.25 2.25 0 01-2.244-2.077L4.772 5.79m14.456 0a48.108 48.108 0 00-3.478-.397m-12 .562c.34-.059.68-.114 1.022-.165m0 0a48.11 48.11 0 013.478-.397m7.5 0v-.916c0-1.18-.91-2.134-2.09-2.201a51.964 51.964 0 00-3.32 0c-1.18.067-2.09 1.022-2.09 2.201v.916m7.5 0a48.667 48.667 0 00-7.5 0"
+                                            />
+                                          </svg>
+                                        </button>
+                                      </td>
+                                    </tr>
+                                  )
+                              )}
+                          </React.Fragment>
+                        );
+                      })}
+                    </tbody>
+                  )}
+                </React.Fragment>
+              ))}
             </table>
           </div>
         </div>
       </div>
 
-      {/* Modal portal remains unchanged */}
       {editor.visible &&
         createPortal(
           <div className="z-50 fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center">

@@ -1238,7 +1238,7 @@ export default function Statistics(): React.ReactNode {
           )}
         </div>
         {userStats?.statistics?.initialInvestment && (
-          <div className="fixed bottom-6 right-6 z-50 pointer-events-none">
+          <div className="fixed bottom-6 right-6 z-40 pointer-events-none">
             <div className="relative flex items-center">
               <button
                 onClick={() =>
