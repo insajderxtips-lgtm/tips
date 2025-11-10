@@ -6,7 +6,6 @@ const jwt = require("jsonwebtoken");
 const { request } = require("undici");
 const http = require("http");
 const socketIo = require("socket.io");
-const rateLimit = require("express-rate-limit");
 const nodemailer = require("nodemailer");
 const { v4: uuidv4 } = require("uuid");
 const cookieParser = require("cookie-parser");
@@ -1794,19 +1793,7 @@ app.put("/removeBet", verifyToken, async (req, res) => {
       .json({ message: "Server error while removing bet." });
   }
 });
-const wuLimiter = rateLimit({
-  windowMs: 24 * 60 * 60 * 1000,
-  max: 2,
-  keyGenerator: (req) => req.body.userEmail || req.ip,
-  message: {
-    message:
-      "Već ste poslali uplatu u poslednja 24h. Ukoliko imate problema, kontaktirajte nas => podrska@insajder.tips",
-  },
-  standardHeaders: true,
-  legacyHeaders: false,
-});
-
-app.post("/addPayment", wuLimiter, async (req, res) => {
+app.post("/addPayment", async (req, res) => {
   const { imageUrl, userEmail, userName, paymentType, mtcn } = req.body;
 
   if (!userEmail || !userName || !paymentType) {
