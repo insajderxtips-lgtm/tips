@@ -14,16 +14,6 @@ const PREMIUM_FEATURES = {
       "Ekskluzivni grafikoni",
     ],
   },
-  tips: {
-    title: "Premium Saveti",
-    description: "Dobijte naše najbolje savete sa većom tačnošću.",
-    benefits: [
-      "Saveti sa većom tačnošću",
-      "Ekskluzivne kombinacije",
-      "Rane obaveštenja",
-      "Analize naših stručnjaka",
-    ],
-  },
   default: {
     title: "Premium Funkcije",
     description: "Otključajte ekskluzivne funkcije sa Premium članstvom.",

@@ -3,6 +3,38 @@ import { useSelector } from "react-redux";
 import { RootState } from "../../redux/store";
 import PremiumFallback from "./PremiumFallback";
 
+// Component for the Modal/Tooltip
+function TipTooltip({ onClose }) {
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+      {/* Background Overlay */}
+      <div className="absolute inset-0 bg-gray-950/80 backdrop-blur-sm" />
+
+      {/* Modal Content */}
+      <div className="relative w-full max-w-md bg-gray-800 border-2 border-cyan-500 rounded-xl shadow-2xl p-6 text-center transform scale-100 transition-transform duration-300">
+        <h3 className="text-xl font-bold text-cyan-400 mb-3">Pomoc</h3>
+        <p className="text-gray-200 mb-6">
+          Klikom na željeni{" "}
+          <span className="font-semibold text-white bg-cyan-600/30 px-1 py-0.5 rounded">
+            Tip
+          </span>{" "}
+          u tabeli automatski ga dodajete na svoj{" "}
+          <span className="font-semibold text-white bg-blue-600/30 px-1 py-0.5 rounded">
+            Tiket
+          </span>{" "}
+          (dole desno).
+        </p>
+        <button
+          onClick={onClose}
+          className="w-full bg-gradient-to-r from-cyan-500 to-blue-600 hover:from-cyan-400 hover:to-blue-500 text-white font-semibold py-3 px-4 rounded-lg transition-all duration-300 transform hover:scale-[1.02] shadow-md shadow-cyan-500/20"
+        >
+          Razumem
+        </button>
+      </div>
+    </div>
+  );
+}
+
 export default function BestOdds() {
   const currentUser = useSelector((state: RootState) => state.user);
   if (currentUser.tier === "free") {
@@ -13,16 +45,32 @@ export default function BestOdds() {
   const [selectedGame, setSelectedGame] = useState(null);
   const [loading, setLoading] = useState(false);
   const [gameOdds, setGameOdds] = useState({});
-  const [expandedCategory, setExpandedCategory] = useState<string | null>(null); // State for tracking expanded categories
+  const [expandedCategory, setExpandedCategory] = useState<string | null>(null);
   const [betslip, setBetslip] = useState([]);
   const [isSlipVisible, setIsSlipVisible] = useState(false);
   const [tipSearch, setTipSearch] = useState(null);
+
+  // --- NEW STATE FOR TOOLTIP ---
+  const [showTooltip, setShowTooltip] = useState(false);
+
   useEffect(() => {
     document.title = "InsajderTips | Najbolje kvote";
+
+    // --- NEW LOGIC FOR TOOLTIP ---
+    const hasSeenTooltip = localStorage.getItem("hasSeenOddsTooltip");
+    if (!hasSeenTooltip) {
+      setShowTooltip(true);
+    }
   }, []);
 
+  // --- NEW HANDLER TO DISMISS TOOLTIP AND SET LOCAL STORAGE ---
+  const handleTooltipClose = () => {
+    setShowTooltip(false);
+    localStorage.setItem("hasSeenOddsTooltip", "true");
+  };
+
   const filteredOdds = useMemo(() => {
-    if (!tipSearch) return gameOdds; // Return original if no search
+    if (!tipSearch) return gameOdds;
 
     const result = {};
 
@@ -67,11 +115,11 @@ export default function BestOdds() {
           away: selectedGame.away,
           tip: bet.reference,
           odds: {
-            MaxBet: bet.maxBet || 1.0, // Default to 1.0 if null
-
+            MaxBet: bet.maxBet || 1.0,
             Mozzart: bet.mozzartBet || 1.0,
             Soccer: bet.soccerBet || 1.0,
             Oktagon: bet.oktagon || 1.0,
+            WinnerBet: bet.winnerbet || 1.0,
           },
         },
       ]);
@@ -124,16 +172,13 @@ export default function BestOdds() {
             Object.fromEntries([...res.headers])
           );
 
-          // First, check if response is OK
           if (!res.ok) {
-            // Try to get the response text to see what the server actually returned
             const responseText = await res.text();
             console.error(
               "Server returned error. Response text:",
               responseText
             );
 
-            // Try to parse as JSON, but if it fails, use the raw text
             try {
               const errorData = JSON.parse(responseText);
               console.error("Server error details (JSON):", errorData);
@@ -148,7 +193,6 @@ export default function BestOdds() {
             }
           }
 
-          // If response is OK, parse as JSON
           return res.json();
         })
         .then((json) => {
@@ -175,11 +219,14 @@ export default function BestOdds() {
   const handleBackButtonClick = () => setSelectedGame(null);
 
   const toggleCategory = (category: string) => {
-    setExpandedCategory(expandedCategory === category ? null : category); // Toggle category visibility
+    setExpandedCategory(expandedCategory === category ? null : category);
   };
 
   return (
     <div className="flex flex-col items-center justify-center w-full min-h-screen p-4 bg-gray-950 relative font-sans">
+      {/* --- RENDER TOOLTIP CONDITIONALLY --- */}
+      {showTooltip && <TipTooltip onClose={handleTooltipClose} />}
+
       {/* Main Content Card */}
       <div className="w-full max-w-5xl bg-gray-900/50 backdrop-blur-xl border border-cyan-500/20 rounded-3xl shadow-2xl shadow-cyan-500/10 flex flex-col">
         {/* Stage 1: Search for a Game */}
@@ -192,6 +239,12 @@ export default function BestOdds() {
                   type="text"
                   placeholder="Pretraži meč po timovima"
                   onChange={(e) => setSearchQuery(e.target.value)}
+                  // --- ADDED onKeyDown HANDLER HERE ---
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter") {
+                      find();
+                    }
+                  }}
                   className="w-full bg-gray-800/60 border-2 border-gray-700 rounded-xl py-4 pl-6 pr-14 text-lg text-white placeholder-gray-500 focus:outline-none focus:border-cyan-400 focus:ring-4 focus:ring-cyan-400/20 hover:border-gray-600 transition-all duration-300 shadow-inner"
                 />
                 <svg
@@ -222,7 +275,7 @@ export default function BestOdds() {
                 <div
                   key={index}
                   onClick={() => selectGameById(index)}
-                  className="relative bg-gray-800/70 hover:bg-gray-800/90 border border-gray-700/50 rounded-2xl p-5 cursor-pointer shadow-lg transition-all duration-300 hover:border-cyan-500/30 hover:shadow-cyan-500/10  group"
+                  className="relative bg-gray-800/70 hover:bg-gray-800/90 border border-gray-700/50 rounded-2xl p-5 cursor-pointer shadow-lg transition-all duration-300 hover:border-cyan-500/30 hover:shadow-cyan-500/10  group"
                 >
                   <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
                     <div className="flex-1">
@@ -318,39 +371,45 @@ export default function BestOdds() {
             {/* Odds Table */}
             <div className="flex-1 overflow-auto">
               {loading ? (
-                <div className="p-10 text-center text-cyan-300">
+                <div className="p-10 text-center text-cyan-300 text-xl">
                   Učitavanje kvota...
                 </div>
               ) : (
-                <div className="max-h-[65vh] overflow-y-auto scrollbar-thin scrollbar-thumb-cyan-700/50 scrollbar-track-transparent">
-                  <table className="min-w-full text-sm text-left">
-                    <thead className="sticky top-0 bg-gray-900/60 backdrop-blur-md z-10">
+                <div className="max-h-[65vh] overflow-y-auto scrollbar-thin scrollbar-thumb-cyan-600 scrollbar-track-transparent border border-gray-700/50 rounded-lg shadow-inner shadow-gray-900">
+                  <table className="min-w-full text-sm text-left border-collapse">
+                    <thead className="sticky top-0 bg-gray-900/90 backdrop-blur-sm z-20 shadow-md">
                       <tr>
-                        {["Tip", "Soccer", "Mozzart", "MaxBet", "Oktagon"].map(
-                          (header, idx) => (
-                            <th
-                              key={idx}
-                              className={`px-6 py-4 font-semibold tracking-wider ${
-                                idx === 0
-                                  ? "text-left text-cyan-300"
-                                  : "text-center text-gray-300"
-                              }`}
-                            >
-                              {header}
-                            </th>
-                          )
-                        )}
+                        {[
+                          "Tip",
+                          "Soccer",
+                          "Mozzart",
+                          "MaxBet",
+                          "Oktagon",
+                          "WinnerBet",
+                        ].map((header, idx) => (
+                          <th
+                            key={idx}
+                            className={`px-6 py-4 font-extrabold tracking-wide ${
+                              idx === 0
+                                ? "text-left text-cyan-300 w-[15%]" // Reduced width for the 'Tip' column
+                                : "text-center text-gray-300 w-auto"
+                            }`}
+                          >
+                            {header}
+                          </th>
+                        ))}
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-gray-700/50">
                       {Object.keys(filteredOdds).map((category) => (
-                        <>
+                        <React.Fragment key={category}>
+                          {/* Category Header Row (Clickable) */}
                           <tr
                             onClick={() => toggleCategory(category)}
-                            className="bg-gray-800/40 hover:bg-gray-800/60 cursor-pointer transition-colors"
+                            className="bg-gray-800/60 hover:bg-gray-800/80 cursor-pointer transition-colors"
                           >
-                            <td colSpan={5} className="px-6 py-3">
-                              <div className="flex items-center gap-3 font-semibold text-cyan-300">
+                            <td colSpan={6} className="px-6 py-3">
+                              <div className="flex items-center gap-3 font-bold text-lg text-cyan-300">
                                 <svg
                                   className={`h-5 w-5 transform transition-transform duration-300 ${
                                     expandedCategory === category
@@ -370,46 +429,61 @@ export default function BestOdds() {
                               </div>
                             </td>
                           </tr>
+
+                          {/* Bet Rows (Only visible when expanded) */}
                           {expandedCategory === category &&
                             Object.values(filteredOdds[category]).map(
                               (bet, idx) => {
                                 if (!bet.reference || bet.reference === "name")
                                   return null;
+
                                 const odds = {
                                   soccerBet: bet.soccerBet || 0,
                                   mozzartBet: bet.mozzartBet || 0,
                                   maxBet: bet.maxBet || 0,
                                   oktagon: bet.oktagon || 0,
+                                  winner: bet.winnerbet || 0,
                                 };
                                 const highestOdd = Math.max(
                                   ...Object.values(odds)
                                 );
+
                                 return (
                                   <tr
-                                    key={idx}
-                                    className="hover:bg-gray-800/20 transition-colors"
+                                    key={`${category}-${idx}`}
+                                    className="bg-gray-900/20 hover:bg-gray-800/40 transition-colors"
                                   >
+                                    {/* Bet Type Name */}
                                     <td
                                       onClick={() => addToSlip(bet)}
-                                      className="px-6 py-3 font-semibold text-cyan-300 cursor-pointer hover:text-white sticky left-0 bg-gray-900/50"
+                                      className="px-6 py-3 font-medium text-gray-100 cursor-pointer hover:text-cyan-400 sticky left-0 bg-gray-900/60 transition-all border-r border-gray-700/50 z-10"
                                     >
                                       {bet.reference}
                                     </td>
+
+                                    {/* Odds Values */}
                                     {Object.entries(odds).map(
                                       ([key, value]) => (
                                         <td
                                           key={key}
-                                          className="px-6 py-3 text-center"
+                                          className="px-6 py-3 text-center transition-colors"
                                         >
                                           <span
-                                            className={`inline-block min-w-[50px] px-3 py-1 rounded-md text-lg font-mono font-semibold transition-all ${
-                                              value === highestOdd && value > 0
-                                                ? "bg-green-500/20 text-green-300 shadow-sm shadow-green-500/20"
-                                                : "text-gray-300"
-                                            }`}
+                                            className={`
+                                                                    inline-block min-w-[55px] px-3 py-1 rounded-lg text-base font-mono font-bold transition-all duration-200 
+                                                                    ${
+                                                                      value ===
+                                                                        highestOdd &&
+                                                                      value > 0
+                                                                        ? "bg-green-600/30 text-green-300 shadow-lg shadow-green-700/50 scale-105"
+                                                                        : "text-gray-300 bg-gray-800/40"
+                                                                    }
+                                                                `}
                                           >
-                                            {value || (
-                                              <span className="text-gray-600">
+                                            {value > 0 ? (
+                                              value.toFixed(2)
+                                            ) : (
+                                              <span className="text-gray-600/80 font-normal">
                                                 -
                                               </span>
                                             )}
@@ -421,7 +495,7 @@ export default function BestOdds() {
                                 );
                               }
                             )}
-                        </>
+                        </React.Fragment>
                       ))}
                     </tbody>
                   </table>
@@ -434,7 +508,7 @@ export default function BestOdds() {
 
       {/* Floating Bet Slip */}
       <div
-        className={`fixed bottom-0 right-0 sm:right-4 w-full sm:w-96 z-50 transition-transform duration-500 ease-in-out ${
+        className={`fixed bottom-0 right-0 sm:right-4 w-full sm:w-96 z-40 transition-transform duration-500 ease-in-out ${
           isSlipVisible
             ? "translate-y-0"
             : "translate-y-[calc(100%-4rem)] sm:translate-y-[calc(100%-3.5rem)]"

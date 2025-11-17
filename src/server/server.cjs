@@ -9,6 +9,8 @@ const socketIo = require("socket.io");
 const nodemailer = require("nodemailer");
 const { v4: uuidv4 } = require("uuid");
 const cookieParser = require("cookie-parser");
+const rateLimit = require("express-rate-limit");
+
 app.use(cookieParser());
 app.use(express.json());
 app.use(cors());
@@ -91,11 +93,47 @@ const UserSchema = new mongoose.Schema(
 );
 
 const TipSchema = new mongoose.Schema({
-  tipTitle: String,
+  tipTitle: { type: String, required: true },
+  tip: { type: String, required: true },
+
+  // CORE FILTERING FIELDS
+  type: {
+    type: String,
+    enum: ["free", "premium"],
+    required: true,
+    index: true, // Indexing this field for fast queries like 'type: "free"'
+  },
+  active: {
+    type: Boolean,
+    default: true,
+    index: true, // Indexing this for fast 'active: true' queries
+  },
+
+  // OTHER CORE DISPLAY FIELDS
+  league: String,
+  date: Date,
+  confidencePercent: { type: Number, min: 0, max: 100 },
+  stars: { type: Number, min: 1, max: 5 },
+  home: { type: String, required: true },
+  away: { type: String, required: true },
+  homeLogo: String,
+  awayLogo: String,
+
+  // EXPANDED DETAIL FIELDS (Kept embedded as you requested in the first step)
   analysis: String,
-  tip: String,
-  type: String,
-  active: Boolean,
+  stats: {
+    possession: String,
+    shots: String,
+    form: String,
+  },
+  lineups: {
+    home: [String],
+    away: [String],
+  },
+  injuries: {
+    home: [String],
+    away: [String],
+  },
 });
 const tipStatSchema = new mongoose.Schema(
   {
@@ -125,7 +163,14 @@ const Tip = mongoose.model("Tip", TipSchema);
 const TipStat = mongoose.model("TipStat", tipStatSchema);
 
 const JWT_SECRET = "unlockstheworld.";
-
+const paymentLimiter = rateLimit({
+  windowMs: 720 * 60 * 1000, // 15 minutes
+  max: 4, // Limit each IP to 5 payment submission requests per 15 minutes
+  message:
+    "Previše zahteva za plaćanje s ove IP adrese, pokušajte ponovo kasnije (za 12 sati) ili nas kontaktirajte", // Message when max is exceeded
+  standardHeaders: true,
+  legacyHeaders: false,
+});
 const verifyToken = (req, res, next) => {
   // middleware to verify jwt token
   const token = req.header("Authorization").replace("Bearer ", "");
@@ -480,45 +525,26 @@ app.get("/user", verifyToken, async (req, res) => {
     res.status(200).json({ user: userData });
   } catch (err) {}
 });
-app.get("/tips/free/", (req, res) => {
-  Tip.find({ type: "free", active: true })
+app.get("/tips/:type", async (req, res) => {
+  try {
+    const { type } = req.params;
+    if (!["free", "premium"].includes(type)) {
+      return res.status(400).json({ message: "Invalid tip type." });
+    }
 
-    .then((tips) => {
-      if (!tips) {
-        return res
-          .status(404)
-          .json({ message: "Nije pronadjen ni jedan besplatan tip." });
-      }
+    const tips = await Tip.find({ type, active: true }).lean();
 
-      res.json(tips);
-    })
-    .catch((err) => {
-      console.error(err);
-      res.status(500).json({ message: "Greska do servera." });
-    });
-});
+    if (!tips || tips.length === 0) {
+      return res
+        .status(404)
+        .json({ message: `Nije pronadjen ni jedan ${type} tip.` });
+    }
 
-app.get("/tips/premium/", verifyToken, (req, res) => {
-  const decodedJWT = req.user;
-
-  if (decodedJWT.tier !== "premium") {
-    return res.status(403).json({ message: "Nemate pristup ovim tipovima." });
+    res.json(tips);
+  } catch (err) {
+    console.error(`/tips/${req.params.type} error:`, err);
+    res.status(500).json({ message: "Greska do servera." });
   }
-
-  Tip.find({ type: "premium", active: true })
-
-    .then((tips) => {
-      if (!tips.length) {
-        return res
-          .status(404)
-          .json({ message: "Trenutno nema aktivnih premium tipova." });
-      }
-      res.json(tips);
-    })
-    .catch((err) => {
-      console.error(err);
-      res.status(500).json({ message: "Greska do servera." });
-    });
 });
 
 app.get("/statistics/:user", verifyToken, async (req, res) => {
@@ -1069,7 +1095,9 @@ app.get("/oddsChecker/getSearch/:query", async (req, res) => {
         // Exclude all matches related to "igrači" (players) for any sport
         if (
           leagueNameLower.includes("igrači") ||
-          leagueTokenLower.includes("igrači")
+          leagueTokenLower.includes("igrači") ||
+          leagueNameLower.includes("pobednik") ||
+          leagueTokenLower.includes("pobednik")
         ) {
           return false;
         }
@@ -1250,12 +1278,14 @@ app.post("/oddsChecker/getOdds/", async (req, res) => {
     const maxbetSearch = `https://www.maxbet.rs/restapi/offer/sr/search/${searchQuery}/mob?mobileVersion=1.2.1.14&locale=sr`;
     const mozzartSearch = `https://www.mozzartbet.com/betting/search?term=${searchQuery}`;
     const oktagonSearch = `https://www.oktagonbet.com/restapi/offer/sr/search/${searchQuery}/mob?annex=1&mobileVersion=2.38.5.1&locale=sr`;
+    const winnerSearch = `https://wnrs-aggr-api.egt-digital.com/api/sportsapi/public/search/events-data/?searchTerm=${searchQuery}&verticalType=sports`;
     // Fetch both API responses in parallel
     const [
       soccerResponse,
       maxbetSearchResponse,
       mozzartResponse,
       oktagonSearchResponse,
+      winnerSearchResponse,
     ] = await Promise.all([
       request(soccerApi),
       request(maxbetSearch),
@@ -1271,13 +1301,93 @@ app.post("/oddsChecker/getOdds/", async (req, res) => {
         },
       }),
       request(oktagonSearch),
+      request(winnerSearch, {
+        headers: {
+          accept: "*/*",
+          "accept-language": "en-US,en;q=0.9",
+          "cache-control": "no-cache",
+          pragma: "no-cache",
+          // NOTE: 'priority' and 'sec-fetch-*' headers are often stripped by the browser
+          // or cause CORS/CSP errors. They are included here, but may be ignored
+          // or cause issues depending on your execution environment.
+          priority: "u=1, i",
+          "sec-ch-ua":
+            '"Chromium";v="142", "Google Chrome";v="142", "Not_A Brand";v="99"',
+          "sec-ch-ua-mobile": "?1",
+          "sec-ch-ua-platform": '"Android"',
+          "sec-fetch-dest": "empty",
+          "sec-fetch-mode": "cors",
+          "sec-fetch-site": "cross-site",
+          "x-platform-device": "desktop",
+          "x-platform-exp": "1763373110",
+          "x-platform-hash": "b09GnP5tNYlG6FvPGiighw",
+          "x-platform-lang": "sr",
+          "x-platform-tz": "60",
+          Referer: "https://www.winnerbet.rs/",
+        },
+        body: null,
+        method: "GET",
+      }),
     ]);
 
     const soccerJson = await soccerResponse.body.json();
     const maxbetJson = await maxbetSearchResponse.body.json();
     const mozzartJson = await mozzartResponse.body.json();
-
     const oktagonJson = await oktagonSearchResponse.body.json();
+    const winnerbetJson = await winnerSearchResponse.body.json();
+    if (winnerbetJson.length > 0 && winnerbetJson[0].events) {
+      const filteredGames = winnerbetJson[0].events.filter(
+        (game) => new Date(game.scheduledTime).getTime() === date
+      );
+
+      if (filteredGames.length > 0) {
+        const matchId = filteredGames[0].id;
+        fetch(
+          `https://wnrs-aggr-api.egt-digital.com/api/sportsapi/public/sport-events/eventview/normalized/${matchId}`,
+          {
+            method: "GET",
+            headers: {
+              accept: "*/*",
+              "accept-language": "en-US,en;q=0.9",
+              "cache-control": "no-cache",
+              pragma: "no-cache",
+              priority: "u=1, i",
+              "sec-ch-ua":
+                '"Chromium";v="142", "Google Chrome";v="142", "Not_A Brand";v="99"',
+              "sec-ch-ua-mobile": "?1",
+              "sec-ch-ua-platform": '"Android"',
+              "sec-fetch-dest": "empty",
+              "sec-fetch-mode": "cors",
+              "sec-fetch-site": "cross-site",
+              "x-platform-device": "desktop",
+              "x-platform-exp": "1763373110",
+              "x-platform-hash": "b09GnP5tNYlG6FvPGiighw",
+              "x-platform-lang": "sr",
+              "x-platform-tz": "60",
+              Referer: "https://www.winnerbet.rs/",
+            },
+            body: null,
+          }
+        )
+          .then((res) => res.json())
+          .then((data) => {
+            const markets = data.marketsData;
+            const marketKeys = Object.keys(markets);
+
+            if (marketKeys.length > 0) {
+              // First market = "1 X 2"
+              const firstMarket = markets[marketKeys[0]];
+              const outcomes = firstMarket.outcomes;
+
+              odds["ki"]["1"]["winnerbet"] = outcomes[0].odds; // Team 1
+              odds["ki"]["x"]["winnerbet"] = outcomes[1].odds; // Draw
+              odds["ki"]["2"]["winnerbet"] = outcomes[2].odds; // Team 2
+            }
+          })
+          .catch((err) => console.error(err));
+      }
+    }
+
     if (oktagonJson.esMatches) {
       const filteredGames = oktagonJson.esMatches.filter(
         (game) => game.kickOffTime === date
@@ -1382,7 +1492,6 @@ app.post("/oddsChecker/getOdds/", async (req, res) => {
           game.leagueName != "UEFA Champions League 2025/2026,Winner"
       );
 
-      // if we found the game we are lookingg for, append its odds in the container.
       if (filteredGames.length > 0 && sport === "S") {
         const currentOdds = filteredGames[0].odds;
 
@@ -1655,7 +1764,6 @@ app.post("/oddsChecker/getOdds/", async (req, res) => {
       const json = await mozzartOdds.body.json();
       if (json.status !== "ERROR") {
         const mOdds = json.match.odds;
-        console.log(JSON.stringify(mOdds, null, 2)); // Pretty print
 
         if (mOdds && mOdds.length > 0 && sport === "S") {
           odds["ki"]["1"]["mozzartBet"] = mOdds[0].value;
@@ -1744,6 +1852,7 @@ app.post("/oddsChecker/getOdds/", async (req, res) => {
         }
       }
     }
+    console.log(odds);
 
     return res.status(200).json(sport === "S" ? odds : basketballOdds);
   } catch (err) {
@@ -1793,7 +1902,7 @@ app.put("/removeBet", verifyToken, async (req, res) => {
       .json({ message: "Server error while removing bet." });
   }
 });
-app.post("/addPayment", async (req, res) => {
+app.post("/addPayment", paymentLimiter, async (req, res) => {
   const { imageUrl, userEmail, userName, paymentType, mtcn } = req.body;
 
   if (!userEmail || !userName || !paymentType) {

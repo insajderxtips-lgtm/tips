@@ -13,6 +13,27 @@ html {
   min-width: 100% !important;
   min-height: 100vh !important;
   overflow: auto;
+  background: hsla(224, 71%, 4%, 1);
+
+  background: linear-gradient(
+    225deg,
+    hsla(224, 71%, 4%, 1) 65%,
+    hsla(224, 60%, 14%, 1) 100%
+  );
+
+  background: -moz-linear-gradient(
+    225deg,
+    hsla(224, 71%, 4%, 1) 65%,
+    hsla(224, 60%, 14%, 1) 100%
+  );
+
+  background: -webkit-linear-gradient(
+    225deg,
+    hsla(224, 71%, 4%, 1) 65%,
+    hsla(224, 60%, 14%, 1) 100%
+  );
+
+  filter: progid: DXImageTransform.Microsoft.gradient( startColorstr="#030712", endColorstr="#0E1938", GradientType=1 );
 }
 
 @font-face {

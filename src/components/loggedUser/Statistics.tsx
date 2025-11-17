@@ -802,10 +802,62 @@ export default function Statistics(): React.ReactNode {
             </div>
           ) : (
             <>
-              <div className="flex justify-center relative p-4 bg-gradient-to-r from-indigo-900/20 to-purple-900/20  border-2 border-indigo-900/30 shadow-2xl shadow-indigo-900/20">
-                <span className="raceFont text-md md:text-xl font-bold bg-gradient-to-r from-sky-400 to-indigo-500 bg-clip-text text-transparent drop-shadow-[0_2px_4px_rgba(59,130,246,0.5)] hover:scale-105 transition-transform duration-300">
-                  Moje Statistike kladjenja
-                </span>
+              <div className="w-full bg-gradient-to-r from-indigo-900/20 to-purple-900/20 border-2 border-indigo-900/30 shadow-2xl shadow-indigo-900/20 rounded-t-lg">
+                <div className="w-full bg-gradient-to-r from-indigo-900/20 to-purple-900/20 border-2 border-indigo-900/30 shadow-2xl shadow-indigo-900/20 rounded-t-lg relative">
+                  <div className="container mx-auto px-4 sm:px-6 lg:px-8">
+                    <div className="flex items-center justify-center py-4">
+                      {/* Title is centered using justify-center */}
+                      <span className="raceFont text-md md:text-xl font-bold bg-gradient-to-r from-sky-400 to-indigo-500 bg-clip-text text-transparent drop-shadow-[0_2px_4px_rgba(59,130,246,0.5)]">
+                        Moje Statistike kladjenja
+                      </span>
+
+                      {/* Button is ABSOLUTELY positioned to the right. 
+          It will ignore the title's centering and sit on the far right. */}
+                      {userStats?.statistics?.initialInvestment && (
+                        <button
+                          onClick={() =>
+                            !betBuilder.visible &&
+                            setBetBuilder((prev) => ({
+                              ...prev,
+                              visible: true,
+                            }))
+                          }
+                          className="group flex items-center justify-center rounded-full 
+                     bg-slate-800/70 text-white transition-all duration-300 ease-in-out 
+                     border border-sky-600 shadow-md shadow-sky-800/50 
+                     hover:scale-105 hover:bg-sky-700 hover:shadow-sky-500/80 
+                     focus:outline-none focus:ring-4 focus:ring-sky-500/50 
+                     
+                     // POSITIONING: Absolute, centered vertically, locked to the right
+                     absolute right-4 top-1/2 -translate-y-1/2 sm:right-6 lg:right-8
+                     
+                     // MOBILE STYLES: Tiny button, no text
+                     p-2 text-sm whitespace-nowrap gap-0 sm:gap-2
+                     
+                     // DESKTOP STYLES: Full button with text
+                     sm:px-4 sm:py-2 sm:text-sm sm:font-semibold"
+                        >
+                          <svg
+                            xmlns="http://www.w3.org/2000/svg"
+                            viewBox="0 0 24 24"
+                            fill="currentColor"
+                            className="h-5 w-5 sm:h-5 sm:w-5 text-sky-400 transition-transform duration-300 group-hover:text-white group-hover:rotate-45"
+                          >
+                            <path
+                              fillRule="evenodd"
+                              d="M12 2.25c-5.385 0-9.75 4.365-9.75 9.75s4.365 9.75 9.75 9.75 9.75-4.365 9.75-9.75S17.385 2.25 12 2.25zM12.75 9a.75.75 0 00-1.5 0v2.25H9a.75.75 0 000 1.5h2.25V15a.75.75 0 001.5 0v-2.25H15a.75.75 0 000-1.5h-2.25V9z"
+                              clipRule="evenodd"
+                            />
+                          </svg>
+                          {/* Hide text on mobile (default) and show it on screens larger than 'sm' */}
+                          <span className="hidden sm:inline whitespace-nowrap">
+                            Dodaj Opkladu
+                          </span>
+                        </button>
+                      )}
+                    </div>
+                  </div>
+                </div>
               </div>
               <div className="grid grid-cols-1 gap-4 p-4 md:grid-cols-2">
                 <StatCard
@@ -858,7 +910,6 @@ export default function Statistics(): React.ReactNode {
                   }
                 />
               </div>
-
               <div className="flex flex-col w-full  mx-auto  gap-2 0 p-1 md:p-4 ">
                 <div className="min-w-full h-fit flex gap-2  flex-col min-[1230px]:flex-row">
                   <div className="flex h-full w-full flex-col space-y-4 rounded-2xl border border-slate-800 bg-slate-900/50 p-4 shadow-lg sm:p-6">
@@ -1162,7 +1213,7 @@ export default function Statistics(): React.ReactNode {
                       <div className="relative flex h-56 items-center justify-center sm:h-60">
                         <Doughnut data={doughMonthly} options={null} />
                         <div className="absolute flex flex-col items-center justify-center text-center">
-                          <span className="text-3xl font-bold text-sky-300">
+                          <span className="text-2xl font-bold text-sky-300">
                             {currentMonthStats?.totalBets
                               ? Math.round(
                                   (currentMonthStats.totalWins /
@@ -1237,33 +1288,6 @@ export default function Statistics(): React.ReactNode {
             </>
           )}
         </div>
-        {userStats?.statistics?.initialInvestment && (
-          <div className="fixed bottom-6 right-6 z-40 pointer-events-none">
-            <div className="relative flex items-center">
-              <button
-                onClick={() =>
-                  !betBuilder.visible &&
-                  setBetBuilder((prev) => ({ ...prev, visible: true }))
-                }
-                className="group opacity-50 hover:opacity-100 pointer-events-auto flex items-center justify-center gap-2 whitespace-nowrap rounded-full bg-gradient-to-br from-sky-500 to-cyan-400 px-5 py-3 font-semibold text-white shadow-lg shadow-sky-900/40 transition-all duration-300 ease-in-out hover:scale-105 hover:shadow-xl hover:shadow-sky-800/50 focus:outline-none focus:ring-4 focus:ring-sky-500/50"
-              >
-                <svg
-                  xmlns="http://www.w3.org/2000/svg"
-                  viewBox="0 0 24 24"
-                  fill="currentColor"
-                  className="h-6 w-6 transition-transform duration-300 group-hover:rotate-90"
-                >
-                  <path
-                    fillRule="evenodd"
-                    d="M12 2.25c-5.385 0-9.75 4.365-9.75 9.75s4.365 9.75 9.75 9.75 9.75-4.365 9.75-9.75S17.385 2.25 12 2.25zM12.75 9a.75.75 0 00-1.5 0v2.25H9a.75.75 0 000 1.5h2.25V15a.75.75 0 001.5 0v-2.25H15a.75.75 0 000-1.5h-2.25V9z"
-                    clipRule="evenodd"
-                  />
-                </svg>
-                <span>Dodaj Opkladu</span>
-              </button>
-            </div>
-          </div>
-        )}
 
         {betBuilder.visible && (
           <div className="z-50 fixed inset-0 flex items-center justify-center p-4 sm:p-6 backdrop-blur-sm">

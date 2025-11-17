@@ -1,22 +1,6 @@
 import { useLocation, useNavigate } from "react-router";
 import { useState, FC, ReactNode, useEffect } from "react";
-import { useDispatch } from "react-redux";
-
-// --- Mocking Redux and Assets for self-contained example ---
-
-// In your actual app, you would import these from 'react-redux'
-// For this example, we mock them to make the component runnable.
-
-const useSelector = (selector: (state: any) => any) => {
-  // Mock state that would come from your Redux store
-  const mockState = {
-    user: {
-      tier: "free",
-      // You can add other user properties here if needed
-    },
-  };
-  return selector(mockState);
-};
+import { useDispatch, useSelector } from "react-redux";
 
 // Mock the logout action creator
 const logout = () => ({ type: "user/logout" });

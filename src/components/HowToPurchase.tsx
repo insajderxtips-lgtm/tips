@@ -64,18 +64,18 @@ export default function HowToPurchase() {
   const outlet = useOutlet();
   const nav = useNavigate();
   return (
-    <div className="w-full min-h-screen  md:p-6 flex flex-col items-center justify-center">
-      <div className="md:max-w-4xl w-full  backdrop-blur-lg p-8 rounded-2xl shadow-2xl shadow-blue-950/50 text-white">
+    <div className="w-full min-h-screen p-4 md:p-6 flex flex-col items-center justify-center">
+      <div className="md:max-w-4xl w-full backdrop-blur-lg p-4 sm:p-8 rounded-2xl shadow-2xl shadow-blue-950/50 text-white">
         {outlet ? (
           outlet
         ) : (
           <>
-            <h2 className="text-4xl font-bold mb-8 text-center bg-clip-text text-transparent bg-gradient-to-r from-cyan-400 to-blue-400">
+            <h2 className="text-3xl sm:text-4xl font-bold mb-8 text-center bg-clip-text text-transparent bg-gradient-to-r from-cyan-400 to-blue-400">
               Kako mogu da kupim članarinu?
             </h2>
 
             <div className="mb-8 text-center">
-              <p className="text-xl text-cyan-200 mb-4">
+              <p className="text-lg sm:text-xl text-cyan-200 mb-4">
                 Odaberite preferirani način plaćanja
               </p>
             </div>
@@ -84,18 +84,18 @@ export default function HowToPurchase() {
               {paymentData.map((paymentMethod, index) => (
                 <div
                   key={index}
-                  className={`group relative p-6 rounded-xl transition-all duration-300 cursor-pointer
-                  ${
-                    selectedOption === index
-                      ? "bg-gradient-to-br from-cyan-700/30 to-blue-700/30 border-2 border-cyan-500/50 shadow-lg shadow-cyan-500/20"
-                      : "bg-gray-900/30 hover:bg-gray-800/50 border-2 border-transparent hover:border-cyan-500/30"
-                  }`}
+                  className={`group relative p-4 sm:p-6 rounded-xl transition-all duration-300 cursor-pointer
+                            ${
+                              selectedOption === index
+                                ? "bg-gradient-to-br from-cyan-700/30 to-blue-700/30 border-2 border-cyan-500/50 shadow-lg shadow-cyan-500/20"
+                                : "bg-gray-900/30 hover:bg-gray-800/50 border-2 border-transparent hover:border-cyan-500/30"
+                            }`}
                   onClick={() => setSelectedOption(index)}
                 >
                   <div className="flex items-center justify-between">
                     <div>
                       <h3
-                        className={`text-xl font-semibold mb-1 ${
+                        className={`text-lg sm:text-xl font-semibold mb-1 ${
                           selectedOption === index
                             ? "text-cyan-400"
                             : "text-white"
@@ -103,14 +103,18 @@ export default function HowToPurchase() {
                       >
                         {paymentMethod.title}
                       </h3>
-                      <p className="text-sm text-gray-400">
+                      <p className="text-xs sm:text-sm text-gray-400">
                         {paymentMethod.description}
                       </p>
                     </div>
                     <div
                       className={`w-6 h-6 rounded-full flex items-center justify-center 
-                    ${selectedOption === index ? "bg-cyan-500" : "bg-gray-700"} 
-                    transition-colors duration-300`}
+                                    ${
+                                      selectedOption === index
+                                        ? "bg-cyan-500"
+                                        : "bg-gray-700"
+                                    } 
+                                    transition-colors duration-300`}
                     >
                       {selectedOption === index && (
                         <svg
@@ -137,18 +141,18 @@ export default function HowToPurchase() {
             </div>
 
             <div className="text-center space-y-4">
-              <p className="text-sm text-cyan-500/80 italic">
+              <p className="text-xs sm:text-sm text-cyan-500/80 italic">
                 <span className="text-cyan-400">Napomena:</span> Odaberite
                 željeni način plaćanja za nastavak.
               </p>
 
               <button
-                className={`w-full py-3 rounded-xl font-medium transition-all duration-300 flex items-center justify-center gap-2
-                ${
-                  selectedOption === null
-                    ? "bg-gray-700/30 text-gray-500 cursor-not-allowed"
-                    : "bg-gradient-to-r from-cyan-600 to-blue-600 hover:from-cyan-500 hover:to-blue-500 transform hover:-translate-y-0.5 shadow-lg hover:shadow-cyan-500/30"
-                }`}
+                className={`w-full py-2.5 sm:py-3 rounded-xl font-medium transition-all duration-300 flex items-center justify-center gap-2
+                        ${
+                          selectedOption === null
+                            ? "bg-gray-700/30 text-gray-500 cursor-not-allowed"
+                            : "bg-gradient-to-r from-cyan-600 to-blue-600 hover:from-cyan-500 hover:to-blue-500 transform hover:-translate-y-0.5 shadow-lg hover:shadow-cyan-500/30"
+                        }`}
                 onClick={() =>
                   loggedIn
                     ? nav(`${paymentData[selectedOption].url}`, {
@@ -228,7 +232,17 @@ export function StepTwo() {
           message:
             "Uspešno potvrđeno! Premium će biti aktiviran u roku od 24h.",
         });
+      } else if (response.status === 429) {
+        // --- Rate Limiting Handling ---
+        setStatus({
+          success: false,
+          // Display the custom message provided by the server
+          message:
+            data.message ||
+            "Prekoračen je broj pokušaja slanja. Molimo pokušajte ponovo kasnije.",
+        });
       } else {
+        // Handle other server-side errors (e.g., 400, 500)
         throw new Error(data.message || "Došlo je do greške pri obradi uplate");
       }
     } catch (error) {
@@ -668,6 +682,7 @@ export function StepOne() {
       }
 
       // 2. Save to your backend
+      // 2. Save to your backend
       const backendResponse = await fetch("/addPayment", {
         method: "POST",
         headers: {
@@ -683,7 +698,20 @@ export function StepOne() {
 
       const backendData = await backendResponse.json();
 
-      if (!backendResponse.ok) {
+      if (backendResponse.status === 429) {
+        // --- RATE LIMITING HANDLING ---
+        setUploading(false);
+        setStatus({
+          status: 429,
+          // Display the custom message provided by the server
+          message:
+            backendData.message ||
+            "Prekoračen je broj pokušaja slanja. Molimo pokušajte ponovo kasnije.",
+        });
+        // Throw an error to stop execution and skip the success part
+        throw new Error(backendData.message || "Rate limit exceeded");
+      } else if (!backendResponse.ok) {
+        // Handle other server errors (e.g., validation errors)
         setUploading(false);
         setStatus({
           status: 400,
@@ -702,11 +730,23 @@ export function StepOne() {
       });
       // Add success notification here
     } catch (err) {
-      setStatus({
-        status: 400,
-        message:
-          "Vec ste nam poslali sliku uplatnice u poslednja 24h. Ukoliko imate problema, javite nam se (podrska@insajder.tips)",
-      });
+      // This catch block will now catch the error thrown from the 429 check
+      // or the other general errors. You might want to update the message here
+      // to be less specific if it's handling multiple types of errors.
+
+      // Check if the error is due to an earlier check (like the 24h limit)
+      // or a network issue. If the status state was set (e.g., 429), it will
+      // retain that message.
+
+      // Only update status if it wasn't already set by a specific error handler above
+      if (!status.message) {
+        setStatus({
+          status: 400,
+          message:
+            "Doslo je do greske. Proverite da li ste vec poslali sliku uplatnice. Ukoliko imate problema, javite nam se (podrska@insajder.tips)",
+        });
+      }
+
       setUploading(false);
       // Add error notification here
     }
@@ -876,7 +916,7 @@ export function StepOne() {
               {status.message && (
                 <div
                   className={`${
-                    status.message.startsWith("Vec")
+                    status.message.startsWith("Doslo")
                       ? "text-red-500"
                       : "text-green-500"
                   } font-bold text-center`}
