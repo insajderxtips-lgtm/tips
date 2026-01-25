@@ -274,10 +274,10 @@ export default function Sidebar(): ReactNode {
             </div>
             <div className="text-center text-slate-500 text-xs pt-2">
               <a
-                href="mailto:podrska@insajder.tips"
+                href="mailto:insajderxtips@gmail.com"
                 className="hover:text-slate-300 transition-colors"
               >
-                podrska@insajder.tips
+                insajderxtips@gmail.com
               </a>
             </div>
           </div>

@@ -1,20 +1,30 @@
-import React, { useState, useMemo } from "react";
+import React, { useMemo, useState } from "react";
 import { createPortal } from "react-dom";
 
+type BetWrapper = {
+  bet: any; // single bet object OR parlay object (bet.type === "parlay")
+  monthIndex: number;
+  dayIndex: number;
+  idxInDay: number;
+  key: string;
+};
+
 export default function UserBets({
-  bets,
+  bets, // optional - if you already normalized bets elsewhere
   userStats,
   setUserStats,
+  removeBet: propRemoveBet,
+  saveChanges: propSaveChanges,
 }: {
-  bets: any;
+  bets?: any;
   userStats: any;
-  local: any;
   setUserStats: any;
-}): React.ReactNode {
+  removeBet?: (b: any) => Promise<void>;
+  saveChanges?: () => Promise<void>;
+}) {
   const [openParlayKey, setOpenParlayKey] = useState<string | null>(null);
-  const [openMonths, setOpenMonths] = useState({});
-
-  const [editor, setEditor] = useState({
+  const [openMonths, setOpenMonths] = useState<Record<string, boolean>>({});
+  const [editor, setEditor] = useState<any>({
     visible: false,
     parlay: false,
     bet: null,
@@ -22,780 +32,267 @@ export default function UserBets({
     editorStatus: null,
   });
 
-  const JWT = localStorage.getItem("insajder_token") || "";
+  const JWT = typeof window !== "undefined" ? localStorage.getItem("insajder_token") || "" : "";
 
-  const toggleParlay = (key: string) => {
-    setOpenParlayKey(openParlayKey === key ? null : key);
-  };
+  const toggleParlay = (key: string) => setOpenParlayKey(openParlayKey === key ? null : key);
+  const toggleMonth = (monthYear: string) => setOpenMonths((s) => ({ ...s, [monthYear]: !s[monthYear] }));
 
-  const toggleMonth = (monthYear: string) => {
-    setOpenMonths((prev) => ({
-      ...prev,
-      [monthYear]: !prev[monthYear],
-    }));
-  };
-
+  // Build groups from userStats.monthlyStats preserving parlay objects
   const groupedBets = useMemo(() => {
-    if (!bets) return {};
-    const groups = {};
+    const groups: Record<string, BetWrapper[]> = {};
 
-    bets.forEach((bet) => {
-      const isParlay = Array.isArray(bet) && bet[0];
-      const mainBet = isParlay ? bet[0] : bet;
-      const dateStr = mainBet?.date;
+    // If consumer passed in `bets` directly (already normalized), use that path:
+    if (Array.isArray(bets) && bets.length > 0) {
+      // assume bets are top-level bet objects or parlay objects
+      bets.forEach((b: any, i: number) => {
+        const dateStr = b?.date || "Nepoznat";
+        const parts = (dateStr + "").split("/");
+        const month = parts[0] ? parseInt(parts[0], 10) - 1 : new Date().getMonth();
+        const year = parts[2] ? parseInt(parts[2], 10) : new Date().getFullYear();
+        const monthYear = isNaN(month) || isNaN(year)
+          ? "Nepoznat Datum"
+          : new Date(year, month, 1).toLocaleString("sr-Latn", { month: "long", year: "numeric" });
 
-      if (!dateStr) {
-        const unknownGroup = "Nepoznat Datum";
-        if (!groups[unknownGroup]) {
-          groups[unknownGroup] = [];
-        }
-        groups[unknownGroup].push(bet);
-        return;
-      }
+        if (!groups[monthYear]) groups[monthYear] = [];
+        groups[monthYear].push({ bet: b, monthIndex: month, dayIndex: 0, idxInDay: i, key: `${monthYear}-${i}` });
+      });
 
-      const parts = dateStr.split("/");
-      const month = parseInt(parts[0], 10) - 1;
-      const year =
-        parts.length === 3 ? parseInt(parts[2], 10) : new Date().getFullYear();
+      return groups;
+    }
 
-      let monthYear;
-      if (isNaN(month) || isNaN(year)) {
-        monthYear = "Nepoznat Datum";
-      } else {
-        const dateObj = new Date(year, month, 1);
-        monthYear = dateObj.toLocaleString("sr-Latn", {
-          month: "long",
-          year: "numeric",
+    if (!userStats?.statistics?.monthlyStats) return groups;
+
+    userStats.statistics.monthlyStats.forEach((monthObj: any, monthIndex: number) => {
+      const monthLabel = monthObj?.month || new Date(new Date().getFullYear(), monthIndex, 1).toLocaleString("sr-Latn", { month: "long", year: "numeric" });
+      if (!groups[monthLabel]) groups[monthLabel] = [];
+
+      const days = Array.isArray(monthObj?.bets) ? monthObj.bets : [];
+
+      days.forEach((dayBets: any, dayIndex: number) => {
+        if (!Array.isArray(dayBets)) return; // skip null days
+        dayBets.forEach((betObj: any, idxInDay: number) => {
+          // push the bet object as-is (parlay stays a single object with .games)
+          groups[monthLabel].push({
+            bet: betObj,
+            monthIndex,
+            dayIndex,
+            idxInDay,
+            key: `${monthIndex}-${dayIndex}-${idxInDay}`,
+          });
         });
-      }
-
-      if (!groups[monthYear]) {
-        groups[monthYear] = [];
-      }
-      groups[monthYear].push(bet);
+      });
     });
 
     return groups;
-  }, [bets]);
+  }, [bets, userStats]);
 
-  const openEditor = (bet) => {
-    setEditor((prev) => ({
-      ...prev,
+  // Editor helpers
+  const openEditor = (wrapped: BetWrapper) => {
+    const isParlay = wrapped.bet?.type === "parlay";
+    const main = wrapped.bet;
+    setEditor({
       visible: true,
-      bet: bet,
-      parlay: Array.isArray(bet),
-      newStatus: Array.isArray(bet) ? bet[0].status : bet.status,
-    }));
+      parlay: isParlay,
+      bet: wrapped,
+      newStatus: main?.status || "active",
+      editorStatus: null,
+    });
   };
-  const removeBet = async (bet) => {
-    try {
-      const isParlay = bet.isParlay;
-      const stake = Number(bet.stake);
-      const odds = isParlay ? Number(bet.totalOdds) : Number(bet.odds);
-      const betId = isParlay ? bet.parlayId : bet.betId;
-      const status = bet.status;
-      const dateParts = bet.date.split("/").map(Number);
-      const [month, day] = dateParts;
-      const monthIndex = month - 1;
+  const closeEditor = () => setEditor((s) => ({ ...s, visible: false, bet: null, editorStatus: null }));
 
-      const profit = stake * (odds - 1);
-
-      let balanceChange = 0;
-      let profitChange = 0;
-      let winCountChange = 0;
-      let lossCountChange = 0;
-      let activeCountChange = 0;
-
-      if (status === "win") {
-        balanceChange = -profit;
-        profitChange = -profit;
-        winCountChange = -1;
-      } else if (status === "loss") {
-        balanceChange = stake;
-        profitChange = stake;
-        lossCountChange = -1;
-      } else {
-        balanceChange = stake;
-        profitChange = 0;
-        activeCountChange = -1;
-      }
-
-      const updates = [];
-
-      if (status !== "win" && status !== "loss") {
-        updates.push({
-          updatePath: `statistics.monthlyStats.${monthIndex}.monthlyProfit`,
-          newValue: profitChange,
-          increment: true,
-        });
-      }
-
-      updates.push(
-        { updatePath: "statistics.totalBets", newValue: -1, increment: true },
-        {
-          updatePath: `statistics.monthlyStats.${monthIndex}.totalBets`,
-          newValue: -1,
-          increment: true,
+  // If caller passed removeBet/saveChanges, use them; otherwise no-op or minimal server calls:
+  const removeBet = propRemoveBet
+    ? propRemoveBet
+    : async (wrapped: BetWrapper) => {
+        try {
+          const bet = wrapped.bet;
+          const betId = bet?.betId || bet?.parlayId || bet?._id;
+          if (!betId) return;
+          await fetch("/removeBet", {
+            method: "PUT",
+            headers: { "Content-Type": "application/json", Authorization: "Bearer " + JWT },
+            body: JSON.stringify({ betId }),
+          });
+          // optimistic UI update: remove from local state
+          setUserStats((prev: any) => {
+            if (!prev?.statistics) return prev;
+            const next = structuredClone(prev);
+            const monthly = next.statistics.monthlyStats?.[wrapped.monthIndex];
+            if (!monthly?.bets) return next;
+            const day = monthly.bets[wrapped.dayIndex];
+            if (!Array.isArray(day)) return next;
+            monthly.bets[wrapped.dayIndex] = day.filter((b: any, i: number) => i !== wrapped.idxInDay);
+            return next;
+          });
+        } catch (err) {
+          console.error("removeBet error", err);
         }
-      );
+      };
 
-      if (winCountChange !== 0) {
-        updates.push(
-          {
-            updatePath: "statistics.totalWins",
-            newValue: winCountChange,
-            increment: true,
-          },
-          {
-            updatePath: `statistics.monthlyStats.${monthIndex}.totalWins`,
-            newValue: winCountChange,
-            increment: true,
-          }
-        );
+  const saveChanges = propSaveChanges
+    ? propSaveChanges
+    : async () => {
+        // placeholder if the parent doesn't provide saveChanges
+        console.warn("saveChanges not provided");
+      };
+
+  // Utilities for display
+  const formatOdds = (b: any) => {
+    if (!b) return "-";
+    if (b.type === "parlay") {
+      // parlay may store odds top-level, otherwise compute from games
+      const oddsVal = b.odds ?? b.totalOdds;
+      if (oddsVal) return Number(oddsVal).toFixed(2);
+      if (Array.isArray(b.games)) {
+        const prod = b.games.reduce((acc: number, g: any) => acc * Number(g.odds || 1), 1);
+        return prod.toFixed(2);
       }
-      if (lossCountChange !== 0) {
-        updates.push(
-          {
-            updatePath: "statistics.totalLosses",
-            newValue: lossCountChange,
-            increment: true,
-          },
-          {
-            updatePath: `statistics.monthlyStats.${monthIndex}.totalLosses`,
-            newValue: lossCountChange,
-            increment: true,
-          }
-        );
-      }
-      if (activeCountChange !== 0) {
-        updates.push({
-          updatePath: `statistics.monthlyStats.${monthIndex}.totalActive`,
-          newValue: activeCountChange,
-          increment: true,
-        });
-      }
-
-      await fetch("/updateStatistics", {
-        method: "PUT",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: "Bearer " + JWT,
-        },
-        body: JSON.stringify({ updates }),
-      });
-
-      await fetch("/removeBet", {
-        method: "PUT",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: "Bearer " + JWT,
-        },
-        body: JSON.stringify({ betId, date: bet.date, isParlay }),
-      });
-
-      setUserStats((prev) => {
-        if (!prev || !prev.statistics) {
-          return prev;
-        }
-        const newState = JSON.parse(JSON.stringify(prev));
-        const stats = newState.statistics;
-        const monthly = stats.monthlyStats[monthIndex];
-
-        stats.initialInvestment += balanceChange;
-        stats.totalBets = Math.max(0, (stats.totalBets || 0) - 1);
-        stats.totalWins += winCountChange;
-        stats.totalLosses += lossCountChange;
-
-        if (monthly) {
-          monthly.monthlyProfit += profitChange;
-          monthly.totalBets = Math.max(0, (monthly.totalBets || 0) - 1);
-          monthly.totalWins += winCountChange;
-          monthly.totalLosses += lossCountChange;
-          monthly.totalActive += activeCountChange;
-
-          if (monthly.bets && monthly.bets[day]) {
-            monthly.bets[day] = monthly.bets[day].filter((b) => {
-              const currentBetId = Array.isArray(b) ? b[0]?.parlayId : b?.betId;
-              return currentBetId !== betId;
-            });
-          }
-        }
-        return newState;
-      });
-    } catch (error) {
-      console.error("Error removing bet:", error);
+      return "-";
     }
-  };
-  const closeEditor = () => {
-    setEditor((prev) => ({ ...prev, bet: null, visible: false }));
+    return Number(b.odds ?? 0).toFixed(2);
   };
 
-  async function saveChanges() {
-    const isParlay = editor.parlay;
-    const betData = isParlay ? editor.bet[0] : editor.bet;
-    const previousStatus = betData.status;
-    const newStatus = editor.newStatus;
-
-    if (!newStatus || newStatus === previousStatus) {
-      setEditor((prev) => ({
-        ...prev,
-        editorStatus: "This is already the current status.",
-      }));
-      console.log("abort: no status change", { previousStatus, newStatus });
-      return;
-    }
-
-    const stake = Number(betData.stake);
-    const odds = Number(isParlay ? betData.totalOdds : betData.odds);
-    const betId = isParlay ? betData.parlayId : betData.betId;
-    const [monthNum, dayNum] = (betData.date || "1/1").split("/").map(Number);
-    const monthIndex = Math.max(0, (monthNum || 1) - 1);
-    const dayIndex = Math.max(1, dayNum || 1);
-
-    console.log("saveChanges start", {
-      betId,
-      previousStatus,
-      newStatus,
-      stake,
-      odds,
-      monthIndex,
-      dayIndex,
-    });
-
-    const contributionFor = (status) => {
-      const profit = stake * (odds - 1);
-      if (status === "active")
-        return { initialInvestment: -stake, monthlyProfit: 0 };
-      if (status === "loss")
-        return { initialInvestment: -stake, monthlyProfit: -stake };
-      if (status === "win")
-        return { initialInvestment: profit, monthlyProfit: profit };
-      return { initialInvestment: 0, monthlyProfit: 0 };
-    };
-
-    const prevContrib = contributionFor(previousStatus);
-    const newContrib = contributionFor(newStatus);
-
-    const balanceChange =
-      newContrib.initialInvestment - prevContrib.initialInvestment;
-    const profitChange = newContrib.monthlyProfit - prevContrib.monthlyProfit;
-
-    let winCountChange = 0;
-    let lossCountChange = 0;
-    if (previousStatus !== "win" && newStatus === "win") winCountChange = 1;
-    if (previousStatus === "win" && newStatus !== "win") winCountChange = -1;
-    if (previousStatus !== "loss" && newStatus === "loss") lossCountChange = 1;
-    if (previousStatus === "loss" && newStatus !== "loss") lossCountChange = -1;
-
-    console.log("computed deltas", {
-      prevContrib,
-      newContrib,
-      balanceChange,
-      profitChange,
-      winCountChange,
-      lossCountChange,
-    });
-
-    const updates = [];
-    if (balanceChange !== 0)
-      updates.push({
-        updatePath: "statistics.initialInvestment",
-        newValue: balanceChange,
-        increment: true,
-      });
-    if (profitChange !== 0)
-      updates.push({
-        updatePath: `statistics.monthlyStats.${monthIndex}.monthlyProfit`,
-        newValue: profitChange,
-        increment: true,
-      });
-    if (winCountChange !== 0) {
-      updates.push({
-        updatePath: "statistics.totalWins",
-        newValue: winCountChange,
-        increment: true,
-      });
-      updates.push({
-        updatePath: `statistics.monthlyStats.${monthIndex}.totalWins`,
-        newValue: winCountChange,
-        increment: true,
-      });
-    }
-    if (lossCountChange !== 0) {
-      updates.push({
-        updatePath: "statistics.totalLosses",
-        newValue: lossCountChange,
-        increment: true,
-      });
-      updates.push({
-        updatePath: `statistics.monthlyStats.${monthIndex}.totalLosses`,
-        newValue: lossCountChange,
-        increment: true,
-      });
-    }
-
-    console.log("updates payload", updates);
-
-    setUserStats((prev) => {
-      if (!prev || !prev.statistics) {
-        console.log("setUserStats aborted: missing prev.stats");
-        return prev;
-      }
-
-      const newState = JSON.parse(JSON.stringify(prev));
-      const stats = newState.statistics;
-      const monthly = stats.monthlyStats && stats.monthlyStats[monthIndex];
-
-      stats.initialInvestment += balanceChange;
-      stats.totalWins += winCountChange;
-      stats.totalLosses += lossCountChange;
-
-      if (monthly) {
-        monthly.monthlyProfit += profitChange;
-        monthly.totalWins += winCountChange;
-        monthly.totalLosses += lossCountChange;
-      } else {
-        console.log("warning: monthly stat missing for monthIndex", monthIndex);
-      }
-
-      const localBet = monthly?.bets?.[dayIndex]?.find((bet) =>
-        isParlay ? bet[0]?.parlayId === betId : bet?.betId === betId
-      );
-
-      if (localBet) {
-        if (isParlay) localBet[0].status = newStatus;
-        else localBet.status = newStatus;
-      } else {
-        console.log("warning: localBet not found", {
-          monthIndex,
-          dayIndex,
-          betId,
-        });
-      }
-
-      console.log("local state updated", {
-        balanceChange,
-        profitChange,
-        winCountChange,
-        lossCountChange,
-      });
-      return newState;
-    });
-
-    try {
-      const statRes = await fetch("/updateStatistics", {
-        method: "PUT",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: "Bearer " + JWT,
-        },
-        body: JSON.stringify({ updates }),
-      });
-      const statJson = await statRes.json().catch(() => ({}));
-      console.log("updateStatistics response", {
-        ok: statRes.ok,
-        status: statRes.status,
-        body: statJson,
-      });
-      if (!statRes.ok)
-        throw new Error(`updateStatistics failed ${statRes.status}`);
-
-      const betRes = await fetch("/updateBet", {
-        method: "PUT",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: "Bearer " + JWT,
-        },
-        body: JSON.stringify({
-          bet: { betId, date: betData.date, newStatus, isParlay },
-        }),
-      });
-      const betJson = await betRes.json().catch(() => ({}));
-      console.log("updateBet response", {
-        ok: betRes.ok,
-        status: betRes.status,
-        body: betJson,
-      });
-      if (!betRes.ok) throw new Error(`updateBet failed ${betRes.status}`);
-
-      setEditor((prev) => ({
-        ...prev,
-        bet: isParlay
-          ? [{ ...prev.bet[0], status: newStatus }]
-          : { ...prev.bet, status: newStatus },
-        newStatus: "",
-      }));
-
-      console.log("saveChanges finished successfully", { betId, newStatus });
-    } catch (err) {
-      console.error("saveChanges error", err);
-    }
-  }
+  const getBetId = (b: any) => b?.betId || b?.parlayId || b?._id || null;
 
   return (
     <div className="relative max-h-[calc(100vh-200px)] overflow-auto select-none scrollbar-thin scrollbar-track-transparent scrollbar-thumb-gray-700/50">
       <div className="w-full overflow-hidden rounded-2xl border border-slate-800 bg-slate-900/50 shadow-lg">
-        <div className="w-full overflow-hidden rounded-2xl border border-slate-800 bg-slate-900/50 shadow-lg">
-          <div className="overflow-x-auto">
-            <table className="min-w-full divide-y divide-slate-800">
-              <thead className="sticky top-0 z-10 bg-slate-900/80 backdrop-blur-sm">
-                <tr>
-                  <th
-                    scope="col"
-                    className="sticky left-0 z-20 bg-slate-900/80 py-4 pl-6 pr-4 text-left text-base font-semibold text-white backdrop-blur-sm"
-                  >
-                    Meč
-                  </th>
-                  <th
-                    scope="col"
-                    className="px-4 py-4 text-left text-base font-semibold text-white"
-                  >
-                    Tip
-                  </th>
-                  <th
-                    scope="col"
-                    className="px-4 py-4 text-left text-base font-semibold text-white"
-                  >
-                    Kvota
-                  </th>
-                  <th
-                    scope="col"
-                    className="px-4 py-4 text-left text-base font-semibold text-white"
-                  >
-                    Ulog
-                  </th>
-                  <th
-                    scope="col"
-                    className="px-4 py-4 text-left text-base font-semibold text-white"
-                  >
-                    Status
-                  </th>
-                  <th
-                    scope="col"
-                    className="px-4 py-4 text-left text-base font-semibold text-white"
-                  >
-                    Datum
-                  </th>
-                  <th scope="col" className="relative py-4 pl-4 pr-6">
-                    <span className="sr-only">Delete</span>
-                  </th>
-                </tr>
-              </thead>
+        <div className="overflow-x-auto">
+          <table className="min-w-full divide-y divide-slate-800">
+            <thead className="sticky top-0 z-10 bg-slate-900/80 backdrop-blur-sm">
+              <tr>
+                <th className="sticky left-0 z-20 bg-slate-900/80 py-4 pl-6 pr-4 text-left text-base font-semibold text-white">Meč</th>
+                <th className="px-4 py-4 text-left text-base font-semibold text-white">Tip</th>
+                <th className="px-4 py-4 text-left text-base font-semibold text-white">Kvota</th>
+                <th className="px-4 py-4 text-left text-base font-semibold text-white">Ulog</th>
+                <th className="px-4 py-4 text-left text-base font-semibold text-white">Status</th>
+                <th className="px-4 py-4 text-left text-base font-semibold text-white">Datum</th>
+                <th className="relative py-4 pl-4 pr-6"><span className="sr-only">Delete</span></th>
+              </tr>
+            </thead>
 
+            <tbody>
               {Object.entries(groupedBets).map(([monthYear, monthBets]) => (
                 <React.Fragment key={monthYear}>
-                  <tbody className="divide-y divide-slate-800 border-t-2 border-slate-700">
-                    <tr
-                      className="bg-slate-900/70 cursor-pointer sticky top-[57px] z-[5] transition-colors hover:bg-slate-800"
-                      onClick={() => toggleMonth(monthYear)}
-                    >
-                      <td
-                        colSpan={7}
-                        className="py-3 px-6 text-base font-bold text-white tracking-wider"
-                      >
-                        <div className="flex items-center gap-3">
-                          <svg
-                            className={`h-5 w-5 transition-transform ${
-                              openMonths[monthYear] ? "rotate-180" : ""
-                            }`}
-                            fill="none"
-                            viewBox="0 0 24 24"
-                            strokeWidth="2"
-                            stroke="currentColor"
-                          >
-                            <path
-                              strokeLinecap="round"
-                              strokeLinejoin="round"
-                              d="M19 9l-7 7-7-7"
-                            />
-                          </svg>
-                          <span className="capitalize">{monthYear}</span>
-                          <span className="ml-auto text-sm font-normal text-slate-400">
-                            {monthBets.length} opklada
-                          </span>
-                        </div>
-                      </td>
-                    </tr>
-                  </tbody>
+                  <tr onClick={() => toggleMonth(monthYear)} className="bg-slate-900/70 cursor-pointer sticky top-[57px] z-[5] transition-colors hover:bg-slate-800">
+                    <td colSpan={7} className="py-3 px-6 text-base font-bold text-white tracking-wider">
+                      <div className="flex items-center gap-3">
+                        <svg className={`h-5 w-5 transition-transform ${openMonths[monthYear] ? "rotate-180" : ""}`} fill="none" viewBox="0 0 24 24" strokeWidth="2" stroke="currentColor">
+                          <path strokeLinecap="round" strokeLinejoin="round" d="M19 9l-7 7-7-7" />
+                        </svg>
+                        <span className="capitalize">{monthYear}</span>
+                        <span className="ml-auto text-sm font-normal text-slate-400">{monthBets.length} opklada</span>
+                      </div>
+                    </td>
+                  </tr>
 
-                  {openMonths[monthYear] && (
-                    <tbody className="divide-y divide-slate-800">
-                      {monthBets.map((bet, index) => {
-                        const uniqueKey = `${monthYear}-${index}`;
-                        const isParlay = Array.isArray(bet) && bet[0];
-                        const mainBet = isParlay ? bet[0] : bet;
-                        const status = mainBet?.status;
+                  {openMonths[monthYear] && monthBets.map((wrapped: BetWrapper, idx: number) => {
+                    const bet = wrapped.bet;
+                    const isParlay = bet?.type === "parlay";
+                    const main = bet;
+                    const status = main?.status ?? "active";
 
-                        let statusBorderClass = "";
-                        if (status === "win")
-                          statusBorderClass = "border-green-500";
-                        else if (status === "loss")
-                          statusBorderClass = "border-red-500";
-                        else if (status === "active")
-                          statusBorderClass = "border-sky-500";
+                    const statusBorderClass = status === "win" ? "border-green-500" : status === "loss" ? "border-red-500" : "border-sky-500";
+                    const statusBadgeClass = status === "win" ? "bg-green-500/10 text-green-400 ring-1 ring-inset ring-green-500/20" : status === "loss" ? "bg-red-500/10 text-red-400 ring-1 ring-inset ring-red-500/20" : "bg-sky-500/10 text-sky-400 ring-1 ring-inset ring-sky-500/20";
 
-                        let statusBadgeClass = "";
-                        if (status === "win")
-                          statusBadgeClass =
-                            "bg-green-500/10 text-green-400 ring-1 ring-inset ring-green-500/20";
-                        else if (status === "loss")
-                          statusBadgeClass =
-                            "bg-red-500/10 text-red-400 ring-1 ring-inset ring-red-500/20";
-                        else if (status === "active")
-                          statusBadgeClass =
-                            "bg-sky-500/10 text-sky-400 ring-1 ring-inset ring-sky-500/20";
+                    // unique key for toggling
+                    const uniqueKey = wrapped.key;
 
-                        return !isParlay ? (
-                          <tr
-                            key={uniqueKey}
-                            className="transition-colors hover:bg-slate-800/40"
-                          >
-                            <td
-                              className={`whitespace-nowrap py-5 pl-6 pr-4 text-base font-medium text-white sticky left-0 bg-slate-900/50 border-l-4 ${statusBorderClass}`}
-                            >
-                              {bet.match}
-                            </td>
-                            <td className="whitespace-nowrap px-4 py-5 text-base text-slate-400">
-                              {bet.tip}
-                            </td>
-                            <td className="whitespace-nowrap px-4 py-5 text-base text-slate-400">
-                              <span className="inline-flex items-center rounded-lg bg-slate-700/60 px-2.5 py-1.5 text-sm font-semibold text-sky-300">
-                                {bet.odds}
-                              </span>
-                            </td>
-                            <td className="whitespace-nowrap px-4 py-5 text-base font-semibold text-white">
-                              {bet.stake}
-                            </td>
-                            <td className="whitespace-nowrap px-4 py-5 text-base">
-                              <button
-                                onClick={() => openEditor(bet)}
-                                className={`inline-flex items-center gap-x-2 rounded-lg px-2.5 py-1.5 text-sm font-semibold ${statusBadgeClass}`}
-                              >
-                                {status === "active" && (
-                                  <div className="h-2 w-2 rounded-full bg-sky-400 animate-pulse"></div>
-                                )}
-                                {status}
-                              </button>
-                            </td>
-                            <td className="whitespace-nowrap px-4 py-5 text-base text-slate-500">
-                              {bet.date}
-                            </td>
-                            <td className="relative whitespace-nowrap py-5 pl-4 pr-6 text-right text-base font-medium">
-                              <button
-                                onClick={() => removeBet(bet)}
-                                className="p-1 rounded-full text-slate-500 transition-colors hover:text-red-400 hover:bg-slate-800"
-                              >
-                                <svg
-                                  className="h-5 w-5"
-                                  fill="none"
-                                  viewBox="0 0 24 24"
-                                  strokeWidth="1.5"
-                                  stroke="currentColor"
-                                >
-                                  <path
-                                    strokeLinecap="round"
-                                    strokeLinejoin="round"
-                                    d="M14.74 9l-.346 9m-4.788 0L9.26 9m9.968-3.21c.342.052.682.107 1.022.166m-1.022-.165L18.16 19.673a2.25 2.25 0 01-2.244 2.077H8.084a2.25 2.25 0 01-2.244-2.077L4.772 5.79m14.456 0a48.108 48.108 0 00-3.478-.397m-12 .562c.34-.059.68-.114 1.022-.165m0 0a48.11 48.11 0 013.478-.397m7.5 0v-.916c0-1.18-.91-2.134-2.09-2.201a51.964 51.964 0 00-3.32 0c-1.18.067-2.09 1.022-2.09 2.201v.916m7.5 0a48.667 48.667 0 00-7.5 0"
-                                  />
-                                </svg>
-                              </button>
-                            </td>
+                    if (!isParlay) {
+                      return (
+                        <tr key={uniqueKey} className="transition-colors hover:bg-slate-800/40">
+                          <td className={`whitespace-nowrap py-5 pl-6 pr-4 text-base font-medium text-white sticky left-0 bg-slate-900/50 border-l-4 ${statusBorderClass}`}>{bet.match}</td>
+                          <td className="whitespace-nowrap px-4 py-5 text-base text-slate-400">{bet.tip}</td>
+                          <td className="whitespace-nowrap px-4 py-5 text-base text-slate-400"><span className="inline-flex items-center rounded-lg bg-slate-700/60 px-2.5 py-1.5 text-sm font-semibold text-sky-300">{formatOdds(bet)}</span></td>
+                          <td className="whitespace-nowrap px-4 py-5 text-base font-semibold text-white">{bet.stake ?? "-"}</td>
+                          <td className="whitespace-nowrap px-4 py-5 text-base">
+                            <button onClick={() => openEditor(wrapped)} className={`inline-flex items-center gap-x-2 rounded-lg px-2.5 py-1.5 text-sm font-semibold ${statusBadgeClass}`}>{status === "active" && <div className="h-2 w-2 rounded-full bg-sky-400 animate-pulse"></div>}{status}</button>
+                          </td>
+                          <td className="whitespace-nowrap px-4 py-5 text-base text-slate-500">{bet.date}</td>
+                          <td className="relative whitespace-nowrap py-5 pl-4 pr-6 text-right text-base font-medium">
+                            <button onClick={() => removeBet(wrapped)} className="p-1 rounded-full text-slate-500 transition-colors hover:text-red-400 hover:bg-slate-800">
+                              <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" strokeWidth="1.5" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" d="M14.74 9l-.346 9m-4.788 0L9.26 9m9.968-3.21..."/></svg>
+                            </button>
+                          </td>
+                        </tr>
+                      );
+                    }
+
+                    // Parlay summary row
+                    return (
+                      <React.Fragment key={uniqueKey}>
+                        <tr onClick={() => toggleParlay(uniqueKey)} className="cursor-pointer bg-slate-800/20 transition-colors hover:bg-slate-800/50">
+                          <td className={`whitespace-nowrap py-5 pl-6 pr-4 text-base font-medium text-sky-300 sticky left-0 bg-slate-900/50 border-l-4 ${statusBorderClass}`}>
+                            <div className="flex items-center gap-2">
+                              <span>[Sistem {Array.isArray(bet.games) ? bet.games.length : "?"} meča]</span>
+                              <svg className={`h-5 w-5 transition-transform ${openParlayKey === uniqueKey ? "rotate-180" : ""}`} fill="none" viewBox="0 0 24 24" strokeWidth="2" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" d="M19 9l-7 7-7-7"/></svg>
+                            </div>
+                          </td>
+
+                          <td className="whitespace-nowrap px-4 py-5 text-base text-slate-500">-</td>
+
+                          <td className="whitespace-nowrap px-4 py-5 text-base text-slate-400">
+                            <span className="inline-flex items-center rounded-lg bg-slate-700/60 px-2.5 py-1.5 text-sm font-semibold text-sky-300">{formatOdds(bet)}</span>
+                          </td>
+
+                          <td className="whitespace-nowrap px-4 py-5 text-base font-semibold text-white">{bet.stake ?? "-"}</td>
+
+                          <td className="whitespace-nowrap px-4 py-5 text-base">
+                            <button onClick={(e) => { e.stopPropagation(); openEditor(wrapped); }} className={`inline-flex items-center gap-x-2 rounded-lg px-2.5 py-1.5 text-sm font-semibold ${statusBadgeClass}`}>
+                              {status === "active" && <div className="h-2 w-2 rounded-full bg-sky-400 animate-pulse"></div>}{status}
+                            </button>
+                          </td>
+
+                          <td className="whitespace-nowrap px-4 py-5 text-base text-slate-500">{bet.date}</td>
+
+                          <td className="relative whitespace-nowrap py-5 pl-4 pr-6 text-right text-base font-medium">
+                            <button onClick={(e) => { e.stopPropagation(); removeBet(wrapped); }} className="p-1 rounded-full text-slate-500 transition-colors hover:text-red-400 hover:bg-slate-800">
+                              <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" strokeWidth="1.5" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" d="M14.74 9l-.346 9m-4.788 0L9.26 9m9.968-3.21..."/></svg>
+                            </button>
+                          </td>
+                        </tr>
+
+                        {/* expanded games */}
+                        {openParlayKey === uniqueKey && Array.isArray(bet.games) && bet.games.map((g: any, gi: number) => (
+                          <tr key={`${uniqueKey}-sub-${gi}`} className="transition-colors hover:bg-slate-800/40">
+                            <td className="py-5 pl-12 pr-4 text-base font-medium text-white">{g.match}</td>
+                            <td className="px-4 py-5 text-base text-slate-400">{g.tip}</td>
+                            <td className="px-4 py-5 text-base text-slate-400"><span className="inline-flex items-center rounded-lg bg-slate-700/60 px-2.5 py-1.5 text-sm font-semibold text-sky-300">{Number(g.odds ?? 0).toFixed(2)}</span></td>
+                            <td className="px-4 py-5 text-base font-semibold text-white">-</td>
+                            <td className="px-4 py-5 text-base"><span className={`inline-flex items-center rounded-lg px-2.5 py-1.5 text-sm font-semibold ${g.status === "win" ? "bg-green-500/10 text-green-400 ring-1 ring-green-500/20" : g.status === "loss" ? "bg-red-500/10 text-red-400 ring-1 ring-red-500/20" : "bg-sky-500/10 text-sky-400 ring-1 ring-sky-500/20"}`}>{g.status ?? "active"}</span></td>
+                            <td className="px-4 py-5 text-base text-slate-500">{g.date ?? bet.date}</td>
+                            <td className="px-4 py-5"></td>
                           </tr>
-                        ) : (
-                          <React.Fragment key={uniqueKey}>
-                            <tr
-                              onClick={() => toggleParlay(uniqueKey)}
-                              className="cursor-pointer bg-slate-800/20 transition-colors hover:bg-slate-800/50"
-                            >
-                              <td
-                                className={`whitespace-nowrap py-5 pl-6 pr-4 text-base font-medium text-sky-300 sticky left-0 bg-slate-900/50 border-l-4 ${statusBorderClass}`}
-                              >
-                                <div className="flex items-center gap-2">
-                                  <span>[Sistem {bet.length - 1} meča]</span>
-                                  <svg
-                                    className={`h-5 w-5 transition-transform ${
-                                      openParlayKey === uniqueKey
-                                        ? "rotate-180"
-                                        : ""
-                                    }`}
-                                    fill="none"
-                                    viewBox="0 0 24 24"
-                                    strokeWidth="2"
-                                    stroke="currentColor"
-                                  >
-                                    <path
-                                      strokeLinecap="round"
-                                      strokeLinejoin="round"
-                                      d="M19 9l-7 7-7-7"
-                                    />
-                                  </svg>
-                                </div>
-                              </td>
-                              <td className="whitespace-nowrap px-4 py-5 text-base text-slate-500">
-                                -
-                              </td>
-                              <td className="whitespace-nowrap px-4 py-5 text-base text-slate-400">
-                                <span className="inline-flex items-center rounded-lg bg-slate-700/60 px-2.5 py-1.5 text-sm font-semibold text-sky-300">
-                                  {mainBet.totalOdds}
-                                </span>
-                              </td>
-                              <td className="whitespace-nowrap px-4 py-5 text-base font-semibold text-white">
-                                {mainBet.stake}
-                              </td>
-                              <td className="whitespace-nowrap px-4 py-5 text-base">
-                                <button
-                                  onClick={(e) => {
-                                    e.stopPropagation();
-                                    openEditor(bet);
-                                  }}
-                                  className={`inline-flex items-center gap-x-2 rounded-lg px-2.5 py-1.5 text-sm font-semibold ${statusBadgeClass}`}
-                                >
-                                  {status === "active" && (
-                                    <div className="h-2 w-2 rounded-full bg-sky-400 animate-pulse"></div>
-                                  )}
-                                  {status}
-                                </button>
-                              </td>
-                              <td className="whitespace-nowrap px-4 py-5 text-base text-slate-500">
-                                {mainBet.date}
-                              </td>
-                              <td className="relative whitespace-nowrap py-5 pl-4 pr-6 text-right text-base font-medium"></td>
-                            </tr>
-                            {openParlayKey === uniqueKey &&
-                              bet.map(
-                                (parlayGame, parlayIndex) =>
-                                  parlayIndex > 0 && (
-                                    <tr
-                                      key={parlayIndex}
-                                      className="bg-slate-800/10"
-                                    >
-                                      <td
-                                        colSpan={4}
-                                        className="py-4 pl-12 pr-4 text-base text-slate-300"
-                                      >
-                                        {parlayGame.match}
-                                      </td>
-                                      <td className="px-4 py-4 text-base text-slate-400">
-                                        {parlayGame.tip}
-                                      </td>
-                                      <td className="px-4 py-4 text-base">
-                                        <span className="inline-flex items-center rounded-lg bg-slate-700/60 px-2.5 py-1.5 text-sm font-semibold text-sky-300">
-                                          {parlayGame.odds}
-                                        </span>
-                                      </td>
-                                      <td className="relative py-4 pl-4 pr-6 text-right text-base">
-                                        <button
-                                          onClick={() => removeBet(parlayGame)}
-                                          className="p-1 rounded-full text-slate-500 transition-colors hover:text-red-400 hover:bg-slate-800"
-                                        >
-                                          <svg
-                                            className="h-5 w-5"
-                                            fill="none"
-                                            viewBox="0 0 24 24"
-                                            strokeWidth="1.5"
-                                            stroke="currentColor"
-                                          >
-                                            <path
-                                              strokeLinecap="round"
-                                              strokeLinejoin="round"
-                                              d="M14.74 9l-.346 9m-4.788 0L9.26 9m9.968-3.21c.342.052.682.107 1.022.166m-1.022-.165L18.16 19.673a2.25 2.25 0 01-2.244 2.077H8.084a2.25 2.25 0 01-2.244-2.077L4.772 5.79m14.456 0a48.108 48.108 0 00-3.478-.397m-12 .562c.34-.059.68-.114 1.022-.165m0 0a48.11 48.11 0 013.478-.397m7.5 0v-.916c0-1.18-.91-2.134-2.09-2.201a51.964 51.964 0 00-3.32 0c-1.18.067-2.09 1.022-2.09 2.201v.916m7.5 0a48.667 48.667 0 00-7.5 0"
-                                            />
-                                          </svg>
-                                        </button>
-                                      </td>
-                                    </tr>
-                                  )
-                              )}
-                          </React.Fragment>
-                        );
-                      })}
-                    </tbody>
-                  )}
+                        ))}
+                      </React.Fragment>
+                    );
+                  })}
                 </React.Fragment>
               ))}
-            </table>
-          </div>
+            </tbody>
+          </table>
         </div>
       </div>
 
+      {/* Editor Modal (simple) */}
       {editor.visible &&
         createPortal(
-          <div className="z-50 fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center">
-            <div className="bg-gradient-to-br from-gray-900 to-gray-800 border-2 border-cyan-500/30 rounded-xl p-6 max-w-md w-full mx-4 shadow-2xl">
-              <div className="flex justify-between items-center mb-4">
-                <span className="text-white font-semibold text-lg">
-                  Promeni status opklade (Trenutno je{" "}
-                  {editor.parlay ? (
-                    <span
-                      className={
-                        editor.bet[0].status === "win"
-                          ? "text-green-500"
-                          : "text-red-500"
-                      }
-                    >
-                      <span>{editor.bet[0].status}</span>
-                    </span>
-                  ) : (
-                    <span
-                      className={
-                        editor.bet.status === "win"
-                          ? "text-green-500"
-                          : "text-red-500"
-                      }
-                    >
-                      <>{editor.bet.status}</>
-                    </span>
-                  )}
-                  )
-                </span>
-                <button
-                  onClick={closeEditor}
-                  className="text-white hover:text-red-400 transition-colors"
-                >
-                  <svg
-                    className="w-6 h-6"
-                    fill="none"
-                    viewBox="0 0 24 24"
-                    stroke="currentColor"
-                  >
-                    <path
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
-                      strokeWidth="2"
-                      d="M6 18L18 6M6 6l12 12"
-                    />
-                  </svg>
-                </button>
-              </div>
-
-              <select
-                className={`w-full bg-gray-800/50 border-2 ${
-                  editor.newStatus === "win"
-                    ? "border-green-500/30"
-                    : "border-red-500/30"
-                } rounded-lg p-3 mb-4 text-gray-300 focus:ring-2 focus:ring-cyan-400`}
-                defaultValue={editor.newStatus}
-                onChange={(e) =>
-                  setEditor((prev) => ({ ...prev, newStatus: e.target.value }))
-                }
-              >
-                <option value="win" className="bg-gray-800 text-green-400">
-                  Dobitan
-                </option>
-                <option value="loss" className="bg-gray-800 text-red-400">
-                  Gubitan
-                </option>
+          <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
+            <div className="w-96 rounded-2xl bg-slate-900 p-6 text-white shadow-xl">
+              <h2 className="text-xl font-bold mb-4">Ažuriraj Status</h2>
+              <select value={editor.newStatus} onChange={(e) => setEditor((p) => ({ ...p, newStatus: e.target.value }))} className="rounded-md bg-slate-800 px-3 py-2 text-white w-full mb-4">
+                <option value="active">Active</option>
+                <option value="win">Win</option>
+                <option value="loss">Loss</option>
               </select>
-
-              <button
-                className="w-full bg-cyan-600 hover:bg-cyan-500 text-white font-bold py-2.5 rounded-lg transition-colors"
-                onClick={saveChanges}
-              >
-                Sačuvaj
-              </button>
+              <div className="flex justify-end gap-2">
+                <button onClick={closeEditor} className="rounded-lg bg-gray-700 px-4 py-2 hover:bg-gray-600">Cancel</button>
+                <button onClick={async () => { await saveChanges(); closeEditor(); }} className="rounded-lg bg-sky-500 px-4 py-2 hover:bg-sky-400">Save</button>
+              </div>
+              {editor.editorStatus && <p className="mt-2 text-sm text-slate-400">{editor.editorStatus}</p>}
             </div>
           </div>,
-          document.getElementById("modal-root")
+          document.body
         )}
     </div>
   );

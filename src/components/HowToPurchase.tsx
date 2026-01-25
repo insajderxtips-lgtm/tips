@@ -19,7 +19,7 @@ export default function HowToPurchase() {
               <svg
                 xmlns="http://www.w3.org/2000/svg"
                 className="h-10 w-10 text-white"
-                fill="none"
+                fill="none" 
                 viewBox="0 0 24 24"
                 stroke="currentColor"
               >
@@ -556,60 +556,8 @@ export function StepTwo() {
 
       case "kartica":
         return (
-          <div className="w-full bg-gradient-to-br from-[#0f172a] to-[#1e1b4b] text-white p-4 md:p-6 rounded-xl md:rounded-2xl shadow-lg md:shadow-2xl shadow-blue-950/50 border border-purple-500/50">
-            <h2 className="text-center text-2xl md:text-3xl font-bold mb-6 md:mb-8 bg-clip-text text-transparent bg-gradient-to-r from-purple-400 to-pink-500">
-              Kreditna/Debitna kartica
-            </h2>
-
-            <div className="flex flex-col items-center gap-4 md:gap-6">
-              <div className="p-4 md:p-6 bg-gradient-to-br from-blue-900/20 to-cyan-900/10 rounded-lg md:rounded-2xl border border-cyan-800/30 w-full max-w-xs md:max-w-md">
-                <div className="flex items-center justify-center gap-3 md:gap-4 mb-3 md:mb-4">
-                  <span className="text-3xl md:text-4xl">💳</span>
-                  <div className="text-xl md:text-2xl font-bold">
-                    Sigurna transakcija
-                  </div>
-                </div>
-                <div className="space-y-3 md:space-y-4">
-                  <div className="flex items-center gap-2 text-purple-400 text-sm md:text-base">
-                    <svg
-                      className="w-5 h-5 md:w-6 md:h-6"
-                      fill="none"
-                      viewBox="0 0 24 24"
-                      stroke="currentColor"
-                    >
-                      <path
-                        strokeLinecap="round"
-                        strokeLinejoin="round"
-                        strokeWidth={2}
-                        d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z"
-                      />
-                    </svg>
-                    <span>3D Secure protekcija</span>
-                  </div>
-                  <div className="flex items-center gap-2 text-pink-400 text-sm md:text-base">
-                    <svg
-                      className="w-5 h-5 md:w-6 md:h-6"
-                      fill="none"
-                      viewBox="0 0 24 24"
-                      stroke="currentColor"
-                    >
-                      <path
-                        strokeLinecap="round"
-                        strokeLinejoin="round"
-                        strokeWidth={2}
-                        d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"
-                      />
-                    </svg>
-                    <span>PCI DSS sertifikovano</span>
-                  </div>
-                </div>
-              </div>
-
-              <button className="bg-gradient-to-br from-purple-600 to-pink-600 hover:from-purple-500 hover:to-pink-500 px-6 py-3 md:px-8 md:py-4 rounded-lg md:rounded-xl text-sm md:text-base text-white font-semibold transition-all duration-300 hover:shadow-lg md:hover:shadow-2xl hover:shadow-purple-500/30 w-full max-w-xs md:max-w-md flex items-center justify-center gap-2">
-                <span className="text-xl md:text-2xl">🔒</span>
-                Nastavi na plaćanje
-              </button>
-            </div>
+          <div className="w-full text-center bg-gradient-to-br from-[#0f172a] to-[#1e1b4b] text-white p-4 md:p-6 rounded-xl md:rounded-2xl shadow-lg md:shadow-2xl shadow-blue-950/50 border border-purple-500/50">
+           U IZRADI
           </div>
         );
 

@@ -10,6 +10,7 @@ export default function MyAccount(): React.ReactNode {
   const [error, setError] = useState<string | null>(null);
   const [showConfirmModal, setShowConfirmModal] = useState(false);
   const [loadingReset, setLoadingReset] = useState(false);
+  const [isCurrencyOpen, setIsCurrencyOpen] = useState(false);
   const [selectedCurrency, setSelectedCurrency] = useState<string>("RSD");
 
   const JWT = localStorage.getItem("insajder_token");
@@ -23,339 +24,241 @@ export default function MyAccount(): React.ReactNode {
     setSelectedCurrency(currentUser?.defaultCurrency || "RSD");
   }, [currentUser]);
 
-  // ====================
-  // Save username
-  // ====================
   const saveChanges = useCallback(() => {
     setError(null);
-    if (
-      !newUsername ||
-      newUsername.length < 4 ||
-      newUsername === currentUser?.username ||
-      ["admin", "administrator"].includes(newUsername.toLowerCase())
-    ) {
-      setError("Ime mora biti duže od 3 karaktera i drugačije od prethodnog.");
+    if (!newUsername || newUsername.length < 4 || newUsername === currentUser?.username) {
+      setError("Ime mora biti duže od 3 karaktera.");
       return;
     }
 
     fetch("/updateName", {
       method: "PUT",
-      headers: {
-        "Content-Type": "application/json",
-        Authorization: "Bearer " + JWT,
-      },
-      body: JSON.stringify({
-        newName: newUsername,
-        oldName: currentUser?.username,
-      }),
+      headers: { "Content-Type": "application/json", Authorization: "Bearer " + JWT },
+      body: JSON.stringify({ newName: newUsername, oldName: currentUser?.username }),
     })
       .then((res) => {
         if (res.ok) {
           dispatch(setUser({ ...currentUser, username: newUsername }));
-          setError("Uspešno ste promenili korisničko ime!");
-        } else {
-          setError("Došlo je do greške prilikom ažuriranja korisničkog imena.");
-        }
+          setError("Uspešno: Korisničko ime promenjeno!");
+          setNewUsername("");
+        } else setError("Greška pri ažuriranju imena.");
       })
-      .catch(() => {
-        setError("Došlo je do greške prilikom komunikacije sa serverom.");
-      });
+      .catch(() => setError("Greška u komunikaciji sa serverom."));
   }, [newUsername, currentUser, dispatch, JWT]);
 
-  // ====================
-  // Save currency
-  // ====================
-  const saveCurrency = async () => {
+  const saveCurrency = async (val: string) => {
+    setSelectedCurrency(val);
+    setIsCurrencyOpen(false);
     try {
       const res = await fetch("/api/user/currency", {
         method: "PUT",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: "Bearer " + JWT,
-        },
-        body: JSON.stringify({ currency: selectedCurrency }),
+        headers: { "Content-Type": "application/json", Authorization: "Bearer " + JWT },
+        body: JSON.stringify({ currency: val }),
       });
-
-      const data = await res.json();
       if (res.ok) {
-        dispatch(
-          setUser({ ...currentUser, defaultCurrency: selectedCurrency })
-        );
-        setError(
-          `Uspešno ažurirana valuta na ${selectedCurrency.toUpperCase()}`
-        );
-      } else {
-        setError(data?.message || "Neuspešno ažuriranje valute");
+        dispatch(setUser({ ...currentUser, defaultCurrency: val }));
+        setError(`Uspešno: Valuta postavljena na ${val}`);
       }
     } catch (err) {
-      console.error(err);
       setError("Neuspešno ažuriranje valute");
     }
   };
 
-  // ====================
-  // Reset statistics
-  // ====================
   const handleConfirmReset = async () => {
     setLoadingReset(true);
     try {
       const response = await fetch("/resetStatistics", {
         method: "PUT",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: "Bearer " + JWT,
-        },
+        headers: { "Content-Type": "application/json", Authorization: "Bearer " + JWT },
       });
-      const result = await response.json();
-      if (response.ok) {
-        setError("Statistika je uspešno resetovana!");
-      } else {
-        setError("Greška pri resetovanju: " + result.message);
-      }
+      if (response.ok) setError("Uspešno: Statistika resetovana!");
     } catch (err) {
-      console.error(err);
-      setError("Došlo je do greške pri resetovanju statistike.");
+      setError("Greška pri resetovanju.");
     } finally {
       setLoadingReset(false);
       setShowConfirmModal(false);
     }
   };
 
-  // ====================
-  // Logoff
-  // ====================
-  const LogOff = () => {
-    dispatch(logout());
-    nav("/");
-  };
-
-  // Auto-hide toast after 4s
   useEffect(() => {
     if (!error) return;
     const timer = setTimeout(() => setError(null), 4000);
     return () => clearTimeout(timer);
   }, [error]);
 
-  // Title
-  useEffect(() => {
-    document.title = "InsajderTips | Moj nalog";
-  }, []);
-
   return (
-    <div className="w-full max-w-5xl min-h-[80vh] my-auto mx-auto p-4 lg:p-6 flex items-center justify-center">
-      <div className="w-full grid grid-cols-1 lg:grid-cols-3 gap-8 bg-gray-900/50 backdrop-blur-xl border border-cyan-500/20 rounded-3xl shadow-2xl shadow-cyan-500/10 p-6 sm:p-8">
-        {/* Profile Card */}
-        <motion.div
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.5 }}
-          className="lg:col-span-1 flex flex-col items-center text-center p-6 bg-gray-800/40 rounded-2xl border border-gray-700/50 relative overflow-hidden"
-        >
-          <div className="absolute -inset-2 bg-gradient-to-r from-cyan-500 to-blue-600 rounded-full blur-3xl opacity-30 animate-pulse"></div>
-          <div className="relative w-32 h-32 rounded-full bg-slate-900 flex items-center justify-center p-1 shadow-2xl z-10">
-            <svg
-              xmlns="http://www.w3.org/2000/svg"
-              fill="none"
-              viewBox="0 0 24 24"
-              strokeWidth="1.5"
-              stroke="currentColor"
-              className="w-20 h-20 text-cyan-400 transition-colors duration-300"
-            >
-              <path
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                d="M17.982 18.725A7.488 7.488 0 0 0 12 15.75a7.488 7.488 0 0 0-5.982 2.975m11.963 0a9 9 0 1 0-11.963 0m11.963 0A8.966 8.966 0 0 1 12 21a8.966 8.966 0 0 1-5.982-2.275M15 9.75a3 3 0 1 1-6 0 3 3 0 0 1 6 0Z"
-              />
-            </svg>
-          </div>
-          <h2 className="mt-6 text-3xl font-bold text-white z-10">
-            {currentUser?.username}
-          </h2>
-          <p className="mt-1 text-slate-400 z-10">{currentUser?.email}</p>
-          <span
-            className={`mt-4 px-4 py-1.5 rounded-full text-xs font-semibold tracking-wider flex items-center gap-2 z-10 ${
-              currentUser?.tier === "premium"
-                ? "bg-amber-500/10 text-amber-300 border border-amber-500/20"
-                : "bg-gray-600/20 text-gray-300 border border-gray-600/30"
-            }`}
-          >
-            {currentUser?.tier?.toUpperCase()}
-          </span>
-        </motion.div>
+    <div className="w-full min-h-screen flex items-center justify-center p-6 bg-[#030712] text-slate-200 selection:bg-cyan-500/30">
+      <div className="w-full max-w-6xl relative">
+        {/* Animated Background Orbs */}
+        <motion.div 
+          animate={{ scale: [1, 1.2, 1], opacity: [0.15, 0.25, 0.15] }}
+          transition={{ duration: 10, repeat: Infinity }}
+          className="absolute -top-40 -left-40 w-[500px] h-[500px] bg-cyan-600/20 rounded-full blur-[120px] pointer-events-none" 
+        />
+        <motion.div 
+          animate={{ scale: [1.2, 1, 1.2], opacity: [0.1, 0.2, 0.1] }}
+          transition={{ duration: 12, repeat: Infinity }}
+          className="absolute -bottom-40 -right-40 w-[500px] h-[500px] bg-indigo-600/20 rounded-full blur-[120px] pointer-events-none" 
+        />
 
-        {/* Settings & Actions */}
-        <motion.div
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.6 }}
-          className="lg:col-span-2 flex flex-col gap-8"
-        >
-          <div>
-            <h3 className="text-xl font-semibold text-white mb-4">
-              Podešavanja Naloga
-            </h3>
-            <div className="space-y-6 p-6 bg-gray-800/40 rounded-2xl border border-gray-700/50">
-              {/* Change Username */}
-              <div>
-                <label className="text-sm font-medium text-cyan-200 mb-2 block">
-                  Promeni korisničko ime
-                </label>
-                <div className="flex flex-col sm:flex-row gap-3">
-                  <input
-                    type="text"
-                    placeholder="Novo korisničko ime..."
-                    className="flex-1 bg-gray-900/70 border-2 border-gray-700 rounded-lg px-4 py-2.5 focus:outline-none focus:ring-2 focus:ring-cyan-500 focus:border-cyan-500 placeholder-slate-500 text-slate-200 transition-all"
-                    value={newUsername}
-                    onChange={(e) => setNewUsername(e.target.value)}
-                  />
-                  <button
-                    className="bg-gradient-to-r from-cyan-600 to-blue-600 text-white font-semibold py-2.5 px-6 rounded-lg shadow-lg hover:shadow-cyan-500/30 transition-all transform hover:scale-105 disabled:opacity-50 disabled:cursor-not-allowed disabled:scale-100"
-                    onClick={saveChanges}
-                    disabled={!newUsername}
-                  >
-                    Sačuvaj
-                  </button>
+        <div className="relative grid grid-cols-1 lg:grid-cols-12 gap-8 items-start">
+          
+          {/* LEFT COLUMN: MINI PROFILE */}
+          <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} className="lg:col-span-4 space-y-4">
+            <div className="bg-gray-900/40 backdrop-blur-3xl border border-white/[0.08] rounded-[3rem] p-10 flex flex-col items-center shadow-[0_25px_50px_-12px_rgba(0,0,0,0.5)]">
+              <div className="relative">
+                <div className="w-32 h-32 rounded-full bg-gradient-to-b from-gray-800 to-gray-950 p-[2px] shadow-2xl">
+                  <div className="w-full h-full rounded-full bg-gray-950 flex items-center justify-center overflow-hidden relative">
+                    <svg className="w-14 h-14 text-gray-700" fill="currentColor" viewBox="0 0 24 24"><path d="M12 12c2.21 0 4-1.79 4-4s-1.79-4-4-4-4 1.79-4 4 1.79 4 4 4zm0 2c-2.67 0-8 1.34-8 4v2h16v-2c0-2.66-5.33-4-8-4z"/></svg>
+                    <div className="absolute inset-0 bg-gradient-to-tr from-cyan-500/10 to-transparent" />
+                  </div>
+                </div>
+                <div className="absolute -bottom-1 -right-1 w-9 h-9 bg-cyan-500 rounded-full border-[6px] border-[#0d111c] flex items-center justify-center">
+                  <div className="w-2 h-2 bg-white rounded-full animate-pulse" />
                 </div>
               </div>
 
-              {/* Currency Selector */}
-              {currentUser?.tier !== "free" && (
+              <h2 className="mt-8 text-3xl font-black text-white tracking-tighter uppercase">{currentUser?.username}</h2>
+              <p className="text-gray-500 font-bold text-[10px] tracking-[0.2em] uppercase mt-1">{currentUser?.email}</p>
+
+              <div className="w-full grid grid-cols-2 gap-4 mt-10">
+                <div className="bg-black/40 rounded-[1.5rem] p-4 border border-white/[0.05] text-center">
+                  <span className="block text-[9px] font-black text-gray-600 uppercase tracking-[0.2em] mb-1">Status</span>
+                  <span className={`text-xs font-black uppercase ${currentUser?.tier === 'premium' ? 'text-amber-400' : 'text-cyan-400'}`}>{currentUser?.tier}</span>
+                </div>
+                <div className="bg-black/40 rounded-[1.5rem] p-4 border border-white/[0.05] text-center">
+                  <span className="block text-[9px] font-black text-gray-600 uppercase tracking-[0.2em] mb-1">Valuta</span>
+                  <span className="text-xs font-black text-white uppercase">{currentUser?.defaultCurrency || 'RSD'}</span>
+                </div>
+              </div>
+            </div>
+
+            <button onClick={() => dispatch(logout())} className="w-full py-5 rounded-[2rem] bg-white/[0.03] hover:bg-red-500/10 border border-white/[0.05] hover:border-red-500/20 text-gray-500 hover:text-red-500 font-black text-xs uppercase tracking-[0.2em] transition-all flex items-center justify-center gap-3 group">
+              <svg className="w-4 h-4 transition-transform group-hover:-translate-x-1" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M11 16l-4-4m0 0l4-4m-4 4h14m-5 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" /></svg>
+              Odjavi se
+            </button>
+          </motion.div>
+
+          {/* RIGHT COLUMN: MAIN SETTINGS */}
+          <motion.div initial={{ opacity: 0, x: 20 }} animate={{ opacity: 1, x: 0 }} className="lg:col-span-8">
+            <div className="bg-gray-900/40 backdrop-blur-3xl border border-white/[0.08] rounded-[3rem] shadow-2xl overflow-hidden">
+              <div className="p-10 border-b border-white/[0.05] flex justify-between items-center">
                 <div>
-                  <label className="text-sm font-medium text-cyan-200 mb-2 block">
-                    Podesi valutu
-                  </label>
-                  <div className="flex flex-col sm:flex-row gap-3">
-                    <select
-                      value={selectedCurrency}
-                      onChange={(e) => setSelectedCurrency(e.target.value)}
-                      className="flex-1 bg-gray-900/70 border-2 border-gray-700 rounded-lg px-4 py-2.5 focus:outline-none focus:ring-2 focus:ring-cyan-500 focus:border-cyan-500 text-slate-200 transition-all appearance-none"
-                    >
-                      {currencies.map((cur) => (
-                        <option key={cur} value={cur} className="bg-slate-800">
-                          {cur}
-                        </option>
-                      ))}
-                    </select>
-                    <button
-                      className="bg-gradient-to-r from-purple-600 to-indigo-600 text-white font-semibold py-2.5 px-6 rounded-lg shadow-lg hover:shadow-purple-500/30 transition-all transform hover:scale-105 disabled:opacity-50 disabled:cursor-not-allowed disabled:scale-100"
-                      onClick={saveCurrency}
-                      disabled={
-                        selectedCurrency === currentUser?.defaultCurrency
-                      }
-                    >
-                      Sačuvaj
+                  <h3 className="text-2xl font-black text-white uppercase tracking-tight">Podešavanja</h3>
+                  <p className="text-gray-500 text-xs font-bold uppercase tracking-widest mt-1">Personalizacija vašeg iskustva</p>
+                </div>
+                <div className="w-12 h-12 bg-cyan-500/10 rounded-2xl flex items-center justify-center">
+                  <svg className="w-6 h-6 text-cyan-500" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" /><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" /></svg>
+                </div>
+              </div>
+
+              <div className="p-10 space-y-12">
+                {/* Username Section */}
+                <div>
+                  <label className="text-[10px] font-black uppercase tracking-[0.3em] text-cyan-500 mb-5 block">Promena imena</label>
+                  <div className="flex flex-col sm:flex-row gap-4">
+                    <input
+                      type="text"
+                      placeholder="Novo korisničko ime..."
+                      value={newUsername}
+                      onChange={(e) => setNewUsername(e.target.value)}
+                      className="flex-1 bg-black/60 border border-white/[0.05] rounded-2xl py-5 px-6 text-white placeholder-gray-700 focus:outline-none focus:border-cyan-500/50 transition-all font-bold"
+                    />
+                    <button onClick={saveChanges} className="bg-cyan-600 hover:bg-cyan-500 text-white font-black text-xs uppercase tracking-widest px-10 py-5 rounded-2xl transition-all shadow-[0_10px_20px_-5px_rgba(6,182,212,0.4)] active:scale-95">
+                      Ažuriraj
                     </button>
                   </div>
                 </div>
-              )}
-            </div>
-          </div>
 
-          {/* Actions */}
-          <div className="bg-gray-800/40 rounded-2xl border border-gray-700/50 p-6 flex flex-col sm:flex-row gap-4">
-            {currentUser?.tier !== "free" && (
-              <button
-                onClick={() => setShowConfirmModal(true)}
-                className="flex-1 bg-amber-600/80 hover:bg-amber-600 text-white font-semibold py-2.5 rounded-lg transition-all hover:scale-105 shadow-md"
-              >
-                Resetuj Statistiku
-              </button>
-            )}
-            <button
-              onClick={LogOff}
-              className="flex-1 bg-red-600/80 hover:bg-red-600 text-white font-semibold py-2.5 rounded-lg transition-all hover:scale-105 shadow-md"
-            >
-              Izloguj se
-            </button>
-          </div>
-        </motion.div>
+                {/* PREMIUM: Custom Currency Dropdown */}
+                {currentUser?.tier !== "free" && (
+                  <div>
+                    <label className="text-[10px] font-black uppercase tracking-[0.3em] text-indigo-400 mb-5 block">Valuta prikaza</label>
+                    <div className="relative">
+                      <div 
+                        onClick={() => setIsCurrencyOpen(!isCurrencyOpen)}
+                        className="w-full bg-black/60 border border-white/[0.05] rounded-2xl py-5 px-6 flex items-center justify-between cursor-pointer group transition-all hover:border-indigo-500/30"
+                      >
+                        <span className="font-black text-white tracking-widest uppercase">{selectedCurrency}</span>
+                        <svg className={`w-5 h-5 text-indigo-500 transition-transform duration-300 ${isCurrencyOpen ? 'rotate-180' : ''}`} fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M19 9l-7 7-7-7" /></svg>
+                      </div>
 
-        {/* Confirmation Modal */}
-        <AnimatePresence>
-          {showConfirmModal && (
-            <motion.div
-              className="fixed inset-0 bg-black/70 backdrop-blur-sm flex items-center justify-center z-50"
-              initial={{ opacity: 0 }}
-              animate={{ opacity: 1 }}
-              exit={{ opacity: 0 }}
-            >
-              <motion.div
-                className="bg-gray-900 border border-amber-600/40 rounded-2xl p-8 max-w-sm text-center shadow-xl"
-                initial={{ scale: 0.8, opacity: 0 }}
-                animate={{ scale: 1, opacity: 1 }}
-                exit={{ scale: 0.8, opacity: 0 }}
-                transition={{ duration: 0.25 }}
-              >
-                <h2 className="text-xl font-semibold text-white mb-3">
-                  Resetovati statistiku?
-                </h2>
-                <p className="text-slate-400 text-sm mb-6">
-                  Ova akcija je <span className="text-red-400">trajna</span> i
-                  ne može se poništiti!
-                </p>
-                <div className="flex gap-4 justify-center">
-                  <button
-                    className="px-5 py-2.5 bg-gray-700/70 hover:bg-gray-700 rounded-lg text-slate-200 font-medium transition-all"
-                    onClick={() => setShowConfirmModal(false)}
-                    disabled={loadingReset}
-                  >
-                    Odustani
-                  </button>
-                  <button
-                    onClick={handleConfirmReset}
-                    disabled={loadingReset}
-                    className="px-5 py-2.5 bg-amber-600 hover:bg-amber-500 text-white font-semibold rounded-lg transition-all"
-                  >
-                    {loadingReset ? "Resetujem..." : "Da, resetuj"}
-                  </button>
-                </div>
-              </motion.div>
-            </motion.div>
-          )}
-        </AnimatePresence>
-
-        {/* Toast Notification */}
-        <AnimatePresence>
-          {error && (
-            <motion.div
-              className={`fixed bottom-6 left-1/2 -translate-x-1/2 p-4 rounded-lg border text-sm flex items-center gap-3 z-50
-                ${
-                  error.startsWith("Uspešno")
-                    ? "bg-green-900/80 backdrop-blur-md border-green-700 text-green-300"
-                    : "bg-red-900/80 backdrop-blur-md border-red-700 text-red-300"
-                }`}
-              initial={{ y: 50, opacity: 0 }}
-              animate={{ y: 0, opacity: 1 }}
-              exit={{ y: 50, opacity: 0 }}
-              transition={{ duration: 0.3 }}
-            >
-              <svg
-                xmlns="http://www.w3.org/2000/svg"
-                className="w-6 h-6 flex-shrink-0"
-                fill="none"
-                viewBox="0 0 24 24"
-                stroke="currentColor"
-                strokeWidth={2}
-              >
-                {error.startsWith("Uspešno") ? (
-                  <path
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                    d="M9 12.75L11.25 15 15 9.75M21 12a9 9 0 11-18 0 9 9 0 0118 0z"
-                  />
-                ) : (
-                  <path
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                    d="M12 9v3.75m-9.303 3.376c-.866 1.5.217 3.374 1.948 3.374h14.71c1.73 0 2.813-1.874 1.948-3.374L13.949 3.378c-.866-1.5-3.032-1.5-3.898 0L2.697 16.126z"
-                  />
+                      <AnimatePresence>
+                        {isCurrencyOpen && (
+                          <motion.div 
+                            initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 5 }} exit={{ opacity: 0, y: 10 }}
+                            className="absolute top-full left-0 right-0 z-50 mt-2 bg-gray-900 border border-white/[0.08] rounded-2xl overflow-hidden shadow-2xl backdrop-blur-3xl"
+                          >
+                            {currencies.map((cur) => (
+                              <div
+                                key={cur}
+                                onClick={() => saveCurrency(cur)}
+                                className="px-6 py-4 hover:bg-indigo-600/20 cursor-pointer transition-colors flex items-center justify-between group"
+                              >
+                                <span className={`font-black text-xs uppercase tracking-widest ${selectedCurrency === cur ? 'text-indigo-400' : 'text-gray-400'}`}>{cur}</span>
+                                {selectedCurrency === cur && <div className="w-2 h-2 bg-indigo-500 rounded-full shadow-[0_0_10px_rgba(99,102,241,0.8)]" />}
+                              </div>
+                            ))}
+                          </motion.div>
+                        )}
+                      </AnimatePresence>
+                    </div>
+                  </div>
                 )}
-              </svg>
-              <span>{error}</span>
-            </motion.div>
-          )}
-        </AnimatePresence>
+
+                {/* Danger Zone */}
+                {currentUser?.tier !== "free" && (
+                  <div className="pt-8 border-t border-white/[0.05]">
+                    <div className="bg-gradient-to-br from-amber-500/[0.03] to-transparent border border-amber-500/10 rounded-[2.5rem] p-8 flex flex-col sm:flex-row items-center justify-between gap-6">
+                      <div>
+                        <h4 className="text-amber-500 font-black uppercase tracking-widest text-[10px] mb-1">Resetuj statistiku</h4>
+                        <p className="text-gray-500 text-xs font-medium">Ovo će trajno obrisati vašu statistiku.</p>
+                      </div>
+                      <button onClick={() => setShowConfirmModal(true)} className="w-full sm:w-auto px-10 py-4 bg-amber-500/10 hover:bg-amber-600 text-amber-500 hover:text-white border border-amber-500/20 rounded-2xl font-black text-[10px] uppercase tracking-widest transition-all">
+                        Resetuj
+                      </button>
+                    </div>
+                  </div>
+                )}
+              </div>
+            </div>
+          </motion.div>
+        </div>
       </div>
+
+      {/* Confirmation Modal */}
+      <AnimatePresence>
+        {showConfirmModal && (
+          <div className="fixed inset-0 z-[100] flex items-center justify-center p-4">
+            <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="absolute inset-0 bg-black/90 backdrop-blur-sm" onClick={() => setShowConfirmModal(false)} />
+            <motion.div initial={{ scale: 0.9, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} exit={{ scale: 0.9, opacity: 0 }} className="relative w-full max-w-md bg-[#0d111c] border border-white/[0.05] rounded-[3rem] p-10 shadow-2xl text-center">
+              <div className="w-20 h-20 bg-amber-500/10 rounded-full flex items-center justify-center mx-auto mb-6">
+                <svg className="w-10 h-10 text-amber-500" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" /></svg>
+              </div>
+              <h3 className="text-2xl font-black text-white uppercase tracking-tighter mb-2">Potvrda</h3>
+              <p className="text-gray-500 text-sm font-medium mb-8">Statistika će biti obrisana zauvek. Da li želite da nastavite?</p>
+              <div className="space-y-3">
+                <button onClick={handleConfirmReset} disabled={loadingReset} className="w-full bg-amber-600 hover:bg-amber-500 text-white font-black py-5 rounded-2xl transition-all shadow-xl shadow-amber-900/20">
+                  {loadingReset ? "Resetujem..." : "Da, resetuj sve"}
+                </button>
+                <button onClick={() => setShowConfirmModal(false)} className="w-full text-gray-600 font-bold py-2 hover:text-white transition-colors text-xs uppercase tracking-widest">Odustani</button>
+              </div>
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
+
+      {/* Toast Notification */}
+      <AnimatePresence>
+        {error && (
+          <motion.div initial={{ y: 50, opacity: 0 }} animate={{ y: 0, opacity: 1 }} exit={{ y: 50, opacity: 0 }} className={`fixed bottom-10 left-1/2 -translate-x-1/2 z-[110] px-8 py-5 rounded-[2rem] border backdrop-blur-3xl shadow-2xl flex items-center gap-4 min-w-[350px] ${error.startsWith("Uspešno") ? "bg-cyan-500/10 border-cyan-500/20 text-cyan-400" : "bg-red-500/10 border-red-500/20 text-red-400"}`}>
+            <div className={`w-8 h-8 rounded-full flex items-center justify-center flex-shrink-0 ${error.startsWith("Uspešno") ? "bg-cyan-500/20" : "bg-red-500/20"}`}>
+              {error.startsWith("Uspešno") ? <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={4} d="M5 13l4 4L19 7" /></svg> : <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={4} d="M6 18L18 6M6 6l12 12" /></svg>}
+            </div>
+            <span className="font-black text-[11px] uppercase tracking-widest">{error}</span>
+          </motion.div>
+        )}
+      </AnimatePresence>
     </div>
   );
 }

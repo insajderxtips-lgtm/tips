@@ -7,12 +7,9 @@ import PremiumFallback from "./PremiumFallback";
 function TipTooltip({ onClose }) {
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
-      {/* Background Overlay */}
       <div className="absolute inset-0 bg-gray-950/80 backdrop-blur-sm" />
-
-      {/* Modal Content */}
       <div className="relative w-full max-w-md bg-gray-800 border-2 border-cyan-500 rounded-xl shadow-2xl p-6 text-center transform scale-100 transition-transform duration-300">
-        <h3 className="text-xl font-bold text-cyan-400 mb-3">Pomoc</h3>
+        <h3 className="text-xl font-bold text-cyan-400 mb-3">Pomoć</h3>
         <p className="text-gray-200 mb-6">
           Klikom na željeni{" "}
           <span className="font-semibold text-white bg-cyan-600/30 px-1 py-0.5 rounded">
@@ -40,6 +37,7 @@ export default function BestOdds() {
   if (currentUser.tier === "free") {
     return <PremiumFallback />;
   }
+
   const [searchQuery, setSearchQuery] = useState<string | null>(null);
   const [upcomingGames, setUpcomingGames] = useState([]);
   const [selectedGame, setSelectedGame] = useState(null);
@@ -50,20 +48,17 @@ export default function BestOdds() {
   const [isSlipVisible, setIsSlipVisible] = useState(false);
   const [tipSearch, setTipSearch] = useState(null);
 
-  // --- NEW STATE FOR TOOLTIP ---
   const [showTooltip, setShowTooltip] = useState(false);
 
   useEffect(() => {
     document.title = "InsajderTips | Najbolje kvote";
 
-    // --- NEW LOGIC FOR TOOLTIP ---
     const hasSeenTooltip = localStorage.getItem("hasSeenOddsTooltip");
     if (!hasSeenTooltip) {
       setShowTooltip(true);
     }
   }, []);
 
-  // --- NEW HANDLER TO DISMISS TOOLTIP AND SET LOCAL STORAGE ---
   const handleTooltipClose = () => {
     setShowTooltip(false);
     localStorage.setItem("hasSeenOddsTooltip", "true");
@@ -104,27 +99,34 @@ export default function BestOdds() {
   }, [gameOdds, tipSearch]);
 
   const addToSlip = (bet) => {
-    const exists = betslip.some(
-      (bet) => bet.home === selectedGame.home && bet.away === selectedGame.away
+    // Create a unique key for this match
+    const matchKey = `${selectedGame.home} vs ${selectedGame.away}`;
+
+    // Remove any existing tip for this same match
+    setBetslip((prev) =>
+      prev.filter((item) => {
+        const itemMatchKey = `${item.home} vs ${item.away}`;
+        return itemMatchKey !== matchKey;
+      })
     );
-    if (!exists) {
-      setBetslip((prev) => [
-        ...prev,
-        {
-          home: selectedGame.home,
-          away: selectedGame.away,
-          tip: bet.reference,
-          odds: {
-            MaxBet: bet.maxBet || 1.0,
-            Mozzart: bet.mozzartBet || 1.0,
-            Soccer: bet.soccerBet || 1.0,
-            Oktagon: bet.oktagon || 1.0,
-            WinnerBet: bet.winnerbet || 1.0,
-          },
+
+    // Add the new tip
+    setBetslip((prev) => [
+      ...prev,
+      {
+        home: selectedGame.home,
+        away: selectedGame.away,
+        tip: bet.reference,
+        odds: {
+          MaxBet: bet.maxBet || 1.0,
+          Mozzart: bet.mozzartBet || 1.0,
+          Soccer: bet.soccerBet || 1.0,
+          Oktagon: bet.oktagon || 1.0,
         },
-      ]);
-    }
+      },
+    ]);
   };
+
   const removeFromSlip = (bet) => {
     setBetslip((prev) =>
       prev.filter(
@@ -166,48 +168,18 @@ export default function BestOdds() {
         }),
       })
         .then(async (res) => {
-          console.log("Server response status:", res.status);
-          console.log(
-            "Server response headers:",
-            Object.fromEntries([...res.headers])
-          );
-
           if (!res.ok) {
-            const responseText = await res.text();
-            console.error(
-              "Server returned error. Response text:",
-              responseText
-            );
-
-            try {
-              const errorData = JSON.parse(responseText);
-              console.error("Server error details (JSON):", errorData);
-              throw new Error(
-                `Server error: ${res.status} - ${
-                  errorData.error || responseText
-                }`
-              );
-            } catch (e) {
-              console.error("Server returned non-JSON error:", responseText);
-              throw new Error(`Server error: ${res.status} - ${responseText}`);
-            }
+            const text = await res.text();
+            throw new Error(`Server error: ${res.status} - ${text}`);
           }
-
           return res.json();
         })
         .then((json) => {
-          console.log(json);
           setGameOdds(json);
           setLoading(false);
         })
         .catch((error) => {
           console.error("Fetch error:", error);
-          console.error(
-            "Error fetching odds for game:",
-            game.home,
-            "vs",
-            game.away
-          );
           setLoading(false);
         });
 
@@ -223,89 +195,64 @@ export default function BestOdds() {
   };
 
   return (
-    <div className="flex flex-col items-center justify-center w-full min-h-screen p-4 bg-gray-950 relative font-sans">
-      {/* --- RENDER TOOLTIP CONDITIONALLY --- */}
+    <div className="flex flex-col items-center justify-center w-full min-h-screen p-4 bg-gray-950 relative font-sans text-slate-200">
       {showTooltip && <TipTooltip onClose={handleTooltipClose} />}
 
-      {/* Main Content Card */}
-      <div className="w-full max-w-5xl bg-gray-900/50 backdrop-blur-xl border border-cyan-500/20 rounded-3xl shadow-2xl shadow-cyan-500/10 flex flex-col">
-        {/* Stage 1: Search for a Game */}
+      <div className="w-full max-w-6xl bg-gray-900/40 backdrop-blur-2xl border border-white/5 rounded-[2rem] shadow-2xl flex flex-col overflow-hidden">
         {!selectedGame ? (
-          <div className="p-6 sm:p-8">
-            {/* Search Input and Button */}
-            <div className="flex flex-col sm:flex-row gap-3 w-full relative group">
+          <div className="p-6 sm:p-10">
+            <div className="flex flex-col sm:flex-row gap-4 w-full relative group">
               <div className="relative w-full">
                 <input
                   type="text"
-                  placeholder="Pretraži meč po timovima"
+                  placeholder="Pretraži timove..."
                   onChange={(e) => setSearchQuery(e.target.value)}
-                  // --- ADDED onKeyDown HANDLER HERE ---
                   onKeyDown={(e) => {
-                    if (e.key === "Enter") {
-                      find();
-                    }
+                    if (e.key === "Enter") find();
                   }}
-                  className="w-full bg-gray-800/60 border-2 border-gray-700 rounded-xl py-4 pl-6 pr-14 text-lg text-white placeholder-gray-500 focus:outline-none focus:border-cyan-400 focus:ring-4 focus:ring-cyan-400/20 hover:border-gray-600 transition-all duration-300 shadow-inner"
+                  className="w-full bg-white/5 border border-white/10 rounded-2xl py-5 pl-6 pr-14 text-lg text-white placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-cyan-500/50 hover:bg-white/10 transition-all duration-300"
                 />
-                <svg
-                  className="absolute right-5 top-1/2 -translate-y-1/2 h-6 w-6 text-gray-500 group-focus-within:text-cyan-400 transition-colors"
-                  fill="none"
-                  stroke="currentColor"
-                  viewBox="0 0 24 24"
-                >
-                  <path
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                    strokeWidth={2}
-                    d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"
-                  />
-                </svg>
+                <div className="absolute right-5 top-1/2 -translate-y-1/2">
+                  <svg className="h-6 w-6 text-cyan-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+                  </svg>
+                </div>
               </div>
               <button
                 onClick={find}
-                className="w-full sm:w-auto bg-gradient-to-r from-cyan-500 to-blue-600 hover:from-cyan-400 hover:to-blue-500 text-white font-semibold py-4 px-8 rounded-xl transition-all duration-300 transform hover:scale-105 active:scale-95 shadow-lg hover:shadow-xl shadow-cyan-500/20 hover:shadow-cyan-400/30 flex items-center justify-center gap-2"
+                className="w-full sm:w-auto bg-cyan-600 hover:bg-cyan-500 text-white font-bold py-5 px-10 rounded-2xl transition-all active:scale-95 shadow-lg shadow-cyan-900/20"
               >
-                <span>Pronađi</span>
+                Pronađi
               </button>
             </div>
 
-            {/* Upcoming Games List */}
-            <div className="mt-8 space-y-3 overflow-y-auto max-h-[65vh] pr-2 scrollbar-thin scrollbar-thumb-cyan-700/50 scrollbar-track-transparent">
+            <div className="mt-10 space-y-4 overflow-y-auto max-h-[60vh] pr-2 custom-scrollbar">
               {upcomingGames.map((game, index) => (
                 <div
                   key={index}
                   onClick={() => selectGameById(index)}
-                  className="relative bg-gray-800/70 hover:bg-gray-800/90 border border-gray-700/50 rounded-2xl p-5 cursor-pointer shadow-lg transition-all duration-300 hover:border-cyan-500/30 hover:shadow-cyan-500/10  group"
+                  className="group relative bg-white/5 hover:bg-white/10 border border-white/5 rounded-2xl p-6 cursor-pointer transition-all duration-300 hover:border-cyan-500/50"
                 >
-                  <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
-                    <div className="flex-1">
-                      <div className="flex items-center gap-4 text-xl font-bold text-white">
-                        <span>{game.home}</span>
-                        <span className="px-2 py-1 text-xs bg-gray-700/50 rounded-md text-gray-300">
-                          vs
-                        </span>
-                        <span>{game.away}</span>
+                  <div className="flex flex-col md:flex-row md:items-center justify-between gap-6">
+                    <div className="flex items-center gap-6">
+                      <div className="flex flex-col items-end min-w-[120px]">
+                        <span className="text-white font-bold text-xl">{game.home}</span>
+                      </div>
+                      <div className="flex flex-col items-center justify-center bg-cyan-500/10 rounded-lg px-3 py-1">
+                        <span className="text-cyan-400 text-xs font-black uppercase tracking-widest">VS</span>
+                      </div>
+                      <div className="flex flex-col items-start min-w-[120px]">
+                        <span className="text-white font-bold text-xl">{game.away}</span>
                       </div>
                     </div>
-                    <div className="flex items-center gap-3 text-sm font-medium text-gray-300 border-t md:border-t-0 md:border-l border-gray-700 pt-3 md:pt-0 md:pl-6">
-                      <svg
-                        className="h-5 w-5 text-cyan-500"
-                        fill="none"
-                        viewBox="0 0 24 24"
-                        stroke="currentColor"
-                      >
-                        <path
-                          strokeLinecap="round"
-                          strokeLinejoin="round"
-                          strokeWidth={2}
-                          d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"
-                        />
+                    <div className="flex items-center gap-4 text-sm text-gray-400 bg-black/20 px-4 py-2 rounded-xl border border-white/5">
+                      <svg className="h-4 w-4 text-cyan-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
                       </svg>
-                      <span>
-                        {new Intl.DateTimeFormat("sr-RS", {
+                      <span className="font-medium">
+                        {new Intl.DateTimeFormat("en-us", {
                           day: "2-digit",
-                          month: "2-digit",
-                          year: "numeric",
+                          month: "short",
                           hour: "2-digit",
                           minute: "2-digit",
                         }).format(new Date(game.kickOffTime))}
@@ -317,318 +264,221 @@ export default function BestOdds() {
             </div>
           </div>
         ) : (
-          /* Stage 2: View Odds for a Selected Game */
           <div className="flex flex-col h-full">
-            {/* Header */}
-            <div className="p-6 sm:p-8 border-b border-cyan-500/20">
-              <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+            <div className="p-6 sm:p-10 border-b border-white/5 bg-white/[0.02]">
+              <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-6">
                 <div>
                   <button
-                    className="flex items-center gap-2 text-sm text-cyan-300 hover:text-white transition-colors mb-2"
+                    className="flex items-center gap-2 text-xs font-bold uppercase tracking-[0.2em] text-cyan-500 hover:text-cyan-400 transition-colors mb-4"
                     onClick={handleBackButtonClick}
                   >
-                    <svg
-                      className="w-5 h-5"
-                      fill="none"
-                      stroke="currentColor"
-                      viewBox="0 0 24 24"
-                    >
-                      <path
-                        strokeLinecap="round"
-                        strokeLinejoin="round"
-                        strokeWidth={2}
-                        d="M10 19l-7-7m0 0l7-7m-7 7h18"
-                      ></path>
+                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 19l-7-7m0 0l7-7m-7 7h18" />
                     </svg>
-                    <span>Svi Mečevi</span>
+                    Nazad na listu
                   </button>
-                  <h2 className="text-2xl md:text-3xl font-bold text-white">
-                    {selectedGame.home}{" "}
-                    <span className="text-cyan-400">vs</span>{" "}
-                    {selectedGame.away}
+                  <h2 className="text-3xl md:text-5xl font-black text-white tracking-tight">
+                    {selectedGame.home} <span className="text-cyan-500/40 mx-2">—</span> {selectedGame.away}
                   </h2>
                 </div>
-                <div className="relative w-full sm:w-72">
+                <div className="relative w-full lg:w-80">
                   <input
                     onChange={(e) => setTipSearch(e?.target?.value)}
                     type="text"
-                    placeholder="Pronađi tip (npr. GG3+)"
+                    placeholder="Filtriraj tipove (npr. Golovi)"
                     value={tipSearch}
-                    className="w-full bg-gray-800/60 border-2 border-gray-700 rounded-xl py-2 px-4 text-white placeholder-gray-500 focus:outline-none focus:border-cyan-400"
+                    className="w-full bg-black/40 border border-white/10 rounded-xl py-4 px-5 text-white placeholder-gray-500 focus:outline-none focus:border-cyan-500 transition-all"
                   />
-                  {tipSearch && (
-                    <button
-                      onClick={() => setTipSearch("")}
-                      className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-white text-2xl"
-                    >
-                      &times;
-                    </button>
-                  )}
                 </div>
               </div>
             </div>
 
-            {/* Odds Table */}
-            <div className="flex-1 overflow-auto">
+            <div className="flex-1 overflow-auto p-4 sm:p-8 custom-scrollbar">
               {loading ? (
-                <div className="p-10 text-center text-cyan-300 text-xl">
-                  Učitavanje kvota...
+                <div className="p-20 text-center">
+                  <div className="animate-spin inline-block w-8 h-8 border-4 border-cyan-500 border-t-transparent rounded-full mb-4"></div>
+                  <p className="text-cyan-500 font-bold uppercase tracking-widest text-xs">Ažuriranje kvota...</p>
                 </div>
               ) : (
-                <div className="max-h-[65vh] overflow-y-auto scrollbar-thin scrollbar-thumb-cyan-600 scrollbar-track-transparent border border-gray-700/50 rounded-lg shadow-inner shadow-gray-900">
+                <div className="overflow-hidden rounded-2xl border border-white/5 shadow-2xl bg-black/10">
                   <table className="min-w-full text-sm text-left border-collapse">
-                    <thead className="sticky top-0 bg-gray-900/90 backdrop-blur-sm z-20 shadow-md">
-                      <tr>
-                        {[
-                          "Tip",
-                          "Soccer",
-                          "Mozzart",
-                          "MaxBet",
-                          "Oktagon",
-                          "WinnerBet",
-                        ].map((header, idx) => (
-                          <th
-                            key={idx}
-                            className={`px-6 py-4 font-extrabold tracking-wide ${
-                              idx === 0
-                                ? "text-left text-cyan-300 w-[15%]" // Reduced width for the 'Tip' column
-                                : "text-center text-gray-300 w-auto"
-                            }`}
-                          >
-                            {header}
-                          </th>
+                    <thead>
+                      <tr className="bg-white/5">
+                        <th className="px-6 py-5 font-black text-gray-400 uppercase tracking-widest text-[10px]">Market i Tip</th>
+                        {["Soccer", "Mozzart", "MaxBet", "Oktagon"].map((bookie) => (
+                          <th key={bookie} className="px-4 py-5 text-center font-bold text-gray-500 text-[10px] uppercase tracking-widest">{bookie}</th>
                         ))}
                       </tr>
                     </thead>
-                    <tbody className="divide-y divide-gray-700/50">
+                    <tbody className="divide-y divide-white/5">
                       {Object.keys(filteredOdds).map((category) => (
                         <React.Fragment key={category}>
-                          {/* Category Header Row (Clickable) */}
                           <tr
                             onClick={() => toggleCategory(category)}
-                            className="bg-gray-800/60 hover:bg-gray-800/80 cursor-pointer transition-colors"
+                            className="bg-white/[0.03] hover:bg-white/[0.06] cursor-pointer transition-colors"
                           >
-                            <td colSpan={6} className="px-6 py-3">
-                              <div className="flex items-center gap-3 font-bold text-lg text-cyan-300">
-                                <svg
-                                  className={`h-5 w-5 transform transition-transform duration-300 ${
-                                    expandedCategory === category
-                                      ? "rotate-0"
-                                      : "-rotate-90"
-                                  }`}
-                                  viewBox="0 0 20 20"
-                                  fill="currentColor"
-                                >
-                                  <path
-                                    fillRule="evenodd"
-                                    d="M5.293 7.293a1 1 0 011.414 0L10 10.586l3.293-3.293a1 1 0 111.414 1.414l-4 4a1 1 0 01-1.414 0l-4-4a1 1 0 010-1.414z"
-                                    clipRule="evenodd"
-                                  />
-                                </svg>
-                                <span>{filteredOdds[category].name}</span>
+                            <td colSpan={6} className="px-6 py-4">
+                              <div className="flex items-center gap-3">
+                                <div className={`p-1 rounded bg-cyan-500/20 text-cyan-500 transition-transform duration-300 ${expandedCategory === category ? 'rotate-0' : '-rotate-90'}`}>
+                                  <svg className="h-4 w-4" viewBox="0 0 20 20" fill="currentColor">
+                                    <path fillRule="evenodd" d="M5.293 7.293a1 1 0 011.414 0L10 10.586l3.293-3.293a1 1 0 111.414 1.414l-4 4a1 1 0 01-1.414 0l-4-4a1 1 0 010-1.414z" clipRule="evenodd" />
+                                  </svg>
+                                </div>
+                                <span className="font-black text-white uppercase tracking-tight">
+                                  {filteredOdds[category].name}
+                                </span>
                               </div>
                             </td>
                           </tr>
 
-                          {/* Bet Rows (Only visible when expanded) */}
                           {expandedCategory === category &&
-                            Object.values(filteredOdds[category]).map(
-                              (bet, idx) => {
-                                if (!bet.reference || bet.reference === "name")
-                                  return null;
+                            Object.values(filteredOdds[category]).map((bet, idx) => {
+                              if (!bet.reference || bet.reference === "name") return null;
 
-                                const odds = {
-                                  soccerBet: bet.soccerBet || 0,
-                                  mozzartBet: bet.mozzartBet || 0,
-                                  maxBet: bet.maxBet || 0,
-                                  oktagon: bet.oktagon || 0,
-                                  winner: bet.winnerbet || 0,
-                                };
-                                const highestOdd = Math.max(
-                                  ...Object.values(odds)
-                                );
+                              const odds = {
+                                soccerBet: bet.soccerBet || 0,
+                                mozzartBet: bet.mozzartBet || 0,
+                                maxBet: bet.maxBet || 0,
+                                oktagon: bet.oktagon || 0,
+                              };
+                              const highestOdd = Math.max(...Object.values(odds));
 
-                                return (
-                                  <tr
-                                    key={`${category}-${idx}`}
-                                    className="bg-gray-900/20 hover:bg-gray-800/40 transition-colors"
+                              return (
+                                <tr key={`${category}-${idx}`} className="group hover:bg-cyan-500/[0.02] transition-colors">
+                                  <td
+                                    onClick={() => addToSlip(bet)}
+                                    className="px-6 py-5 cursor-pointer"
                                   >
-                                    {/* Bet Type Name */}
-                                    <td
-                                      onClick={() => addToSlip(bet)}
-                                      className="px-6 py-3 font-medium text-gray-100 cursor-pointer hover:text-cyan-400 sticky left-0 bg-gray-900/60 transition-all border-r border-gray-700/50 z-10"
-                                    >
-                                      {bet.reference}
-                                    </td>
+                                    <div className="flex flex-col">
+                                      <span className="text-white font-bold text-base group-hover:text-cyan-400 transition-colors">
+                                        {bet.reference === "1" ? (
+                                          <>{selectedGame.home} POBEĐUJE</>
+                                        ) : bet.reference === "2" ? (
+                                          <>{selectedGame.away} POBEĐUJE</>
+                                        ) : bet.reference?.toLowerCase() === "x" ? (
+                                          <>NEREŠENO</>
+                                        ) : (
+                                          bet.reference
+                                        )}
+                                      </span>
+                                      <span className="text-[9px] text-gray-500 group-hover:text-cyan-500/60 uppercase font-black tracking-widest transition-colors">
+                                        {filteredOdds[category].name.toLowerCase().includes("golova") ? "UKUPNO GOLOVA" : "KLIKNI ZA DODAVANJE"}
+                                      </span>
+                                    </div>
+                                  </td>
 
-                                    {/* Odds Values */}
-                                    {Object.entries(odds).map(
-                                      ([key, value]) => (
-                                        <td
-                                          key={key}
-                                          className="px-6 py-3 text-center transition-colors"
-                                        >
-                                          <span
-                                            className={`
-                                                                    inline-block min-w-[55px] px-3 py-1 rounded-lg text-base font-mono font-bold transition-all duration-200 
-                                                                    ${
-                                                                      value ===
-                                                                        highestOdd &&
-                                                                      value > 0
-                                                                        ? "bg-green-600/30 text-green-300 shadow-lg shadow-green-700/50 scale-105"
-                                                                        : "text-gray-300 bg-gray-800/40"
-                                                                    }
-                                                                `}
-                                          >
-                                            {value > 0 ? (
-                                              value.toFixed(2)
-                                            ) : (
-                                              <span className="text-gray-600/80 font-normal">
-                                                -
-                                              </span>
-                                            )}
-                                          </span>
-                                        </td>
-                                      )
-                                    )}
-                                  </tr>
-                                );
-                              }
-                            )}
+                                  {Object.entries(odds).map(([key, value]) => (
+                                    <td key={key} className="px-2 py-4 text-center">
+                                      <button
+                                        disabled={value <= 0}
+                                        onClick={() => addToSlip(bet)}
+                                        className={`
+                                          w-full max-w-[85px] py-3.5 rounded-xl font-mono font-bold text-sm transition-all
+                                          ${value === highestOdd && value > 0 
+                                            ? "bg-cyan-500 text-black shadow-[0_0_25px_rgba(6,182,212,0.3)] scale-105" 
+                                            : "bg-white/5 text-gray-300 hover:bg-white/10 hover:text-white"
+                                          }
+                                          ${value <= 0 ? "opacity-10 cursor-not-allowed" : "cursor-pointer active:scale-90"}
+                                        `}
+                                      >
+                                        {value > 0 ? value.toFixed(2) : "—"}
+                                      </button>
+                                    </td>
+                                  ))}
+                                </tr>
+                              );
+                            })}
                         </React.Fragment>
                       ))}
                     </tbody>
                   </table>
+                  
                 </div>
+                
               )}
             </div>
+            
           </div>
+          
+          
         )}
+        <span className="text-center my-auto mb-6 font-bold">USKORO SVE KLADIONICE DOSTUPNE!</span>
       </div>
 
-      {/* Floating Bet Slip */}
+      {/* Floating Betslip */}
       <div
-        className={`fixed bottom-0 right-0 sm:right-4 w-full sm:w-96 z-40 transition-transform duration-500 ease-in-out ${
-          isSlipVisible
-            ? "translate-y-0"
-            : "translate-y-[calc(100%-4rem)] sm:translate-y-[calc(100%-3.5rem)]"
+        className={`fixed bottom-0 right-0 sm:right-8 w-full sm:w-[420px] z-50 transition-all duration-500 ease-in-out ${
+          isSlipVisible ? "translate-y-0" : "translate-y-[calc(100%-70px)]"
         }`}
       >
-        <button
+        <div 
           onClick={() => setIsSlipVisible(!isSlipVisible)}
-          className="w-full py-3 sm:py-2.5 px-4 flex items-center justify-between bg-gradient-to-r from-cyan-600 to-blue-700 hover:from-cyan-500 hover:to-blue-600 sm:rounded-t-xl shadow-lg"
+          className="cursor-pointer bg-cyan-600 p-5 sm:rounded-t-3xl flex items-center justify-between shadow-[0_-10px_30px_rgba(0,0,0,0.3)]"
         >
-          <span className="text-white font-bold text-lg flex items-center gap-2">
-            <svg
-              className="w-6 h-6"
-              fill="none"
-              stroke="currentColor"
-              viewBox="0 0 24 24"
-            >
-              <path
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                strokeWidth={2}
-                d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-3 7h3m-3 4h3m-6-4h.01M9 16h.01"
-              ></path>
-            </svg>
-            Tiket ({betslip.length})
-          </span>
-          <svg
-            className={`h-6 w-6 text-white transform transition-transform duration-300 ${
-              isSlipVisible ? "" : "rotate-180"
-            }`}
-            viewBox="0 0 20 20"
-            fill="currentColor"
-          >
-            <path
-              fillRule="evenodd"
-              d="M5.293 7.293a1 1 0 011.414 0L10 10.586l3.293-3.293a1 1 0 111.414 1.414l-4 4a1 1 0 01-1.414 0l-4-4a1 1 0 010-1.414z"
-              clipRule="evenodd"
-            />
+          <div className="flex items-center gap-3">
+            <div className="bg-white text-cyan-600 w-7 h-7 rounded-lg flex items-center justify-center font-black text-sm">
+              {betslip.length}
+            </div>
+            <span className="text-white font-black uppercase tracking-widest text-xs">Pregled Tiketa</span>
+          </div>
+          <svg className={`h-5 w-5 text-white transition-transform duration-500 ${isSlipVisible ? 'rotate-0' : 'rotate-180'}`} fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M19 9l-7 7-7-7" />
           </svg>
-        </button>
-        <div className="bg-gray-900/80 backdrop-blur-xl border-x border-b border-cyan-500/20 sm:rounded-b-xl max-h-[70vh] flex flex-col">
-          <div className="flex-1 overflow-y-auto p-3 space-y-2">
+        </div>
+
+        <div className="bg-gray-950 border-x border-white/5 h-[520px] flex flex-col shadow-2xl">
+          <div className="flex-1 overflow-y-auto p-5 space-y-4 custom-scrollbar">
             {betslip.length === 0 ? (
-              <div className="text-center py-10 text-gray-500">
-                Tiket je prazan.
+              <div className="h-full flex flex-col items-center justify-center text-gray-700">
+                <svg className="w-12 h-12 mb-3 opacity-10" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1} d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" />
+                </svg>
+                <p className="text-xs uppercase font-black tracking-tighter opacity-40">Dodajte tipove na vaš tiket</p>
               </div>
             ) : (
               betslip.map((bet, index) => (
-                <div
-                  key={index}
-                  className="bg-gray-800/70 p-3 rounded-lg border border-gray-700/50"
-                >
-                  <div className="flex justify-between items-start">
-                    <div className="flex-1">
-                      <p className="font-semibold text-cyan-300 text-sm">
-                        {bet.home} vs {bet.away}
-                      </p>
-                      <p className="text-lg font-bold text-white mt-1">
-                        {bet.tip}
-                      </p>
+                <div key={index} className="bg-white/[0.03] border border-white/5 p-4 rounded-2xl relative group hover:bg-white/[0.05] transition-all">
+                  <button
+                    onClick={(e) => { e.stopPropagation(); removeFromSlip(bet); }}
+                    className="absolute -top-1 -right-1 bg-red-500 text-white w-5 h-5 rounded-full opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center text-[10px] font-bold shadow-lg"
+                  >
+                    ✕
+                  </button>
+                  <div className="flex flex-col">
+                    <span className="text-xs text-gray-400">{bet.home} – {bet.away}</span>
+                    <div className="flex items-baseline gap-2 mt-1">
+                      <span className="text-white font-bold text-lg leading-none">
+                        {bet.tip === "1" ? `${bet.home} POBEĐUJE` : 
+                         bet.tip === "2" ? `${bet.away} POBEĐUJE` : 
+                         bet.tip?.toLowerCase() === "x" ? "NEREŠENO" : bet.tip}
+                      </span>
                     </div>
-                    <button
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        removeFromSlip(bet);
-                      }}
-                      className="p-1 text-gray-500 hover:text-red-400 transition-colors"
-                    >
-                      <svg
-                        className="h-5 w-5"
-                        fill="none"
-                        viewBox="0 0 24 24"
-                        stroke="currentColor"
-                      >
-                        <path
-                          strokeLinecap="round"
-                          strokeLinejoin="round"
-                          strokeWidth={2}
-                          d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"
-                        />
-                      </svg>
-                    </button>
+                  </div>
+                  <div className="mt-2 text-right">
+                    <span className="text-[11px] text-gray-500 font-mono bg-white/5 px-2 py-0.5 rounded">
+                      Max: {Math.max(...Object.values(bet.odds)).toFixed(2)}
+                    </span>
                   </div>
                 </div>
               ))
             )}
           </div>
+
           {betslip.length > 0 && (
-            <div className="border-t border-cyan-500/20 p-4 bg-gray-900/50">
-              <p className="text-sm text-cyan-300 mb-2">
-                Najbolja ukupna kvota:
-              </p>
-              <div className="grid grid-cols-2 md:grid-cols-4 gap-2 text-xs">
+            <div className="p-6 bg-black/60 border-t border-white/10 backdrop-blur-md">
+              <span className="text-[9px] font-black text-gray-600 uppercase tracking-[0.2em] block mb-4">Ukupne kvote po kladionicama</span>
+              <div className="grid grid-cols-3 gap-2">
                 {Object.keys(betslip[0].odds).map((bookie) => {
-                  const totalOdds = betslip.reduce(
-                    (total, bet) => total * (bet.odds[bookie] || 1),
-                    1
-                  );
-                  const isBest =
-                    totalOdds ===
-                    Math.max(
-                      ...Object.keys(betslip[0].odds).map((b) =>
-                        betslip.reduce(
-                          (total, bet) => total * (bet.odds[b] || 1),
-                          1
-                        )
-                      )
-                    );
+                  const totalOdds = betslip.reduce((total, bet) => total * (bet.odds[bookie] || 1), 1);
+                  const maxTotal = Math.max(...Object.keys(betslip[0].odds).map((b) => betslip.reduce((total, bet) => total * (bet.odds[b] || 1), 1)));
+                  const isBest = totalOdds === maxTotal && totalOdds > 1;
+                  
                   return (
-                    <div
-                      key={bookie}
-                      className={`p-2 rounded-md text-center ${
-                        isBest
-                          ? "bg-green-500/20 text-green-300"
-                          : "bg-gray-800/50 text-gray-400"
-                      }`}
-                    >
-                      <div className="font-mono text-base font-bold">
+                    <div key={bookie} className={`p-2.5 rounded-xl border transition-all duration-300 ${isBest ? "bg-cyan-500/10 border-cyan-500/50" : "bg-white/5 border-transparent opacity-40"}`}>
+                      <div className={`text-sm font-black font-mono leading-none mb-1 ${isBest ? "text-cyan-400" : "text-gray-400"}`}>
                         {totalOdds.toFixed(2)}
                       </div>
-                      <div className="text-[0.65rem] opacity-80">{bookie}</div>
+                      <div className="text-[8px] uppercase font-bold text-gray-600 truncate">{bookie}</div>
                     </div>
                   );
                 })}

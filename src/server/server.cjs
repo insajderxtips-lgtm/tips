@@ -48,14 +48,25 @@ const UserSchema = new mongoose.Schema(
   {
     email: { type: String, required: true, unique: true },
     password: { type: String, required: true },
-    username: { type: String },
-    tier: { type: String },
-    isVerified: { type: Boolean, required: true },
+
+    username: { type: String, required: true, unique: true },
+
+    lastUsernameChange: {
+      type: Date,
+      default: null
+    },
+
+    tier: { type: String, default: "free" },
+
+    isVerified: { type: Boolean, required: true, default: false },
     verificationCode: { type: String },
     codeExpiresAt: { type: Date },
+
     resetPasswordToken: { type: String },
     resetPasswordExpires: { type: Date },
-    defaultCurrency: String,
+
+    defaultCurrency: { type: String, default: "EUR" },
+
     statistics: {
       totalBets: { type: Number, default: 0 },
       totalWins: { type: Number, default: 0 },
@@ -72,8 +83,8 @@ const UserSchema = new mongoose.Schema(
             totalWins: { type: Number, default: 0 },
             totalLosses: { type: Number, default: 0 },
             monthlyProfit: { type: Number, default: 0 },
-            bets: { type: Array, default: [] },
-          },
+            bets: { type: Array, default: [] }
+          }
         ],
         default: months.map((month) => ({
           month,
@@ -81,17 +92,20 @@ const UserSchema = new mongoose.Schema(
           totalWins: 0,
           totalLosses: 0,
           monthlyProfit: 0,
-          bets: [],
-        })),
+          bets: []
+        }))
       },
 
       avgBetAmount: { type: Number, default: 0 },
-      averageReturnOnInvestment: { type: Number, default: 0 },
-    },
+      averageReturnOnInvestment: { type: Number, default: 0 }
+    }
   },
   { timestamps: true }
 );
-
+const oddsLimiter = rateLimit({
+  windowMs: 3000, // 3 seconds
+  max: 1
+});
 const TipSchema = new mongoose.Schema({
   tipTitle: { type: String, required: true },
   tip: { type: String, required: true },
@@ -695,164 +709,40 @@ app.put("/updateBet", verifyToken, async (req, res) => {
 });
 app.put("/removeBet", verifyToken, async (req, res) => {
   const { userId } = req.user;
-  const { betId } = req.body;
+  const { betId, isParlay } = req.body;
 
   if (!userId || !betId) {
-    return res.status(400).json({ message: "Missing required parameters." });
+    return res.status(400).json({ message: "Invalid request." });
   }
 
   try {
     const user = await User.findById(userId);
-    if (!user) {
-      return res.status(404).json({ message: "User not found." });
-    }
+    if (!user) return res.status(404).json({ message: "User not found." });
 
-    let betRemoved = false;
-    let removedBet = null;
-    let removedMonthKey = null;
+    // Loop over all months
+    if (user.statistics?.monthlyStats) {
+      for (const month of user.statistics.monthlyStats) {
+        if (!month.bets) continue;
 
-    // Find & remove the bet (single or parlay)
-    if (user.statistics && user.statistics.monthlyStats) {
-      for (const monthKey in user.statistics.monthlyStats) {
-        const month = user.statistics.monthlyStats[monthKey];
-        if (!month || !month.bets) continue;
+        // Loop over all days
+        for (let dayIndex = 0; dayIndex < month.bets.length; dayIndex++) {
+          const dayBets = month.bets[dayIndex];
+          if (!dayBets || !dayBets.length) continue;
 
-        for (const dayKey in month.bets) {
-          const dayBets = month.bets[dayKey];
-
-          if (!Array.isArray(dayBets)) continue;
-
-          const newDayBets = [];
-
-          for (const existingBet of dayBets) {
-            // Single bet object
-            if (existingBet && existingBet.betId === betId) {
-              betRemoved = true;
-              removedBet = existingBet;
-              removedMonthKey = monthKey;
-              // skip pushing -> removed
-              continue;
-            }
-
-            // Parlay stored as array of bet objects
-            if (Array.isArray(existingBet)) {
-              const parlayContains = existingBet.some((g) => g.betId === betId);
-              if (parlayContains) {
-                betRemoved = true;
-                removedBet = existingBet; // the whole parlay array
-                removedMonthKey = monthKey;
-                continue; // remove whole parlay
-              }
-            }
-
-            // keep this bet
-            newDayBets.push(existingBet);
-          }
-
-          month.bets[dayKey] = newDayBets;
+          // Filter out the bet / parlay
+          month.bets[dayIndex] = dayBets.filter((b) =>
+            isParlay ? b[0]?.parlayId !== betId : b?.betId !== betId
+          );
         }
       }
     }
 
-    if (!betRemoved || !removedBet) {
-      return res.status(404).json({ message: "Bet not found." });
-    }
+    await user.save(); // persist changes to DB
 
-    // Normalize processing: if parlay (array) -> process each element,
-    // otherwise single element array
-    const isParlay = Array.isArray(removedBet);
-    const betsToProcess = isParlay ? removedBet : [removedBet];
-
-    // Ensure statistics numbers exist
-    user.statistics.totalBets = Number(user.statistics.totalBets || 0);
-    user.statistics.totalWins = Number(user.statistics.totalWins || 0);
-    user.statistics.totalLosses = Number(user.statistics.totalLosses || 0);
-    user.statistics.totalProfit = Number(user.statistics.totalProfit || 0);
-    user.statistics.initialInvestment = Number(
-      user.statistics.initialInvestment || 0
-    );
-
-    // Get month object (for monthly updates)
-    const month =
-      removedMonthKey != null
-        ? user.statistics.monthlyStats[removedMonthKey]
-        : null;
-    if (month) {
-      month.totalBets = Number(month.totalBets || 0);
-      month.totalWins = Number(month.totalWins || 0);
-      month.totalLosses = Number(month.totalLosses || 0);
-      month.monthlyProfit = Number(month.monthlyProfit || 0);
-    }
-
-    // For each "bet entry" removed, reverse its statistical and balance effects
-    for (const bet of betsToProcess) {
-      // Parse numeric values safely
-      const stake = parseFloat(bet.stake) || 0;
-      const odds = parseFloat(bet.odds) || 1;
-      const status = (bet.status || "").toLowerCase();
-
-      // Decrement global and monthly totalBets per entry removed
-      user.statistics.totalBets = Math.max(0, user.statistics.totalBets - 1);
-      if (month) month.totalBets = Math.max(0, month.totalBets - 1);
-
-      if (status === "win") {
-        // Undo a win:
-        // - decrease totalWins
-        // - subtract recorded profit from totalProfit/monthlyProfit
-        // - remove that profit from initialInvestment (payout that was previously added)
-        const profit = stake * odds - stake; // stake * (odds - 1)
-        user.statistics.totalWins = Math.max(0, user.statistics.totalWins - 1);
-        user.statistics.totalProfit =
-          (user.statistics.totalProfit || 0) - profit;
-        if (month) {
-          month.totalWins = Math.max(0, month.totalWins - 1);
-          month.monthlyProfit = (month.monthlyProfit || 0) - profit;
-        }
-        // Subtract profit from the balance to revert the payout the win added earlier.
-        user.statistics.initialInvestment = Math.max(
-          0,
-          (user.statistics.initialInvestment || 0) - profit
-        );
-      } else if (status === "loss") {
-        // Undo a loss:
-        // - decrease totalLosses
-        // - add stake back to totalProfit/monthlyProfit (undo loss)
-        // - refund stake back to initialInvestment
-        user.statistics.totalLosses = Math.max(
-          0,
-          user.statistics.totalLosses - 1
-        );
-        user.statistics.totalProfit =
-          (user.statistics.totalProfit || 0) + stake;
-        if (month) {
-          month.totalLosses = Math.max(0, month.totalLosses - 1);
-          month.monthlyProfit = (month.monthlyProfit || 0) + stake;
-        }
-        user.statistics.initialInvestment =
-          (user.statistics.initialInvestment || 0) + stake;
-      } else {
-        // active / unsettled bet: placing the bet previously subtracted stake from balance,
-        // so removing an active bet should refund the stake.
-        user.statistics.initialInvestment =
-          (user.statistics.initialInvestment || 0) + stake;
-        // active bets shouldn't affect totalWins/totalLosses/totalProfit
-      }
-    }
-
-    // Recalculate winRate safely
-    user.statistics.winRate =
-      user.statistics.totalBets > 0
-        ? (user.statistics.totalWins / user.statistics.totalBets) * 100
-        : 0;
-
-    await user.save();
-
-    return res.status(200).json({ message: "Bet successfully removed." });
+    return res.status(200).json({ message: "Bet removed successfully." });
   } catch (err) {
     console.error("Error removing bet:", err);
-    return res
-      .status(500)
-      .json({ message: "Server error while removing bet." });
+    return res.status(500).json({ message: "Server error." });
   }
 });
 
@@ -891,45 +781,51 @@ app.put("/api/user/currency", verifyToken, async (req, res) => {
 app.put("/updateName", verifyToken, async (req, res) => {
   try {
     const { oldName, newName } = req.body;
-    const userId = req.user.userId; // Extracted from token via verifyToken middleware
+    const userId = req.user.userId;
 
     if (!oldName || !newName) {
-      return res
-        .status(400)
-        .json({ error: "Both oldName and newName are required" });
+      return res.status(400).json({ error: "Both oldName and newName are required" });
     }
 
     if (oldName === newName) {
-      return res
-        .status(400)
-        .json({ error: "New name must be different from the old name" });
+      return res.status(400).json({ error: "New name must be different" });
     }
 
-    // Find user by ID
     const user = await User.findById(userId);
     if (!user) {
       return res.status(404).json({ error: "User not found" });
     }
 
-    // Check if the old name matches the current name
     if (user.username !== oldName) {
-      return res
-        .status(400)
-        .json({ error: "Old name does not match current name" });
+      return res.status(400).json({ error: "Old name does not match current name" });
     }
 
-    // Update the name
+    // ⏱ Rate limit: once per 24h
+    if (user.lastUsernameChange) {
+      const hoursSince =
+        (Date.now() - user.lastUsernameChange.getTime()) / (1000 * 60 * 60);
+
+      if (hoursSince < 24) {
+        return res.status(429).json({
+          error: "Username can only be changed once every 24 hours"
+        });
+      }
+    }
+
     user.username = newName;
+    user.lastUsernameChange = new Date();
     await user.save();
 
-    return res
-      .status(200)
-      .json({ message: "Name updated successfully", newName: user.name });
+    return res.status(200).json({
+      message: "Name updated successfully",
+      newName: user.username
+    });
   } catch (error) {
     console.error("Error updating name:", error);
     res.status(500).json({ error: "Internal Server Error" });
   }
 });
+
 app.post("/requestPasswordResetCode", async (req, res) => {
   const { email } = req.body;
   console.log("Password reset request received for:", email);
@@ -958,20 +854,22 @@ app.post("/requestPasswordResetCode", async (req, res) => {
   const resetLink = `http://insajder.tips/#/reset-password?token=${token}`;
 
   // 4. Send email with link
-  const transport = nodemailer.createTransport({
-    service: "gmail",
-    auth: {
-      user: "insajderxtips@gmail.com",
-      pass: "krdp zpun xpku cdmk",
-    },
-  });
+ const transport = nodemailer.createTransport({
+  host: "smtp.gmail.com",
+  port: 465,
+  secure: true,
+  auth: {
+    user: "insajderxtips@gmail.com",
+    pass: "krdp zpun xpku cdmk",
+  },
+});
 
-  await transport.sendMail({
-    from: "InsajderTips | Resetujte sifru",
-    to: email,
-    subject: "InsajderTips | Resetujte Sifru",
-    text: `Da biste resetovali sifru, kliknite na sledeći link: ${resetLink}\n\nAko niste vi zahtevali, ignorisite ovaj email.`,
-  });
+await transport.sendMail({
+  from: '"Insajder Tips" <insajderxtips@gmail.com>', // Correct format
+  to: email,
+  subject: "Insajder Tips | Resetujte Šifru",
+  text: `Da biste resetovali sifru, kliknite na sledeći link: ${resetLink}`,
+});
 
   return res
     .status(200)
@@ -1082,40 +980,53 @@ app.get("/oddsChecker/getSearch/:query", async (req, res) => {
       const data = await response.body.json();
 
       // Debug: Log all matches with sport and leagueName
+/*
       data?.esMatches.forEach((match, index) => {
         console.log(`Match #${index + 1}:`, match.sport, "-", match.leagueName);
       });
+      */
 
       // Filter out any matches where leagueName or leagueToken contains "Igrači"
       // Also keep only sport S or B, apply extra filters to basketball leagues
-      const filtered = data?.esMatches.filter((match) => {
-        const leagueNameLower = (match.leagueName || "").toLowerCase();
-        const leagueTokenLower = (match.leagueToken || "").toLowerCase();
+    const filtered = data?.esMatches.filter((match) => {
+  const leagueNameLower = (match.leagueName || "").toLowerCase();
+  const leagueTokenLower = (match.leagueToken || "").toLowerCase();
 
-        // Exclude all matches related to "igrači" (players) for any sport
-        if (
-          leagueNameLower.includes("igrači") ||
-          leagueTokenLower.includes("igrači") ||
-          leagueNameLower.includes("pobednik") ||
-          leagueTokenLower.includes("pobednik")
-        ) {
-          return false;
-        }
+  if (
+    leagueNameLower.includes("igrači") ||
+    leagueTokenLower.includes("igrači") ||
+    leagueNameLower.includes("pobednik") ||
+    leagueTokenLower.includes("pobednik") ||
+    leagueNameLower.includes("winner") ||
+    leagueTokenLower.includes("winner") ||
+    leagueNameLower.includes("test") ||
+    match.away === "." ||
+    match.ticketPrintType !== 0 ||
+    match.oddsCount <= 5 ||
+    match.blocked ||
+    match.status !== 0
+  ) {
+    return false;
+  }
 
-        // Only soccer (S) or basketball (B)
-        if (match.sport === "S") {
-          return true;
-        }
+  // football
+  if (match.sport === "S") {
+    return true;
+  }
 
-        if (match.sport === "B") {
-          // Additional basketball exclusions
-          if (match.leagueName === "Evroliga Igrači") return false;
-          if (match.leagueName.includes("NBA 2024/25")) return false;
-          return true;
-        }
+  // basketball
+  if (match.sport === "B") {
+    if (
+      leagueNameLower.includes("nba") ||
+      leagueNameLower.includes("evroliga") // ✅ FIXED
+    ) {
+      return false;
+    }
+    return true;
+  }
 
-        return false;
-      });
+  return false;
+});
 
       return res.status(200).json(filtered);
     }
@@ -1125,7 +1036,7 @@ app.get("/oddsChecker/getSearch/:query", async (req, res) => {
   }
 });
 
-app.post("/oddsChecker/getOdds/", async (req, res) => {
+app.post("/oddsChecker/getOdds/", oddsLimiter, async (req, res) => {
   // attempts to get the odds for a specific match on all the bet stores.
 
   console.log("Entered getOdds.");
@@ -1147,6 +1058,8 @@ app.post("/oddsChecker/getOdds/", async (req, res) => {
         doubleChance_1X: { reference: "1x" },
         doubleChance_X2: { reference: "x2" },
         doubleChance_12: { reference: "12" },
+         w1: { reference: "W1" },
+          w2: { reference: "W2" },
         homeAndHome2Plus: { reference: "1&D2+" }, // new
         homeAndHome3Plus: { reference: "1&D3+" }, // new
         awayAndAway2Plus: { reference: "2&G2+" }, // new
@@ -1165,17 +1078,33 @@ app.post("/oddsChecker/getOdds/", async (req, res) => {
         over2_5: { reference: "3+" },
         over_3_5: { reference: "4+" },
         over_4_5: { reference: "5+" },
+          over_5_5: { reference: "6+" }, //new1
+          gg: { reference: "GG" },
+          ng: { reference: "NG" },
+          gg3: { reference: "GG3+" },
         under1_5: { reference: "0-1" },
         under2_5: { reference: "0-2" },
+        under3_5: { reference: "0-3" }, // new1
+        
+ oneToTwo: { reference: "1-2" }, // new1
+  oneToThree: { reference: "1-3" }, // new1
+   oneToFour: { reference: "1-4" }, // new1
+
+
+
+
+        twoToThree: { reference: "2-3" }, // new1
         twoToFour: { reference: "2-4" },
+         twoToFive: { reference: "2-5" }, //new1
         twoToSix: { reference: "2-6" },
+        threeToFour: { reference: "3-4" }, //new1
+          threeToFive: { reference: "3-5" }, //new1
         threeToSix: { reference: "3-6" },
-        gg: { reference: "gg" },
-        gg3: { reference: "gg3+" },
-        ng: { reference: "ng" },
         firstMore: { reference: "1>" },
         secondMore: { reference: "2>" },
         equalGoals: { reference: "1=2" },
+            even: { reference: "Par" }, // new1
+                odd: { reference: "Nepar" }, // new1
       },
 
       homeGoals: {
@@ -1188,6 +1117,8 @@ app.post("/oddsChecker/getOdds/", async (req, res) => {
         zeroToTwo: { reference: "D0-2" },
         first_0_5: { reference: "1.POL D1+" },
         first_1_5: { reference: "1.POL D2+" },
+        second_0_5: { reference: "2.POL D1+" },
+        second_1_5: { reference: "2.POL D2+" },
       },
 
       awayGoals: {
@@ -1199,27 +1130,30 @@ app.post("/oddsChecker/getOdds/", async (req, res) => {
         zeroToOne: { reference: "G0-1" },
         first_0_5: { reference: "1.POL G1+" },
         first_1_5: { reference: "1.POL G2+" },
+          second_0_5: { reference: "2.POL G1+" },
+        second_1_5: { reference: "2.POL G2+" },
       },
 
       firstHalf: {
         name: "Prvo poluvreme",
-        gg: { reference: "GG1" },
         over_0_5: { reference: "PP1+" },
         over_1_5: { reference: "PP2+" },
         over_2_5: { reference: "PP3+" },
-        over_0_5_both: { reference: "1P1+&2P1+" },
-        first05Second15: { reference: "1P1+&2P2+" },
+        gg: { reference: "GG1" },
+        over_0_5_both: { reference: "I1+ & II1+" },
+        first05Second15: { reference: "I1+ & II2+" },
         ki1: { reference: "Ishod PP. 1" },
-        ki2: { reference: "Ishod PP 2." },
-        kix: { reference: "Ishod PP X." },
+        ki2: { reference: "Ishod PP. 2" },
+        kix: { reference: "Ishod PP. X" },
         pg1: { reference: "Prvi Gol PP. 1" },
         pg2: { reference: "Prvi Gol PP. 2" },
       },
       secondHalf: {
         name: "Drugo poluvreme",
         over_0_5: { reference: "2P1+" },
-        over_1_5: { reference: "2P2++" },
-        over_2_5: { reference: "2P3++" },
+        over_1_5: { reference: "2P2+" },
+        over_2_5: { reference: "2P3+" },
+        gg: { reference: "GG2" },
         ki1: { reference: "Ishod 2P. 1" },
         ki2: { reference: "Ishod 2P. 2" },
         kix: { reference: "Ishod 2P. X" },
@@ -1239,37 +1173,7 @@ app.post("/oddsChecker/getOdds/", async (req, res) => {
       },
     };
 
-    let basketballOdds = {
-      ki: {
-        name: "Konačan ishod",
-        1: { reference: "1 (bez prod.)" },
-        x: { reference: "x (bez prod.)" },
-        2: { reference: "2 (bez prod.)" },
-        prod1: { reference: "1 (sa prod.)" },
-        prod2: { reference: "2 (sa prod.)" },
-      },
-      firstHalf: {
-        name: "Prvo poluvreme",
-        ki1: { reference: "1" },
-        ki2: { reference: "2" },
-        kix: { reference: "x" },
-      },
-      firstMinute: {
-        name: "Prvi minut",
-        ki1: { reference: "1" },
-        ki2: { reference: "2" },
-        kix: { reference: "x" },
-      },
-      htft: {
-        name: "Prelazi",
-        hh: { reference: "1-1" },
-        ha: { reference: "1-2" },
-        aa: { reference: "2-2" },
-        ah: { reference: "2-1" },
-        xa: { reference: "X-2" },
-        xh: { reference: "X-1" },
-      },
-    };
+
 
     // odds structure that we will return upon finding the odds 1: {soccerBet: 1.50} example
 
@@ -1278,14 +1182,12 @@ app.post("/oddsChecker/getOdds/", async (req, res) => {
     const maxbetSearch = `https://www.maxbet.rs/restapi/offer/sr/search/${searchQuery}/mob?mobileVersion=1.2.1.14&locale=sr`;
     const mozzartSearch = `https://www.mozzartbet.com/betting/search?term=${searchQuery}`;
     const oktagonSearch = `https://www.oktagonbet.com/restapi/offer/sr/search/${searchQuery}/mob?annex=1&mobileVersion=2.38.5.1&locale=sr`;
-    const winnerSearch = `https://wnrs-aggr-api.egt-digital.com/api/sportsapi/public/search/events-data/?searchTerm=${searchQuery}&verticalType=sports`;
     // Fetch both API responses in parallel
     const [
       soccerResponse,
       maxbetSearchResponse,
       mozzartResponse,
       oktagonSearchResponse,
-      winnerSearchResponse,
     ] = await Promise.all([
       request(soccerApi),
       request(maxbetSearch),
@@ -1301,92 +1203,14 @@ app.post("/oddsChecker/getOdds/", async (req, res) => {
         },
       }),
       request(oktagonSearch),
-      request(winnerSearch, {
-        headers: {
-          accept: "*/*",
-          "accept-language": "en-US,en;q=0.9",
-          "cache-control": "no-cache",
-          pragma: "no-cache",
-          // NOTE: 'priority' and 'sec-fetch-*' headers are often stripped by the browser
-          // or cause CORS/CSP errors. They are included here, but may be ignored
-          // or cause issues depending on your execution environment.
-          priority: "u=1, i",
-          "sec-ch-ua":
-            '"Chromium";v="142", "Google Chrome";v="142", "Not_A Brand";v="99"',
-          "sec-ch-ua-mobile": "?1",
-          "sec-ch-ua-platform": '"Android"',
-          "sec-fetch-dest": "empty",
-          "sec-fetch-mode": "cors",
-          "sec-fetch-site": "cross-site",
-          "x-platform-device": "desktop",
-          "x-platform-exp": "1763373110",
-          "x-platform-hash": "b09GnP5tNYlG6FvPGiighw",
-          "x-platform-lang": "sr",
-          "x-platform-tz": "60",
-          Referer: "https://www.winnerbet.rs/",
-        },
-        body: null,
-        method: "GET",
-      }),
     ]);
 
     const soccerJson = await soccerResponse.body.json();
     const maxbetJson = await maxbetSearchResponse.body.json();
     const mozzartJson = await mozzartResponse.body.json();
     const oktagonJson = await oktagonSearchResponse.body.json();
-    const winnerbetJson = await winnerSearchResponse.body.json();
-    if (winnerbetJson.length > 0 && winnerbetJson[0].events) {
-      const filteredGames = winnerbetJson[0].events.filter(
-        (game) => new Date(game.scheduledTime).getTime() === date
-      );
 
-      if (filteredGames.length > 0) {
-        const matchId = filteredGames[0].id;
-        fetch(
-          `https://wnrs-aggr-api.egt-digital.com/api/sportsapi/public/sport-events/eventview/normalized/${matchId}`,
-          {
-            method: "GET",
-            headers: {
-              accept: "*/*",
-              "accept-language": "en-US,en;q=0.9",
-              "cache-control": "no-cache",
-              pragma: "no-cache",
-              priority: "u=1, i",
-              "sec-ch-ua":
-                '"Chromium";v="142", "Google Chrome";v="142", "Not_A Brand";v="99"',
-              "sec-ch-ua-mobile": "?1",
-              "sec-ch-ua-platform": '"Android"',
-              "sec-fetch-dest": "empty",
-              "sec-fetch-mode": "cors",
-              "sec-fetch-site": "cross-site",
-              "x-platform-device": "desktop",
-              "x-platform-exp": "1763373110",
-              "x-platform-hash": "b09GnP5tNYlG6FvPGiighw",
-              "x-platform-lang": "sr",
-              "x-platform-tz": "60",
-              Referer: "https://www.winnerbet.rs/",
-            },
-            body: null,
-          }
-        )
-          .then((res) => res.json())
-          .then((data) => {
-            const markets = data.marketsData;
-            const marketKeys = Object.keys(markets);
 
-            if (marketKeys.length > 0) {
-              // First market = "1 X 2"
-              const firstMarket = markets[marketKeys[0]];
-              const outcomes = firstMarket.outcomes;
-
-              odds["ki"]["1"]["winnerbet"] = outcomes[0].odds; // Team 1
-              odds["ki"]["x"]["winnerbet"] = outcomes[1].odds; // Draw
-              odds["ki"]["2"]["winnerbet"] = outcomes[2].odds; // Team 2
-            }
-          })
-          .catch((err) => console.error(err));
-      }
-    }
 
     if (oktagonJson.esMatches) {
       const filteredGames = oktagonJson.esMatches.filter(
@@ -1399,85 +1223,114 @@ app.post("/oddsChecker/getOdds/", async (req, res) => {
         await fetch(match).then((res) => {
           res.json().then((json) => {
             const currentOdds = json.odds;
-            odds["homeGoals"]["zeroToOne"]["oktagon"] = currentOdds["355"];
-            odds["ki"]["1"]["oktagon"] = currentOdds["1"];
-            odds["ki"]["x"]["oktagon"] = currentOdds["2"];
-            odds["ki"]["2"]["oktagon"] = currentOdds["3"];
-            odds["goals"]["gg"]["oktagon"] = currentOdds["272"];
-            odds["goals"]["ng"]["oktagon"] = currentOdds["273"];
-            odds["ki"]["doubleChance_1X"]["oktagon"] = currentOdds["7"];
-            odds["ki"]["doubleChance_12"]["oktagon"] = currentOdds["8"];
-            odds["ki"]["doubleChance_X2"]["oktagon"] = currentOdds["9"];
-            odds["goals"]["over2_5"]["oktagon"] = currentOdds["24"];
-            odds["goals"]["under2_5"]["oktagon"] = currentOdds["22"];
-            // x
-            odds["ki"]["homeAnd3Plus"]["oktagon"] = currentOdds["287"];
-            odds["ki"]["homeAnd4Plus"]["oktagon"] = currentOdds["314"];
-            odds["ki"]["awayAnd3Plus"]["oktagon"] = currentOdds["288"]; // fix
-            odds["ki"]["awayAnd4Plus"]["oktagon"] = currentOdds["315"]; // fix
-            odds["ki"]["awayAndGG"]["oktagon"] = currentOdds["366"];
-            odds["ki"]["homeAndHome2Plus"]["oktagon"] = currentOdds["419"];
-            odds["ki"]["homeAndHome3Plus"]["oktagon"] = currentOdds["484"];
-            odds["ki"]["awayAndAway2Plus"]["oktagon"] = currentOdds["420"];
-            odds["ki"]["awayAndAway3Plus"]["oktagon"] = currentOdds["413"];
+            console.log(currentOdds);
+    
+if (currentOdds && sport === "S") {
+  odds["ki"]["awayAndAway3Plus"]["oktagon"] = currentOdds["50267"];
+  odds["ki"]["homeAndHome3Plus"]["oktagon"] = currentOdds["50266"];
+  odds["ki"]["1"]["oktagon"] = currentOdds["1"];
+  odds["ki"]["homeAndGG"]["oktagon"] = currentOdds["365"];
 
-            odds["goals"]["over1_5"]["oktagon"] = currentOdds["8"];
-            odds["goals"]["over2_5"]["oktagon"] = currentOdds["24"];
-            odds["goals"]["over_3_5"]["oktagon"] = currentOdds["25"];
-            odds["goals"]["over_4_5"]["oktagon"] = currentOdds["27"];
-            odds["goals"]["under1_5"]["oktagon"] = currentOdds["21"];
-            odds["goals"]["under2_5"]["oktagon"] = currentOdds["22"];
-            odds["goals"]["twoToFour"]["oktagon"] = currentOdds["243"];
-            odds["goals"]["twoToSix"]["oktagon"] = currentOdds["220"];
-            odds["goals"]["threeToSix"]["oktagon"] = currentOdds["382"];
-            odds["goals"]["firstMore"]["oktagon"] = currentOdds["29"];
-            odds["goals"]["secondMore"]["oktagon"] = currentOdds["31"];
-            odds["goals"]["equalGoals"]["oktagon"] = currentOdds["30"];
+  odds["ki"]["x"]["oktagon"] = currentOdds["2"];
+  odds["ki"]["2"]["oktagon"] = currentOdds["3"];
+  odds["ki"]["doubleChance_1X"]["oktagon"] = currentOdds["7"];
+  odds["ki"]["doubleChance_12"]["oktagon"] = currentOdds["8"];
+  odds["ki"]["doubleChance_X2"]["oktagon"] = currentOdds["9"];
 
-            odds["homeGoals"]["over_0_5"]["oktagon"] = currentOdds["238"];
-            odds["homeGoals"]["over_1_5"]["oktagon"] = currentOdds["248"];
-            odds["homeGoals"]["over_2_5"]["oktagon"] = currentOdds["276"];
-            odds["homeGoals"]["over_3_5"]["oktagon"] = currentOdds["555"];
-            odds["awayGoals"]["over_0_5"]["oktagon"] = currentOdds["240"];
-            odds["awayGoals"]["over_1_5"]["oktagon"] = currentOdds["250"];
-            odds["awayGoals"]["over_2_5"]["oktagon"] = currentOdds["277"];
-            odds["awayGoals"]["zeroToOne"]["oktagon"] = currentOdds["249"];
-            odds["homeGoals"]["zeroToTwo"]["oktagon"] = currentOdds["551"];
-            odds["awayGoals"]["over_3_5"]["oktagon"] = currentOdds["556"];
+  odds["goals"]["gg"]["oktagon"] = currentOdds["272"];
+  odds["goals"]["ng"]["oktagon"] = currentOdds["273"];
+  odds["goals"]["over1_5"]["oktagon"] = currentOdds["242"];
+  odds["goals"]["over2_5"]["oktagon"] = currentOdds["24"];
+  odds["goals"]["over_3_5"]["oktagon"] = currentOdds["25"];
+  odds["goals"]["over_4_5"]["oktagon"] = currentOdds["27"];
+  odds["goals"]["over_5_5"]["oktagon"] = currentOdds["223"];
+  odds["goals"]["under2_5"]["oktagon"] = currentOdds["22"];
+  odds["goals"]["under1_5"]["oktagon"] = currentOdds["21"];
 
-            odds["firstHalf"]["over_0_5"]["oktagon"] = currentOdds["207"];
-            odds["firstHalf"]["over_1_5"]["oktagon"] = currentOdds["208"];
-            odds["firstHalf"]["over_2_5"]["oktagon"] = currentOdds["209"];
-            odds["homeGoals"]["first_0_5"]["oktagon"] = currentOdds["307"];
-            odds["homeGoals"]["first_1_5"]["oktagon"] = currentOdds["274"];
-            odds["awayGoals"]["first_0_5"]["oktagon"] = currentOdds["308"];
-            odds["awayGoals"]["first_1_5"]["oktagon"] = currentOdds["275"];
-            odds["firstHalf"]["ki1"]["oktagon"] = currentOdds["4"];
-            odds["firstHalf"]["ki2"]["oktagon"] = currentOdds["6"];
-            odds["firstHalf"]["kix"]["oktagon"] = currentOdds["5"];
-            odds["firstHalf"]["gg"]["oktagon"] = currentOdds["291"];
-            odds["firstHalf"]["first05Second15"]["oktagon"] =
-              currentOdds["316"];
-            odds["firstHalf"]["over_0_5_both"]["oktagon"] = currentOdds["363"];
+  odds["goals"]["twoToFour"]["oktagon"] = currentOdds["243"];
+  odds["goals"]["twoToSix"]["oktagon"] = currentOdds["220"];
+  odds["goals"]["threeToSix"]["oktagon"] = currentOdds["382"];
+  odds["goals"]["firstMore"]["oktagon"] = currentOdds["29"];
+  odds["goals"]["secondMore"]["oktagon"] = currentOdds["31"];
+  odds["goals"]["equalGoals"]["oktagon"] = currentOdds["30"];
 
-            odds["secondHalf"]["over_0_5"]["oktagon"] = currentOdds["213"];
-            odds["secondHalf"]["over_1_5"]["oktagon"] = currentOdds["214"];
-            odds["secondHalf"]["over_0_5"]["oktagon"] = currentOdds["215"];
-            odds["secondHalf"]["ki1"]["oktagon"] = currentOdds["235"];
-            odds["secondHalf"]["kix"]["oktagon"] = currentOdds["236"];
-            odds["secondHalf"]["ki2"]["oktagon"] = currentOdds["237"];
+  odds["ki"]["w1"]["oktagon"] = currentOdds["264"];
+  odds["ki"]["w2"]["oktagon"] = currentOdds["265"];
 
-            odds["htft"]["hh"]["oktagon"] = currentOdds["10"];
-            odds["htft"]["hx"]["oktagon"] = currentOdds["11"];
-            odds["htft"]["ha"]["oktagon"] = currentOdds["12"];
-            odds["htft"]["aa"]["oktagon"] = currentOdds["18"];
-            odds["htft"]["ax"]["oktagon"] = currentOdds["17"];
-            odds["htft"]["ah"]["oktagon"] = currentOdds["16"];
-            odds["htft"]["xh"]["oktagon"] = currentOdds["13"];
-            odds["htft"]["xx"]["oktagon"] = currentOdds["14"];
-            odds["htft"]["xa"]["oktagon"] = currentOdds["15"];
+  odds["secondHalf"]["gg"]["oktagon"] = currentOdds["299"];
 
-            odds["goals"]["gg3"]["oktagon"] = currentOdds["303"];
+  odds["goals"]["under3_5"]["oktagon"] = currentOdds["219"];
+  odds["goals"]["oneToTwo"]["oktagon"] = currentOdds["278"];
+  odds["goals"]["oneToThree"]["oktagon"] = currentOdds["279"];
+  odds["goals"]["oneToFour"]["oktagon"] = currentOdds["280"];
+  odds["goals"]["twoToThree"]["oktagon"] = currentOdds["23"];
+  odds["goals"]["twoToFive"]["oktagon"] = currentOdds["333"];
+  odds["goals"]["threeToFour"]["oktagon"] = currentOdds["244"];
+  odds["goals"]["threeToFive"]["oktagon"] = currentOdds["281"];
+
+  odds["goals"]["even"]["oktagon"] = currentOdds["231"];
+  odds["goals"]["odd"]["oktagon"] = currentOdds["232"];
+
+  odds["homeGoals"]["second_0_5"]["oktagon"] = currentOdds["312"];
+  odds["homeGoals"]["second_1_5"]["oktagon"] = currentOdds["297"];
+  odds["awayGoals"]["second_0_5"]["oktagon"] = currentOdds["313"];
+  odds["awayGoals"]["second_1_5"]["oktagon"] = currentOdds["298"];
+
+  odds["homeGoals"]["over_0_5"]["oktagon"] = currentOdds["238"];
+  odds["homeGoals"]["over_1_5"]["oktagon"] = currentOdds["248"];
+  odds["homeGoals"]["over_2_5"]["oktagon"] = currentOdds["276"];
+  odds["homeGoals"]["over_3_5"]["oktagon"] = currentOdds["555"];
+  odds["homeGoals"]["zeroToOne"]["oktagon"] = currentOdds["247"];
+  odds["homeGoals"]["zeroToTwo"]["oktagon"] = currentOdds["551"];
+
+  odds["awayGoals"]["over_0_5"]["oktagon"] = currentOdds["240"];
+  odds["awayGoals"]["over_1_5"]["oktagon"] = currentOdds["250"];
+  odds["awayGoals"]["over_2_5"]["oktagon"] = currentOdds["277"];
+  odds["awayGoals"]["over_3_5"]["oktagon"] = currentOdds["556"];
+  odds["awayGoals"]["zeroToOne"]["oktagon"] = currentOdds["249"];
+
+  odds["homeGoals"]["first_0_5"]["oktagon"] = currentOdds["307"];
+  odds["homeGoals"]["first_1_5"]["oktagon"] = currentOdds["274"];
+  odds["awayGoals"]["first_0_5"]["oktagon"] = currentOdds["308"];
+  odds["awayGoals"]["first_1_5"]["oktagon"] = currentOdds["275"];
+
+  odds["firstHalf"]["ki1"]["oktagon"] = currentOdds["4"];
+  odds["firstHalf"]["kix"]["oktagon"] = currentOdds["5"];
+  odds["firstHalf"]["ki2"]["oktagon"] = currentOdds["6"];
+  odds["firstHalf"]["gg"]["oktagon"] = currentOdds["291"];
+  odds["firstHalf"]["over_0_5_both"]["oktagon"] = currentOdds["363"];
+  odds["firstHalf"]["first05Second15"]["oktagon"] = currentOdds["316"];
+
+  odds["secondHalf"]["ki1"]["oktagon"] = currentOdds["235"];
+  odds["secondHalf"]["kix"]["oktagon"] = currentOdds["236"];
+  odds["secondHalf"]["ki2"]["oktagon"] = currentOdds["237"];
+  odds["secondHalf"]["over_0_5"]["oktagon"] = currentOdds["213"];
+  odds["secondHalf"]["over_1_5"]["oktagon"] = currentOdds["214"];
+  odds["secondHalf"]["over_2_5"]["oktagon"] = currentOdds["215"];
+
+  odds["htft"]["hh"]["oktagon"] = currentOdds["10"];
+  odds["htft"]["hx"]["oktagon"] = currentOdds["11"];
+  odds["htft"]["ha"]["oktagon"] = currentOdds["12"];
+  odds["htft"]["xh"]["oktagon"] = currentOdds["13"];
+  odds["htft"]["xx"]["oktagon"] = currentOdds["14"];
+  odds["htft"]["xa"]["oktagon"] = currentOdds["15"];
+  odds["htft"]["ah"]["oktagon"] = currentOdds["16"];
+  odds["htft"]["ax"]["oktagon"] = currentOdds["17"];
+  odds["htft"]["aa"]["oktagon"] = currentOdds["18"];
+
+  odds["ki"]["homeAnd3Plus"]["oktagon"] = currentOdds["287"];
+  odds["ki"]["homeAnd4Plus"]["oktagon"] = currentOdds["314"];
+  odds["ki"]["awayAnd3Plus"]["oktagon"] = currentOdds["288"];
+  odds["ki"]["awayAnd4Plus"]["oktagon"] = currentOdds["315"];
+  odds["ki"]["awayAndGG"]["oktagon"] = currentOdds["366"];
+
+  odds["firstHalf"]["over_0_5"]["oktagon"] = currentOdds["207"];
+  odds["firstHalf"]["over_1_5"]["oktagon"] = currentOdds["208"];
+  odds["firstHalf"]["over_2_5"]["oktagon"] = currentOdds["209"];
+
+  odds["goals"]["gg3"]["oktagon"] = currentOdds["303"];
+}
+
           });
         });
       }
@@ -1485,15 +1338,40 @@ app.post("/oddsChecker/getOdds/", async (req, res) => {
     if (maxbetJson.esMatches) {
       // here, we will try to find the exact game from the search list.
 
-      const filteredGames = maxbetJson.esMatches.filter(
-        (game) =>
-          game.kickOffTime === date &&
-          game.leagueName != "Max Bonus Tip Fudbal " &&
-          game.leagueName != "UEFA Champions League 2025/2026,Winner"
-      );
+     const filteredGames = maxbetJson.esMatches.filter(
+  (game) =>
+    game.kickOffTime === date &&
+    game.sport === "S" &&                // real football matches
+    game.away !== "." &&                 // removes winner / outright
+    !game.leagueName.includes("Winner") &&// removes all cup winners
+    game.ticketPrintType === 0 &&         // normal matches only
+    game.oddsCount > 5 &&                 // avoids futures / specials
+    !game.blocked &&
+    game.status === 0
+);
 
       if (filteredGames.length > 0 && sport === "S") {
         const currentOdds = filteredGames[0].odds;
+
+   
+       
+
+
+        odds["ki"]["w1"]["maxBet"] = currentOdds["264"];
+        odds["ki"]["w2"]["maxBet"] = currentOdds["265"];
+
+        odds["goals"]["twoToThree"]["maxBet"] = currentOdds["23"];
+
+        odds["homeGoals"]["second_0_5"]["maxBet"] = currentOdds["312"];
+        odds["homeGoals"]["second_1_5"]["maxBet"] = currentOdds["297"];
+
+        odds["awayGoals"]["second_0_5"]["maxBet"] = currentOdds["313"];
+        odds["awayGoals"]["second_1_5"]["maxBet"] = currentOdds["298"];
+
+
+
+        odds["secondHalf"]["gg"]["maxBet"] = currentOdds["299"];
+
 
         odds["ki"]["1"]["maxBet"] = currentOdds["1"];
         odds["ki"]["x"]["maxBet"] = currentOdds["2"];
@@ -1511,9 +1389,9 @@ app.post("/oddsChecker/getOdds/", async (req, res) => {
         odds["ki"]["awayAnd3Plus"]["maxBet"] = currentOdds["288"];
         odds["ki"]["awayAnd4Plus"]["maxBet"] = currentOdds["315"];
         odds["ki"]["awayAndGG"]["maxBet"] = currentOdds["366"];
-
+        odds["ki"]["homeAndGG"]["maxBet"] = currentOdds["365"];
         odds["ki"]["homeAndHome2Plus"]["maxBet"] = currentOdds["419"];
-        odds["ki"]["homeAndHome3Plus"]["maxBet"] = currentOdds["484"];
+        odds["ki"]["homeAndHome3Plus"]["maxBet"] = currentOdds["50266"];
         odds["ki"]["awayAndAway2Plus"]["maxBet"] = currentOdds["420"];
         odds["ki"]["awayAndAway3Plus"]["maxBet"] = currentOdds["50267"];
 
@@ -1566,12 +1444,12 @@ app.post("/oddsChecker/getOdds/", async (req, res) => {
         odds["firstHalf"]["first05Second15"]["maxBet"] = currentOdds["316"];
         odds["firstHalf"]["over_0_5_both"]["maxBet"] = currentOdds["363"];
 
-        odds["firstHalf"]["pg1"]["maxBet"] = currentOdds["363"];
-        odds["firstHalf"]["pg2"]["maxBet"] = currentOdds["363"];
+        odds["firstHalf"]["pg1"]["maxBet"] = currentOdds["204"];
+        odds["firstHalf"]["pg2"]["maxBet"] = currentOdds["206"];
 
         odds["secondHalf"]["over_0_5"]["maxBet"] = currentOdds["213"];
         odds["secondHalf"]["over_1_5"]["maxBet"] = currentOdds["214"];
-        odds["secondHalf"]["over_0_5"]["maxBet"] = currentOdds["215"];
+
         odds["secondHalf"]["ki1"]["maxBet"] = currentOdds["235"];
         odds["secondHalf"]["kix"]["maxBet"] = currentOdds["236"];
         odds["secondHalf"]["ki2"]["maxBet"] = currentOdds["237"];
@@ -1585,27 +1463,26 @@ app.post("/oddsChecker/getOdds/", async (req, res) => {
         odds["htft"]["xh"]["maxBet"] = currentOdds["13"];
         odds["htft"]["xx"]["maxBet"] = currentOdds["14"];
         odds["htft"]["xa"]["maxBet"] = currentOdds["15"];
-
         odds["goals"]["gg3"]["maxBet"] = currentOdds["303"];
 
         // '1' = home win 2 = x 3 = awayWin  272 = gg 273 = ng 24 = ug3+ 7 = 1x 12  = 8 x2 = 9 ----- 2.5+ =
 
         // Process maxbet odds and append to the odds object
-      } else if (filteredGames.length > 0 && sport === "B") {
-        let currentOdds = filteredGames[0].odds;
-        basketballOdds["ki"]["prod1"]["maxBet"] = currentOdds["50291"];
-        basketballOdds["ki"]["prod2"]["maxBet"] = currentOdds["50293"];
       }
     }
     if (soccerJson?.betMap) {
       const soccerOdds = soccerJson?.betMap; // Get the whole betMap
 
+   
+
       if (soccerOdds && sport === "S") {
         odds["ki"]["awayAndAway3Plus"]["soccerBet"] =
           soccerOdds["50267"]?.NULL?.ov;
         odds["ki"]["homeAndHome3Plus"]["soccerBet"] =
-          soccerOdds["221"]?.NULL?.ov;
+          soccerOdds["50266"]?.NULL?.ov;
         odds["ki"]["1"]["soccerBet"] = soccerOdds["1"]?.NULL?.ov;
+        odds["ki"]["homeAndGG"]["soccerBet"] = soccerOdds["365"]?.NULL?.ov;
+
         odds["ki"]["x"]["soccerBet"] = soccerOdds["2"]?.NULL?.ov;
         odds["ki"]["2"]["soccerBet"] = soccerOdds["3"]?.NULL?.ov;
         odds["ki"]["doubleChance_1X"]["soccerBet"] = soccerOdds["7"]?.NULL?.ov;
@@ -1616,15 +1493,83 @@ app.post("/oddsChecker/getOdds/", async (req, res) => {
         odds["goals"]["over1_5"]["soccerBet"] = soccerOdds["242"]?.NULL?.ov;
         odds["goals"]["over2_5"]["soccerBet"] = soccerOdds["24"]?.NULL?.ov;
         odds["goals"]["over_3_5"]["soccerBet"] = soccerOdds["25"]?.NULL?.ov;
-        odds["goals"]["over_4_5"]["soccerBet"] = soccerOdds["27"]?.NULL?.ov; // fix
+        odds["goals"]["over_4_5"]["soccerBet"] = soccerOdds["27"]?.NULL?.ov; 
+          odds["goals"]["over_5_5"]["soccerBet"] = soccerOdds["223"]?.NULL?.ov; 
         odds["goals"]["under2_5"]["soccerBet"] = soccerOdds["22"]?.NULL?.ov;
-        odds["goals"]["under1_5"]["soccerBet"] = soccerOdds["21"]?.NULL?.ov; // fix
+        odds["goals"]["under1_5"]["soccerBet"] = soccerOdds["21"]?.NULL?.ov; 
         odds["goals"]["twoToFour"]["soccerBet"] = soccerOdds["243"]?.NULL?.ov;
         odds["goals"]["twoToSix"]["soccerBet"] = soccerOdds["220"]?.NULL?.ov;
         odds["goals"]["threeToSix"]["soccerBet"] = soccerOdds["382"]?.NULL?.ov;
         odds["goals"]["firstMore"]["soccerBet"] = soccerOdds["29"]?.NULL?.ov;
         odds["goals"]["secondMore"]["soccerBet"] = soccerOdds["31"]?.NULL?.ov;
         odds["goals"]["equalGoals"]["soccerBet"] = soccerOdds["30"]?.NULL?.ov;
+
+
+
+
+
+
+
+
+        odds["ki"]["w1"]["soccerBet"] = soccerOdds["264"]?.NULL?.ov;
+        odds["ki"]["w2"]["soccerBet"] = soccerOdds["265"]?.NULL?.ov;
+
+
+
+
+
+
+
+
+        odds["secondHalf"]["gg"]["soccerBet"] = soccerOdds["299"]?.NULL?.ov; // gg2
+
+
+
+
+
+
+
+
+                odds["goals"]["under3_5"]["soccerBet"] = soccerOdds["219"]?.NULL?.ov; // 0-3
+
+
+                odds["goals"]["oneToTwo"]["soccerBet"] = soccerOdds["278"]?.NULL?.ov; // 1-2
+                odds["goals"]["oneToThree"]["soccerBet"] = soccerOdds["279"]?.NULL?.ov; // 1-3
+                odds["goals"]["oneToFour"]["soccerBet"] = soccerOdds["280"]?.NULL?.ov; // 1-4
+
+
+
+                odds["goals"]["twoToThree"]["soccerBet"] = soccerOdds["23"]?.NULL?.ov; // 2-3
+                odds["goals"]["twoToFive"]["soccerBet"] = soccerOdds["333"]?.NULL?.ov; // 2-5
+
+
+        odds["goals"]["threeToFour"]["soccerBet"] = soccerOdds["244"]?.NULL?.ov; // 3-4
+                odds["goals"]["threeToFive"]["soccerBet"] = soccerOdds["281"]?.NULL?.ov; // 3-5
+
+                
+
+                odds["goals"]["even"]["soccerBet"] = soccerOdds["231"]?.NULL?.ov; // 3-5
+                odds["goals"]["odd"]["soccerBet"] = soccerOdds["232"]?.NULL?.ov; // 3-5
+
+
+
+
+                odds["homeGoals"]["second_0_5"]["soccerBet"] = soccerOdds["312"]?.NULL?.ov; // 3-5
+                odds["homeGoals"]["second_1_5"]["soccerBet"] = soccerOdds["297"]?.NULL?.ov; // 3-5
+
+
+
+
+
+                              odds["awayGoals"]["second_0_5"]["soccerBet"] = soccerOdds["313"]?.NULL?.ov; // 3-5
+                              odds["awayGoals"]["second_1_5"]["soccerBet"] = soccerOdds["298"]?.NULL?.ov; // 3-5
+
+
+
+
+
+        odds["firstHalf"]["pg1"]["soccerBet"] = soccerOdds["792"]?.NULL?.ov;
+        odds["firstHalf"]["pg2"]["soccerBet"] = soccerOdds["794"]?.NULL?.ov;
 
         odds["homeGoals"]["over_0_5"]["soccerBet"] =
           soccerOdds["238"]?.NULL?.ov;
@@ -1702,159 +1647,219 @@ app.post("/oddsChecker/getOdds/", async (req, res) => {
           soccerOdds["209"]?.NULL?.ov;
 
         odds["goals"]["gg3"]["soccerBet"] = soccerOdds["303"]?.NULL?.ov;
-      } else if (soccerOdds && sport === "B") {
-        basketballOdds["ki"]["1"]["soccerBet"] = soccerOdds["1"]?.NULL?.ov;
-        basketballOdds["ki"]["x"]["soccerBet"] = soccerOdds["2"]?.NULL?.ov;
-        basketballOdds["ki"]["2"]["soccerBet"] = soccerOdds["3"]?.NULL?.ov;
-        basketballOdds["ki"]["prod1"]["soccerBet"] =
-          soccerOdds["50291"]?.NULL?.ov;
-        basketballOdds["ki"]["prod2"]["soccerBet"] =
-          soccerOdds["50293"]?.NULL?.ov;
-
-        basketballOdds["firstHalf"]["ki1"]["soccerBet"] =
-          soccerOdds["4"]?.NULL?.ov;
-        basketballOdds["firstHalf"]["kix"]["soccerBet"] =
-          soccerOdds["5"]?.NULL?.ov;
-        basketballOdds["firstHalf"]["ki2"]["soccerBet"] =
-          soccerOdds["6"]?.NULL?.ov;
-        basketballOdds["firstMinute"]["ki1"]["soccerBet"] =
-          soccerOdds["55358"]?.NULL?.ov;
-        basketballOdds["firstMinute"]["kix"]["soccerBet"] =
-          soccerOdds["55359"]?.NULL?.ov;
-        basketballOdds["firstMinute"]["ki2"]["soccerBet"] =
-          soccerOdds["55360"]?.NULL?.ov;
-
-        basketballOdds["htft"]["aa"]["soccerBet"] = // 2-2
-          soccerOdds["50304"]?.NULL?.ov;
-        basketballOdds["htft"]["ah"]["soccerBet"] = // 2-1
-          soccerOdds["50302"]?.NULL?.ov;
-        basketballOdds["htft"]["ha"]["soccerBet"] = // 1-2
-          soccerOdds["50298"]?.NULL?.ov;
-        basketballOdds["htft"]["hh"]["soccerBet"] = // 1-1
-          soccerOdds["50296"]?.NULL?.ov;
-        basketballOdds["htft"]["xa"]["soccerBet"] = // X-2
-          soccerOdds["50301"]?.NULL?.ov;
-        basketballOdds["htft"]["xh"]["soccerBet"] = // X-1
-          soccerOdds["50299"]?.NULL?.ov;
-      }
+      } 
     }
     if (mozzartJson?.items?.length > 0) {
       const items = mozzartJson.items;
-      const filteredGames = items.filter((game) => game.startTime === date);
-      if (!filteredGames) {
+    
+
+     const filteredGames = items.filter(
+  game =>
+    game.startTime === date && 
+    (game.visitor || game.totalOddsCount > 10) // dynamic filter for real match
+);
+
+
+
+      if (!filteredGames || filteredGames.length <= 0) {
         return res.status(404).json({ error: "Nije pronadjen mec." });
       }
-      const mozzartOdds = await request(
-        `https://www.mozzartbet.com/match/${filteredGames[0]?.id}`,
-        {
-          headers: {
-            "Content-Type": "application/json",
-            Accept: "application/json",
-            Medium: "WEB",
-            "User-Agent":
-              "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/134.0.0.0 Safari/537.36",
-            Referer:
-              "https://www.mozzartbet.com/sr/kladjenje/sport/1?date=today",
-            "X-Requested-With": "XMLHttpRequest",
-          },
-          method: "POST",
-        }
-      );
 
-      const json = await mozzartOdds.body.json();
+     
+     const result = await fetch(`https://www.mozzartbet.com/betting/match/${filteredGames[0].id}`, {
+  method: "POST",
+  headers: {
+    "accept": "application/json, text/plain, */*",
+    "content-type": "application/json",
+    "medium": "PREMATCH_WEB",
+    "origin": "https://www.mozzartbet.com",
+    "referer": "https://www.mozzartbet.com/sr/kladjenje/sport/1/match/468279",
+  },
+  body: JSON.stringify({
+    medium: "PREMATCH_WEB"
+  }),
+  credentials: "include" // ⬅️ VERY IMPORTANT (cookies)
+});
+
+const json = await result.json();
+
+
+   
       if (json.status !== "ERROR") {
-        const mOdds = json.match.odds;
+       
+   
+      // do ovde sam stigao, promenili su api, sada je jos lakse, json.match.oddsGroup je array objekata gde svaki objekat predstavlja
+      // grupu betova //Konacan ishod je prvi objekat, npr, ima odds array u njemu.
+      // odds array predstavlja array objekata gde svaki objekat je tip, npr prvi objekat je kec pobedjuje, pa drugi X pa treci dvojka.
+const groups = json.match.oddsGroup;
 
-        if (mOdds && mOdds.length > 0 && sport === "S") {
-          odds["ki"]["1"]["mozzartBet"] = mOdds[0].value;
-          odds["ki"]["x"]["mozzartBet"] = mOdds[1].value;
-          odds["ki"]["2"]["mozzartBet"] = mOdds[2].value;
 
-          odds["ki"]["homeAnd3Plus"]["mozzartBet"] = mOdds[301].value;
-          odds["ki"]["homeAnd4Plus"]["mozzartBet"] = mOdds[312].value;
-          odds["ki"]["homeAndHome2Plus"]["mozzartBet"] = mOdds[310].value;
 
-          odds["ki"]["doubleChance_1X"]["mozzartBet"] = mOdds[3].value;
-          odds["ki"]["doubleChance_12"]["mozzartBet"] = mOdds[4].value;
-          odds["ki"]["doubleChance_X2"]["mozzartBet"] = mOdds[5].value;
-          odds["ki"]["awayAnd3Plus"]["mozzartBet"] = mOdds[302].value;
-          odds["ki"]["awayAnd4Plus"]["mozzartBet"] = mOdds[313].value;
-          odds["ki"]["awayAndGG"]["mozzartBet"] = mOdds[319].value;
-          odds["ki"]["awayAndAway2Plus"]["mozzartBet"] = mOdds[311].value;
+/*
+groups.forEach((group, groupIndex) => {
+  console.log(`\n[GROUP ${groupIndex}] ${group.groupName}`);
 
-          odds["goals"]["gg"]["mozzartBet"] = mOdds[223].value;
-          odds["goals"]["ng"]["mozzartBet"] = mOdds[224].value;
-          odds["goals"]["over2_5"]["mozzartBet"] = mOdds[9].value;
-          odds["goals"]["under2_5"]["mozzartBet"] = mOdds[7].value;
-          odds["goals"]["gg3"]["mozzartBet"] = mOdds[225].value;
-          odds["goals"]["over1_5"]["mozzartBet"] = mOdds[17].value;
-          odds["goals"]["over_3_5"]["mozzartBet"] = mOdds[10].value;
-          odds["goals"]["over_4_5"]["mozzartBet"] = mOdds[12].value;
-          odds["goals"]["under1_5"]["mozzartBet"] = mOdds[6].value;
+  group.odds.forEach((odd, oddIndex) => {
+    // Summary line
+    console.log(`  └─ [GROUP ${groupIndex} | ODD ${oddIndex}] ${odd.subgame?.name ?? "no-name"} | value: ${odd.value}`);
 
-          odds["htft"]["aa"]["mozzartBet"] = mOdds[55].value;
-          odds["htft"]["ah"]["mozzartBet"] = mOdds[53].value;
-          odds["htft"]["ax"]["mozzartBet"] = mOdds[54].value;
-          odds["htft"]["ha"]["mozzartBet"] = mOdds[49].value;
-          odds["htft"]["hh"]["mozzartBet"] = mOdds[47].value;
-          odds["htft"]["hx"]["mozzartBet"] = mOdds[48].value;
-          odds["htft"]["xa"]["mozzartBet"] = mOdds[52].value;
-          odds["htft"]["xh"]["mozzartBet"] = mOdds[50].value;
-          odds["htft"]["xx"]["mozzartBet"] = mOdds[51].value;
+    // Full JSON object
+    console.log(JSON.stringify(odd, null, 2));
+  });
+});
+*/
 
-          odds["goals"]["twoToFour"]["mozzartBet"] = mOdds[23].value;
-          odds["goals"]["twoToSix"]["mozzartBet"] = mOdds[19].value;
-          odds["goals"]["threeToSix"]["mozzartBet"] = mOdds[33].value;
 
-          odds["goals"]["firstMore"]["mozzartBet"] = mOdds[101].value;
-          odds["goals"]["secondMore"]["mozzartBet"] = mOdds[102].value;
-          odds["goals"]["equalGoals"]["mozzartBet"] = mOdds[103].value;
 
-          odds["homeGoals"]["over_0_5"]["mozzartBet"] = mOdds[243].value;
-          odds["homeGoals"]["over_1_5"]["mozzartBet"] = mOdds[244].value;
-          odds["homeGoals"]["over_2_5"]["mozzartBet"] = mOdds[250].value;
-          odds["homeGoals"]["over_3_5"]["mozzartBet"] = mOdds[260].value;
-          odds["homeGoals"]["zeroToOne"]["mozzartBet"] = mOdds[251].value;
-          odds["homeGoals"]["zeroToTwo"]["mozzartBet"] = mOdds[252].value;
 
-          odds["awayGoals"]["over_0_5"]["mozzartBet"] = mOdds[268].value;
-          odds["awayGoals"]["over_1_5"]["mozzartBet"] = mOdds[269].value;
-          odds["awayGoals"]["over_2_5"]["mozzartBet"] = mOdds[275].value;
-          odds["awayGoals"]["over_3_5"]["mozzartBet"] = mOdds[285].value;
-          odds["awayGoals"]["zeroToOne"]["mozzartBet"] = mOdds[276].value;
 
-          odds["secondHalf"]["ki1"]["mozzartBet"] = mOdds[104].value;
-          odds["secondHalf"]["kix"]["mozzartBet"] = mOdds[105].value;
-          odds["secondHalf"]["ki2"]["mozzartBet"] = mOdds[106].value;
+ odds["ki"]["1"]["mozzartBet"] = groups[0]?.odds?.[0]?.value ?? null;
+odds["ki"]["x"]["mozzartBet"] = groups[0]?.odds?.[1]?.value ?? null;
+odds["ki"]["2"]["mozzartBet"] = groups[0]?.odds?.[2]?.value ?? null;
 
-          odds["secondHalf"]["over_0_5"]["mozzartBet"] = mOdds[87].value;
-          odds["secondHalf"]["over_1_5"]["mozzartBet"] = mOdds[88].value;
-          odds["secondHalf"]["over_2_5"]["mozzartBet"] = mOdds[89].value;
 
-          odds["firstHalf"]["over_0_5_both"]["mozzartBet"] = mOdds[317].value;
-          odds["firstHalf"]["first05Second15"]["mozzartBet"] = mOdds[315].value;
-          odds["firstHalf"]["gg"]["mozzartBet"] = mOdds[226].value;
 
-          odds["homeGoals"]["first_0_5"]["mozzartBet"] = mOdds[209].value;
-          odds["homeGoals"]["first_1_5"]["mozzartBet"] = mOdds[210].value;
+odds["goals"]["even"]["mozzartBet"] = groups[4]?.odds?.[0]?.value ?? null;
+odds["goals"]["odd"]["mozzartBet"] = groups[4]?.odds?.[1]?.value ?? null;
 
-          odds["awayGoals"]["first_0_5"]["mozzartBet"] = mOdds[216].value;
-          odds["awayGoals"]["first_1_5"]["mozzartBet"] = mOdds[217].value;
 
-          odds["firstHalf"]["ki1"]["mozzartBet"] = mOdds[44].value;
-          odds["firstHalf"]["ki2"]["mozzartBet"] = mOdds[46].value;
-          odds["firstHalf"]["kix"]["mozzartBet"] = mOdds[45].value;
+odds["homeGoals"]["second_0_5"]["mozzartBet"] = groups[20]?.odds?.[1]?.value ?? null; // 
+odds["homeGoals"]["second_1_5"]["mozzartBet"] = groups[20]?.odds?.[3]?.value ?? null; // 
 
-          odds["firstHalf"]["over_0_5"]["mozzartBet"] = mOdds[73].value;
-          odds["firstHalf"]["over_1_5"]["mozzartBet"] = mOdds[74].value;
-          odds["firstHalf"]["over_2_5"]["mozzartBet"] = mOdds[75].value;
-        } else if (mOdds && mOdds.length > 0 && sport === "B") {
-        }
+
+
+odds["awayGoals"]["second_0_5"]["mozzartBet"] = groups[21]?.odds?.[1]?.value ?? null; // 
+odds["awayGoals"]["second_1_5"]["mozzartBet"] = groups[21]?.odds?.[3]?.value ?? null; // 
+
+
+odds["secondHalf"]["gg"]["mozzartBet"] = groups[3]?.odds?.[8]?.value ?? null;
+
+
+odds["ki"]["w1"]["mozzartBet"] = groups[6]?.odds?.[0]?.value ?? null;
+odds["ki"]["w2"]["mozzartBet"] = groups[6]?.odds?.[1]?.value ?? null;
+
+odds["goals"]["over_5_5"]["mozzartBet"] = groups[2]?.odds?.[8]?.value ?? null;
+
+odds["goals"]["under3_5"]["mozzartBet"] = groups[2]?.odds?.[4]?.value ?? null;
+
+odds["goals"]["oneToTwo"]["mozzartBet"] = groups[2]?.odds?.[10]?.value ?? null;
+odds["goals"]["oneToThree"]["mozzartBet"] = groups[2]?.odds?.[11]?.value ?? null;
+odds["goals"]["oneToFour"]["mozzartBet"] = groups[2]?.odds?.[12]?.value ?? null;
+odds["goals"]["twoToThree"]["mozzartBet"] = groups[2]?.odds?.[14]?.value ?? null;
+odds["goals"]["twoToFour"]["mozzartBet"] = groups[2]?.odds?.[15]?.value ?? null;
+odds["goals"]["twoToFive"]["mozzartBet"] = groups[2]?.odds?.[16]?.value ?? null;
+odds["goals"]["twoToSix"]["mozzartBet"] = groups[2]?.odds?.[17]?.value ?? null;
+odds["goals"]["threeToFour"]["mozzartBet"] = groups[2]?.odds?.[18]?.value ?? null;
+odds["goals"]["threeToFive"]["mozzartBet"] = groups[2]?.odds?.[19]?.value ?? null;
+odds["goals"]["threeToSix"]["mozzartBet"] = groups[2]?.odds?.[20]?.value ?? null;
+
+// x
+odds["ki"]["homeAndHome3Plus"]["mozzartBet"] = groups[27]?.odds?.[32]?.value ?? null;
+odds["ki"]["awayAndAway3Plus"]["mozzartBet"] = groups[27]?.odds?.[38]?.value ?? null;
+
+
+
+odds["goals"]["firstMore"]["mozzartBet"] = groups[37]?.odds?.[0]?.value ?? null;
+odds["goals"]["secondMore"]["mozzartBet"] = groups[37]?.odds?.[2]?.value ?? null;
+odds["goals"]["equalGoals"]["mozzartBet"] = groups[37]?.odds?.[1]?.value ?? null;
+
+
+
+odds["ki"]["doubleChance_1X"]["mozzartBet"] = groups[1]?.odds?.[0]?.value ?? null;
+odds["ki"]["doubleChance_12"]["mozzartBet"] = groups[1]?.odds?.[1]?.value ?? null;
+odds["ki"]["doubleChance_X2"]["mozzartBet"] = groups[1]?.odds?.[2]?.value ?? null;
+
+odds["ki"]["homeAnd3Plus"]["mozzartBet"] = groups[27]?.odds?.[2]?.value ?? null;
+odds["ki"]["homeAnd4Plus"]["mozzartBet"] = groups[27]?.odds?.[4]?.value ?? null;
+odds["ki"]["awayAnd3Plus"]["mozzartBet"] = groups[27]?.odds?.[19]?.value ?? null;
+odds["ki"]["awayAnd4Plus"]["mozzartBet"] = groups[27]?.odds?.[21]?.value ?? null;
+
+odds["ki"]["homeAndGG"]["mozzartBet"] = groups[35]?.odds?.[0]?.value ?? null;
+odds["ki"]["awayAndGG"]["mozzartBet"] = groups[35]?.odds?.[3]?.value ?? null;
+
+odds["goals"]["over1_5"]["mozzartBet"] = groups[2]?.odds?.[1]?.value ?? null;
+odds["goals"]["over2_5"]["mozzartBet"] = groups[2]?.odds?.[3]?.value ?? null;
+odds["goals"]["over_3_5"]["mozzartBet"] = groups[2]?.odds?.[5]?.value ?? null;
+odds["goals"]["over_4_5"]["mozzartBet"] = groups[2]?.odds?.[7]?.value ?? null;
+
+odds["goals"]["under2_5"]["mozzartBet"] = groups[2]?.odds?.[2]?.value ?? null;
+odds["goals"]["under1_5"]["mozzartBet"] = groups[2]?.odds?.[0]?.value ?? null;
+odds["goals"]["twoToFour"]["mozzartBet"] = groups[2]?.odds?.[15]?.value ?? null;
+odds["goals"]["twoToSix"]["mozzartBet"] = groups[2]?.odds?.[17]?.value ?? null;
+odds["goals"]["threeToSix"]["mozzartBet"] = groups[2]?.odds?.[20]?.value ?? null;
+
+odds["goals"]["gg"]["mozzartBet"] = groups[3]?.odds?.[0]?.value ?? null;
+odds["goals"]["ng"]["mozzartBet"] = groups[3]?.odds?.[1]?.value ?? null;
+odds["goals"]["gg3"]["mozzartBet"] = groups[3]?.odds?.[2]?.value ?? null;
+
+odds["homeGoals"]["zeroToOne"]["mozzartBet"] = groups[10]?.odds?.[2]?.value ?? null;
+odds["homeGoals"]["zeroToTwo"]["mozzartBet"] = groups[10]?.odds?.[4]?.value ?? null;
+
+
+odds["awayGoals"]["zeroToOne"]["mozzartBet"] = groups[11]?.odds?.[2]?.value ?? null;
+
+
+odds["homeGoals"]["over_0_5"]["mozzartBet"] = groups[10]?.odds?.[1]?.value ?? null;
+odds["homeGoals"]["over_1_5"]["mozzartBet"] = groups[10]?.odds?.[3]?.value ?? null;
+odds["homeGoals"]["over_2_5"]["mozzartBet"] = groups[10]?.odds?.[5]?.value ?? null;
+
+odds["awayGoals"]["over_0_5"]["mozzartBet"] = groups[11]?.odds?.[1]?.value ?? null;
+odds["awayGoals"]["over_1_5"]["mozzartBet"] = groups[11]?.odds?.[3]?.value ?? null;
+odds["awayGoals"]["over_2_5"]["mozzartBet"] = groups[11]?.odds?.[5]?.value ?? null;
+odds["awayGoals"]["over_3_5"]["mozzartBet"] = groups[11]?.odds?.[16]?.value ?? null;
+
+
+
+
+
+odds["htft"]["hh"]["mozzartBet"] = groups[25]?.odds?.[0]?.value ?? null;
+odds["htft"]["hx"]["mozzartBet"] = groups[25]?.odds?.[2]?.value ?? null;
+odds["htft"]["ha"]["mozzartBet"] = groups[25]?.odds?.[3]?.value ?? null;
+odds["htft"]["xa"]["mozzartBet"] = groups[25]?.odds?.[8]?.value ?? null;
+odds["htft"]["xh"]["mozzartBet"] = groups[25]?.odds?.[4]?.value ?? null;
+
+odds["htft"]["xx"]["mozzartBet"] = groups[25]?.odds?.[6]?.value ?? null;
+odds["htft"]["ah"]["mozzartBet"] = groups[25]?.odds?.[10]?.value ?? null;
+odds["htft"]["ax"]["mozzartBet"] = groups[25]?.odds?.[11]?.value ?? null;
+odds["htft"]["aa"]["mozzartBet"] = groups[25]?.odds?.[12]?.value ?? null;
+
+odds["firstHalf"]["gg"]["mozzartBet"] = groups[3]?.odds?.[6]?.value ?? null;
+
+odds["homeGoals"]["first_0_5"]["mozzartBet"] = groups[16]?.odds?.[1]?.value ?? null;
+odds["homeGoals"]["first_1_5"]["mozzartBet"] = groups[16]?.odds?.[3]?.value ?? null;
+
+odds["awayGoals"]["first_0_5"]["mozzartBet"] = groups[17]?.odds?.[1]?.value ?? null;
+odds["awayGoals"]["first_1_5"]["mozzartBet"] = groups[17]?.odds?.[3]?.value ?? null;
+
+
+odds["firstHalf"]["over_0_5_both"]["mozzartBet"] = groups[22]?.odds?.[0]?.value ?? null;
+odds["firstHalf"]["first05Second15"]["mozzartBet"] = groups[22]?.odds?.[1]?.value ?? null;
+
+odds["secondHalf"]["over_0_5"]["mozzartBet"] = groups[19]?.odds?.[1]?.value ?? null;
+odds["secondHalf"]["over_1_5"]["mozzartBet"] = groups[19]?.odds?.[3]?.value ?? null;
+odds["secondHalf"]["over_2_5"]["mozzartBet"] = groups[19]?.odds?.[5]?.value ?? null;
+
+odds["secondHalf"]["ki1"]["mozzartBet"] = groups[18]?.odds?.[0]?.value ?? null;
+odds["secondHalf"]["ki2"]["mozzartBet"] = groups[18]?.odds?.[2]?.value ?? null;
+odds["secondHalf"]["kix"]["mozzartBet"] = groups[18]?.odds?.[1]?.value ?? null;
+
+
+odds["firstHalf"]["ki1"]["mozzartBet"] = groups[12]?.odds?.[0]?.value ?? null;
+odds["firstHalf"]["ki2"]["mozzartBet"] = groups[12]?.odds?.[2]?.value ?? null;
+odds["firstHalf"]["kix"]["mozzartBet"] = groups[12]?.odds?.[1]?.value ?? null;
+
+odds["firstHalf"]["over_0_5"]["mozzartBet"] = groups[15]?.odds?.[1]?.value ?? null;
+odds["firstHalf"]["over_1_5"]["mozzartBet"] = groups[15]?.odds?.[3]?.value ?? null;
+odds["firstHalf"]["over_2_5"]["mozzartBet"] = groups[15]?.odds?.[5]?.value ?? null;
+
+odds["secondHalf"]["ki1"]["mozzartBet"] = groups[18]?.odds?.[0]?.value ?? null;
+odds["secondHalf"]["kix"]["mozzartBet"] = groups[18]?.odds?.[1]?.value ?? null;
+odds["secondHalf"]["ki2"]["mozzartBet"] = groups[18]?.odds?.[2]?.value ?? null;
+
       }
     }
-    console.log(odds);
 
-    return res.status(200).json(sport === "S" ? odds : basketballOdds);
+    return res.status(200).json(sport === "S" ? odds : null);
   } catch (err) {
     console.error("Error fetching odds data:", err);
     return res.status(500).json({ error: "Failed to fetch odds data" });
