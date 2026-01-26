@@ -12,12 +12,14 @@ import {
 } from "chart.js";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { Bar, Doughnut, Line } from "react-chartjs-2";
-import { useSelector } from "react-redux";
+import { useDispatch, useSelector } from "react-redux";
 import { v4 as uuidv4 } from "uuid";
 import "../../index.css";
 import { RootState } from "../../redux/store";
 import PremiumFallback from "./PremiumFallback";
 import UserBets from "./UserBets";
+import { logout } from "../../redux/slices/UserSlice";
+import { useNavigate } from "react-router";
 
 ChartJS.register(
   CategoryScale,
@@ -85,7 +87,7 @@ enum Month {
 }
 
 export default function Statistics(): React.ReactNode {
-  const currentUser = useSelector((state: RootState) => state.user); // The user, used to check if premium on the client.
+const currentUser = useSelector((state: RootState) => state.user);
   if (currentUser.tier === "free") {
     return <PremiumFallback />;
   }
@@ -110,9 +112,11 @@ export default function Statistics(): React.ReactNode {
 
   const currentMonth = new Date().getMonth();
   const today = new Date().getDate();
+  const dispatch = useDispatch();
+  const nav = useNavigate();
 
-  const JWT = localStorage.getItem("insajder_token");
-  const defaultCurrency = userStats?.defaultCurrency;
+
+const [JWT, setJWT] = useState(localStorage.getItem("insajder_token"));  const defaultCurrency = userStats?.defaultCurrency;
   const [lineMode, setLineMode] = useState({ month: currentMonth, day: 0 }); // Main statistic you see, tracks when user switches to a specific day, 0 = whole month
   const currentMonthStats = userStats?.statistics?.monthlyStats[lineMode.month];
   const [parlay, setParlay] = useState<CurrentBet[]>([]); // BetBuilder parlay mode items
@@ -298,36 +302,23 @@ export default function Statistics(): React.ReactNode {
     if (Array.isArray(data)) {
       // If bet is a parlay bet
       data.forEach((bet) => {
-        if (Array.isArray(bet)) {
-          const status = bet[0]?.status;
-          const stake = bet[0]?.stake;
-          const totalOdds = bet[0]?.totalOdds;
+  // 1. Odredi status i vrednosti bez obzira na tip opklade
+  const status = bet?.status?.toLowerCase();
+  const stake = Number(bet?.stake || 0);
+  const odds = Number(bet?.odds || 1);
 
-          if (status === "win") {
-            winCount += 1;
-            profit += Number(((stake * totalOdds - stake) * 100) / 100);
-          } else if (status === "loss") {
-            lossCount += 1;
-            profit -= stake;
-          } else {
-            totalActives += 1; // Active bet
-          }
-        } else {
-          const status = bet?.status;
-          const stake = bet?.stake;
-          const odds = bet?.odds;
-
-          if (status === "win") {
-            winCount += 1;
-            profit += Number(((stake * odds - stake) * 100) / 100);
-          } else if (status === "loss") {
-            lossCount += 1;
-            profit -= stake;
-          } else {
-            totalActives += 1; // Active bet
-          }
-        }
-      });
+  // 2. Provera statusa
+  if (status === "win" || status === "won") {
+    winCount += 1;
+    profit += (stake * odds - stake);
+  } else if (status === "loss" || status === "lost") {
+    lossCount += 1;
+    profit -= stake;
+  } else {
+    // Ako nije win ili loss, onda je active
+    totalActives += 1;
+  }
+});
     }
 
     const totalBets = winCount + lossCount;
@@ -749,32 +740,54 @@ const getBets = useCallback(
       });
     }
   };
-  useEffect(() => {
-    document.title = "InsajderTips | Statistike";
+useEffect(() => {
+  document.title = "InsajderTips | Statistike";
 
-    if (!currentUser.username || !JWT) {
-      setError({
-        message: "Doslo je do greske. Molimo da se ulogujete ponovo.",
-      });
-      return;
-    }
-    const { username } = currentUser;
-    // Fetch statistics
-    fetch("/statistics/" + username, {
-      headers: { Authorization: "Bearer " + JWT },
-    }).then((res) => {
-      if (!res.ok) {
-        setLoading(false);
-        return;
+  const activeToken = localStorage.getItem("insajder_token");
+  
+  // 1. If token is missing, log off immediately
+  if (!activeToken) {
+    console.warn("LOG: No token found. Logging off...");
+   dispatch(logout());
+    nav("/");
+    return;
+  }
+
+  // 2. If user object isn't ready yet, just wait (don't log off yet)
+  if (!currentUser?.username) {
+    return;
+  }
+
+  setLoading(true);
+
+  fetch("/statistics/" + currentUser.username, {
+    headers: { 
+      "Authorization": `Bearer ${activeToken}`,
+      "Content-Type": "application/json"
+    },
+  })
+    .then((res) => {
+      if (res.status === 401) {
+        // 3. If server rejects the token, log off
+
+        throw new Error("Unauthorized");
       }
-      res.json().then((json) => {
-        setUserStats(json);
-
-        setLoading(false);
-      });
+      if (!res.ok) throw new Error("Server Error");
+      return res.json();
+    })
+    .then((json) => {
+      setUserStats(json);
+      setError(null);
+    })
+    .catch((err) => {
+      if (err.message !== "Unauthorized") {
+        setError({ message: "Greška pri učitavanju." });
+      }
+    })
+    .finally(() => {
+      setLoading(false);
     });
-  }, []);
-
+}, [currentUser?.username]); // Added activeToken here
   if (loading) {
     return (
       <div className="h-full w-full justify-center items-center flex text-center">
@@ -787,47 +800,54 @@ const getBets = useCallback(
     <div className="h-full w-full flex justify-center items-center">
       <div className="h-full w-[100%]  flex ml-auto md:mx-auto">
         <div className="my-2 w-full flex flex-col  ">
-          {!userStats?.statistics?.initialInvestment ? (
-            <div className="h-full w-full flex flex-col justify-center items-center p-6">
-              <div className="bg-gradient-to-br from-[#1e293b] to-[#0f172a] shadow-2xl border border-gray-700 rounded-2xl p-8 max-w-lg text-center">
-                <h2 className="text-xl font-bold text-white mb-4">
-                  Početni kapital nije postavljen
-                </h2>
-                <p className="text-gray-300 text-sm mb-6 leading-relaxed">
-                  Da biste pravilno pratili svoju investiciju i ostvareni
-                  profit, potrebno je da unesete svoj početni kapital.
-                </p>
+          {!userStats ? (
+  /* 1. Loading State: Prevents the "Missing Capital" screen from flashing on refresh */
+  <div className="h-96 w-full flex items-center justify-center">
+    <div className="w-8 h-8 border-2 border-cyan-500/20 border-t-cyan-500 rounded-full animate-spin" />
+  </div>
+) : !userStats?.statistics?.initialInvestment ? (
+  /* 2. Actual Missing Capital State */
+  <div className="h-full w-full flex flex-col justify-center items-center p-6 animate-in fade-in duration-500">
+    <div className="bg-slate-900/60 backdrop-blur-xl shadow-2xl border border-white/5 rounded-[2rem] p-8 max-w-lg text-center">
+      <h2 className="text-xl font-black text-white mb-2 uppercase italic tracking-tighter">
+        Početni kapital nije postavljen
+      </h2>
+      <p className="text-slate-400 text-xs font-bold uppercase tracking-widest mb-6 leading-relaxed">
+        Unesite iznos da biste aktivirali praćenje profita i statistike.
+      </p>
 
-                <div className="w-full">
-                  <input
-                    type="number"
-                    onChange={(e) => updateCapital(Number(e.target.value))}
-                    placeholder={`Unesite kapital (${defaultCurrency?.toUpperCase()})`}
-                    className="w-full border border-gray-600 bg-gray-800 text-white text-center text-lg p-3 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#4f46e5] transition"
-                  />
-                  {bankCapital && bankCapital > 0 && (
-                    <button
-                      onClick={() => updateInitialCapital()}
-                      className="w-full bg-[#4f46e5] hover:bg-[#4338ca] text-white font-semibold mt-4 rounded-lg py-3 transition-all"
-                    >
-                      Sačuvaj kapital
-                    </button>
-                  )}
-                  {error && (
-                    <p
-                      className={`mt-4 text-sm p-3 rounded-lg ${
-                        error.message.startsWith("Vas")
-                          ? "bg-[#10b981] text-white"
-                          : "bg-[#ef4444] text-white"
-                      }`}
-                    >
-                      {error.message}
-                    </p>
-                  )}
-                </div>
-              </div>
-            </div>
-          ) : (
+      <div className="w-full space-y-3">
+        <input
+          type="number"
+          onChange={(e) => updateCapital(Number(e.target.value))}
+          placeholder={`Unesite kapital (${defaultCurrency?.toUpperCase()})`}
+          className="w-full border border-white/5 bg-slate-950/50 text-white text-center text-lg font-mono p-4 rounded-xl focus:outline-none focus:ring-2 focus:ring-cyan-500 transition-all placeholder:text-slate-700"
+        />
+        
+        {bankCapital && bankCapital > 0 && (
+          <button
+            onClick={() => updateInitialCapital()}
+            className="w-full bg-white text-black font-black uppercase text-xs py-4 rounded-xl hover:bg-cyan-400 transition-all shadow-[0_0_20px_rgba(255,255,255,0.1)]"
+          >
+            Sačuvaj kapital
+          </button>
+        )}
+
+        {error && (
+          <div
+            className={`mt-4 text-[10px] font-black uppercase tracking-widest p-3 rounded-lg ${
+              error.message.startsWith("Vas")
+                ? "bg-emerald-500/10 text-emerald-400 border border-emerald-500/20"
+                : "bg-rose-500/10 text-rose-400 border border-rose-500/20"
+            }`}
+          >
+            {error.message}
+          </div>
+        )}
+      </div>
+    </div>
+  </div>
+)  : (
             <>
               <div className="w-full bg-gradient-to-r from-indigo-900/20 to-purple-900/20 border-2 border-indigo-900/30 shadow-2xl shadow-indigo-900/20 rounded-t-lg">
                 <div className="w-full bg-gradient-to-r from-indigo-900/20 to-purple-900/20 border-2 border-indigo-900/30 shadow-2xl shadow-indigo-900/20 rounded-t-lg relative">
@@ -1181,242 +1201,200 @@ const getBets = useCallback(
           )}
         </div>
 
-        {betBuilder.visible && (
-      <div className="z-50 fixed inset-0 flex items-center justify-center p-4 backdrop-blur-md bg-black/40">
-  <div className="w-full max-w-2xl transform transition-all animate-in fade-in zoom-in duration-300">
-    {/* Decorative outer glow wrap */}
-    <div className="relative p-[1px] rounded-3xl bg-gradient-to-b from-white/20 via-transparent to-white/5 shadow-2xl">
-      <div className="bg-[#0f172a]/95 backdrop-blur-2xl rounded-[23px] border border-white/10 overflow-hidden relative shadow-inner">
+      {betBuilder.visible && (
+  <div className="z-[100] fixed inset-0 flex items-center justify-center p-4 backdrop-blur-md bg-black/60 transition-all duration-300">
+    <div className="w-full max-w-xl transform transition-all animate-in fade-in zoom-in duration-300">
+      <div className="relative overflow-hidden rounded-[32px] border border-white/10 bg-slate-950 shadow-2xl">
         
-        {/* Subtle background flare */}
-        <div className="absolute -top-24 -left-24 w-48 h-48 bg-cyan-500/20 blur-[100px] pointer-events-none"></div>
-        <div className="absolute -bottom-24 -right-24 w-48 h-48 bg-purple-500/20 blur-[100px] pointer-events-none"></div>
+        {/* Animated Background Accents */}
+        <div className="absolute -top-24 -left-24 w-64 h-64 bg-cyan-500/10 blur-[100px] animate-pulse"></div>
+        <div className="absolute -bottom-24 -right-24 w-64 h-64 bg-purple-500/10 blur-[100px] animate-pulse"></div>
 
-        {/* Header */}
-        <div className="px-8 pt-8 pb-4 relative">
-          <div className="flex items-center justify-between">
+        <div className="relative p-8">
+          {/* Header */}
+          <div className="flex items-center justify-between mb-8">
             <div>
-              <h2 className="text-3xl font-extrabold tracking-tight text-white italic">
-                KREIRAJ <span className="text-cyan-400 not-italic">OPKLADU</span>
+              <h2 className="text-2xl font-black tracking-tight text-white uppercase italic">
+                Novi <span className="text-cyan-400 not-italic">Tiket</span>
               </h2>
+              <p className="text-xs font-bold text-slate-500 uppercase tracking-widest mt-1">Popunite detalje opklade</p>
             </div>
-            <div className="h-12 w-12 rounded-2xl bg-gradient-to-br from-gray-800 to-gray-900 border border-white/10 flex items-center justify-center shadow-lg">
-              <div className="w-2 h-2 rounded-full bg-cyan-500 animate-pulse"></div>
-            </div>
+            <button 
+              onClick={() => {
+                setCurrentBet(null);
+                setBetBuilder((prev) => ({ ...prev, visible: false }));
+                setParlay([]);
+              }}
+              className="h-10 w-10 rounded-xl bg-slate-900 border border-white/5 flex items-center justify-center text-slate-400 hover:text-white transition-colors"
+            >
+              <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" /></svg>
+            </button>
           </div>
-        </div>
 
-        {/* Mode Selector - Modern Segmented Control */}
-        <div className="px-8 mb-8">
-          <div className="bg-black/40 p-1.5 rounded-2xl flex gap-1 border border-white/5">
+          {/* Mode Switcher */}
+          <div className="flex p-1 bg-slate-900 rounded-2xl border border-white/5 mb-8">
             <button
               onClick={() => betBuilder.mode !== "single" && setBetBuilder((prev) => ({ ...prev, mode: "single" }))}
-              className={`flex-1 py-3 rounded-xl font-bold text-sm transition-all duration-500 ${
-                betBuilder.mode === "single"
-                  ? "bg-gradient-to-r from-cyan-500 to-blue-600 text-white shadow-[0_0_20px_rgba(6,182,212,0.4)]"
-                  : "text-gray-500 hover:text-gray-300 hover:bg-white/5"
+              className={`flex-1 py-3 rounded-xl text-xs font-bold transition-all duration-300 ${
+                betBuilder.mode === "single" ? "bg-white text-black shadow-lg" : "text-slate-500 hover:text-slate-300"
               }`}
             >
               SINGL
             </button>
             <button
               onClick={() => betBuilder.mode !== "parlay" && setBetBuilder((prev) => ({ ...prev, mode: "parlay" }))}
-              className={`flex-1 py-3 rounded-xl font-bold text-sm transition-all duration-500 ${
-                betBuilder.mode === "parlay"
-                  ? "bg-gradient-to-r from-purple-500 to-indigo-600 text-white shadow-[0_0_20px_rgba(168,85,247,0.4)]"
-                  : "text-gray-500 hover:text-gray-300 hover:bg-white/5"
+              className={`flex-1 py-3 rounded-xl text-xs font-bold transition-all duration-300 ${
+                betBuilder.mode === "parlay" ? "bg-white text-black shadow-lg" : "text-slate-500 hover:text-slate-300"
               }`}
             >
               SISTEM
             </button>
           </div>
-        </div>
 
-        {/* Main Form Body */}
-        <div className="px-8 pb-8 space-y-6">
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            {/* Match Input */}
-            <div className="group space-y-2">
-              <label className="text-[10px] font-bold text-gray-500 uppercase tracking-wider ml-1">Naziv utakmice</label>
-              <div className="relative">
+          {/* Form Inputs */}
+          <div className="space-y-5">
+            <div className="grid grid-cols-2 gap-4">
+              <div className="col-span-2 space-y-2">
+                <label className="text-[10px] font-bold text-slate-500 uppercase tracking-widest ml-1">Utakmica</label>
                 <input
                   onChange={(e) => setCurrentBet((prev) => ({ ...prev, match: e.target.value }))}
                   type="text"
-                  className="w-full bg-white/5 border border-white/10 focus:border-cyan-500/50 text-white rounded-xl p-4 focus:outline-none focus:ring-4 focus:ring-cyan-500/10 transition-all placeholder:text-gray-600"
                   placeholder="npr. Real Madrid - Barcelona"
+                  className="w-full bg-slate-900/50 border border-white/5 focus:border-cyan-500/50 text-white rounded-2xl p-4 outline-none transition-all placeholder:text-slate-700 focus:ring-1 focus:ring-cyan-500/20"
+                />
+              </div>
+
+              <div className="space-y-2">
+                <label className="text-[10px] font-bold text-slate-500 uppercase tracking-widest ml-1">Tip</label>
+                <input
+                  onChange={(e) => setCurrentBet((prev) => ({ ...prev, tip: e.target.value }))}
+                  type="text"
+                  placeholder="GG3+"
+                  className="w-full bg-slate-900/50 border border-white/5 focus:border-cyan-500/50 text-white rounded-2xl p-4 outline-none transition-all"
+                />
+              </div>
+
+              <div className="space-y-2">
+                <label className="text-[10px] font-bold text-slate-500 uppercase tracking-widest ml-1">Kvota</label>
+                <input
+                  onChange={(e) => setCurrentBet((prev) => ({ ...prev, odds: e.target.value }))}
+                  type="number"
+                  placeholder="1.85"
+                  className="w-full bg-slate-900/50 border border-white/5 focus:border-cyan-500/50 text-cyan-400 font-mono text-lg rounded-2xl p-4 outline-none transition-all"
                 />
               </div>
             </div>
 
-            {/* Tip Input */}
-            <div className="group space-y-2">
-              <label className="text-[10px] font-bold text-gray-500 uppercase tracking-wider ml-1">TIP</label>
-              <input
-                onChange={(e) => setCurrentBet((prev) => ({ ...prev, tip: e.target.value }))}
-                type="text"
-                className="w-full bg-white/5 border border-white/10 focus:border-cyan-500/50 text-white rounded-xl p-4 focus:outline-none focus:ring-4 focus:ring-cyan-500/10 transition-all placeholder:text-gray-600"
-                placeholder="npr. GG3+"
-              />
-            </div>
-
-            {/* Odds Input */}
-            <div className="group space-y-2">
-              <label className="text-[10px] font-bold text-gray-500 uppercase tracking-wider ml-1">Kvota</label>
-              <input
-                type="number"
-                onChange={(e) => setCurrentBet((prev) => ({ ...prev, odds: e.target.value }))}
-                className="w-full bg-white/5 border border-white/10 focus:border-cyan-500/50 text-cyan-400 font-mono text-lg rounded-xl p-4 focus:outline-none focus:ring-4 focus:ring-cyan-500/10 transition-all"
-                step="0.01"
-                placeholder="1.85"
-              />
-            </div>
-
-            {/* Stake Input (Single) */}
+            {/* Status & Stake for Single */}
             {betBuilder.mode === "single" && (
-              <div className="group space-y-2">
-                <label className="text-[10px] font-bold text-gray-500 uppercase tracking-wider ml-1">Ulog ({currentUser.defaultCurrency})</label>
-                <input
-                  type="number"
-                  onChange={(e) => setCurrentBet((prev) => ({ ...prev, stake: e.target.value }))}
-                  className="w-full bg-white/5 border border-white/10 focus:border-emerald-500/50 text-emerald-400 font-mono text-lg rounded-xl p-4 focus:outline-none focus:ring-4 focus:ring-emerald-500/10 transition-all"
-                  placeholder="100"
-                />
+              <div className="animate-in fade-in slide-in-from-top-2 duration-300 space-y-5">
+                <div className="space-y-2">
+                  <label className="text-[10px] font-bold text-slate-500 uppercase tracking-widest ml-1">Ulog ({currentUser.defaultCurrency || ""})</label>
+                  <input
+                    onChange={(e) => setCurrentBet((prev) => ({ ...prev, stake: e.target.value }))}
+                    type="number"
+                    placeholder="100"
+                    className="w-full bg-slate-900/50 border border-white/5 focus:border-emerald-500/50 text-emerald-400 font-mono text-lg rounded-2xl p-4 outline-none transition-all"
+                  />
+                </div>
+                
+                <div className="p-4 bg-slate-900/40 rounded-2xl border border-white/5 flex items-center justify-between">
+                  <span className="text-[10px] font-bold text-slate-500 uppercase tracking-widest">Status:</span>
+            <div className="flex gap-2">
+  {[
+    { label: 'aktivan', value: 'active' },
+    { label: 'prolazan', value: 'win' },
+    { label: 'gubitan', value: 'loss' }
+  ].map((s) => (
+    <button
+      key={s.value}
+      type="button" // Uvek dodaj type="button" unutar formi
+      onClick={() => setCurrentBet(prev => ({ ...prev, status: s.value }))}
+      className={`px-4 py-2 rounded-xl text-[10px] font-black uppercase transition-all border ${
+        currentBet?.status === s.value 
+        ? "bg-white text-black border-white shadow-lg scale-105" 
+        : "bg-slate-900 text-slate-500 border-white/5"
+      }`}
+    >
+      {s.label}
+    </button>
+  ))}
+</div>
+                </div>
+              </div>
+            )}
+
+            {/* Parlay List */}
+            {betBuilder.mode === "parlay" && (
+              <div className="animate-in fade-in slide-in-from-top-2 duration-300 space-y-4">
+                {parlay?.length > 0 && (
+                  <div className="bg-slate-900/40 rounded-2xl border border-white/5 overflow-hidden">
+                    <div className="max-h-40 overflow-y-auto p-2 space-y-1 scrollbar-hide">
+                      {parlay.map((item, idx) => (
+                        <div key={idx} className="flex items-center justify-between p-3 bg-slate-900 rounded-xl border border-white/5">
+                          <div>
+                            <p className="text-xs font-bold text-white">{item.match}</p>
+                            <p className="text-[10px] text-slate-500 uppercase font-bold">{item.tip}</p>
+                          </div>
+                          <div className="flex items-center gap-3">
+                            <span className="text-sm font-mono font-bold text-cyan-400">{item.odds}</span>
+                            <button onClick={() => removeParlayItem(idx)} className="text-slate-600 hover:text-red-400"><svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" /></svg></button>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                    <div className="p-4 bg-white/5 border-t border-white/5 flex justify-between items-center">
+                      <span className="text-[10px] font-black text-slate-500 uppercase">Ukupna Kvota</span>
+                      <span className="text-xl font-mono font-black text-white">{parlay.reduce((acc, i) => acc * i.odds, 1).toFixed(2)}</span>
+                    </div>
+                  </div>
+                )}
+                <div className="space-y-2">
+                  <label className="text-[10px] font-bold text-slate-500 uppercase tracking-widest ml-1">Ukupan Ulog (€)</label>
+                  <input
+                    onChange={(e) => setCurrentBet((prev) => ({ ...prev, stake: e.target.value }))}
+                    type="number"
+                    placeholder="Unesite ulog"
+                    className="w-full bg-slate-900/50 border border-white/5 focus:border-purple-500/50 text-purple-400 font-mono text-lg rounded-2xl p-4 outline-none transition-all"
+                  />
+                </div>
               </div>
             )}
           </div>
 
-          {/* Status Chips (Single Only) */}
-          {betBuilder.mode === "single" && (
-            <div className="flex items-center gap-4 bg-black/20 p-4 rounded-2xl border border-white/5">
-              <span className="text-[10px] font-bold text-gray-500 uppercase">Status:</span>
-              <div className="flex gap-2">
-                {[
-                  { id: "active", label: "Aktivan", color: "cyan" },
-                  { id: "win", label: "Dobitan", color: "emerald" },
-                  { id: "loss", label: "Gubitan", color: "red" },
-                ].map((s) => (
-                  <button
-                    key={s.id}
-                    onClick={() => setCurrentBet((prev) => ({ ...prev, status: s.id }))}
-                    className={`px-4 py-2 rounded-lg text-xs font-bold transition-all border ${
-                      currentBet?.status === s.id
-                        ? `bg-${s.color}-500/20 border-${s.color}-500 text-${s.color}-400 shadow-[0_0_15px_rgba(0,0,0,0.2)]`
-                        : "bg-transparent border-white/10 text-gray-500 hover:border-white/20"
-                    }`}
-                  >
-                    {s.label}
-                  </button>
-                ))}
-              </div>
-            </div>
-          )}
-
-          {/* Parlay Table Section */}
-          {betBuilder.mode === "parlay" && parlay?.length > 0 && (
-            <div className="animate-in slide-in-from-bottom-4 duration-500">
-              <div className="bg-black/30 rounded-2xl border border-white/10 overflow-hidden">
-                <table className="w-full text-left">
-                  <thead className="bg-white/5 text-[10px] font-bold text-gray-500 uppercase tracking-widest">
-                    <tr>
-                      <th className="px-4 py-3">Događaj</th>
-                      <th className="px-4 py-3 text-right">Kvota</th>
-                      <th className="px-4 py-3 w-10"></th>
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y divide-white/5">
-                    {parlay.map((bet, index) => (
-                      <tr key={index} className="group hover:bg-white/5 transition-colors">
-                        <td className="px-4 py-3">
-                          <p className="text-sm font-medium text-white">{bet.match}</p>
-                          <p className="text-xs text-gray-500">{bet.tip}</p>
-                        </td>
-                        <td className="px-4 py-3 text-right font-mono text-cyan-400 font-bold">{bet.odds}</td>
-                        <td className="px-4 py-3">
-                          <button onClick={() => removeParlayItem(index)} className="text-gray-600 hover:text-red-400 transition-colors">
-                            <XMarkIcon className="w-4 h-4" />
-                          </button>
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-                {/* Parlay Summary Card */}
-                <div className="p-4 bg-gradient-to-r from-purple-500/10 to-blue-500/10 flex justify-between items-center border-t border-white/10">
-                  <div>
-                    <p className="text-[10px] font-bold text-gray-400 uppercase">Ukupna Kvota</p>
-                    <p className="text-2xl font-black text-white tracking-tighter">
-                      {parlay.reduce((total, el) => total * el.odds, 1).toFixed(2)}
-                    </p>
-                  </div>
-                  <div className="text-right">
-                    <p className="text-[10px] font-bold text-gray-400 uppercase">Status Listića</p>
-                    <select
-                      onChange={(e) => setParlayStatus(e.target.value)}
-                      className="bg-transparent text-cyan-400 font-bold text-sm focus:outline-none cursor-pointer"
-                    >
-                      <option value="active">Aktivan</option>
-                      <option value="win">Dobitan</option>
-                      <option value="loss">Gubitan</option>
-                    </select>
-                  </div>
-                </div>
-              </div>
-              <div className="mt-4">
-                <label className="text-[10px] font-bold text-gray-500 uppercase tracking-wider ml-1">Ukupan Ulog (€)</label>
-                <input
-                  type="number"
-                  onChange={(e) => setCurrentBet((prev) => ({ ...prev, stake: e.target.value }))}
-                  className="w-full mt-1 bg-white/5 border border-white/10 focus:border-purple-500/50 text-white rounded-xl p-4 focus:outline-none transition-all"
-                  placeholder="Unesite ulog za ceo sistem"
-                />
-              </div>
-            </div>
-          )}
-
-          {/* Action Footer */}
-          <div className="flex flex-col sm:flex-row gap-3 pt-4">
+          {/* Footer Actions */}
+          <div className="mt-8 flex gap-3">
             {betBuilder.mode === "single" ? (
-              <button
+              <button 
                 onClick={saveCurrentBet}
-                className="flex-[2] py-4 bg-white text-black rounded-2xl font-black uppercase tracking-widest text-sm hover:bg-cyan-400 transition-all shadow-[0_10px_20px_rgba(255,255,255,0.1)] active:scale-[0.98]"
+                className="flex-1 py-4 bg-cyan-500 hover:bg-cyan-400 text-black font-black text-xs uppercase tracking-widest rounded-2xl transition-all shadow-lg shadow-cyan-500/20 active:scale-95"
               >
-                SAČUVAJ OPKLADU
+                Sačuvaj Tiket
               </button>
             ) : (
               <>
-                <button
+                <button 
                   onClick={() => addToParlay()}
-                  className="flex-1 py-4 bg-white/10 text-white border border-white/10 rounded-2xl font-bold uppercase tracking-widest text-xs hover:bg-white/20 transition-all active:scale-[0.98]"
+                  className="flex-1 py-4 bg-slate-900 hover:bg-slate-800 text-white border border-white/10 font-black text-xs uppercase tracking-widest rounded-2xl transition-all active:scale-95"
                 >
-                  DODAJ PAR
+                  Dodaj Par
                 </button>
                 {parlay?.length > 0 && (
-                  <button
+                  <button 
                     onClick={saveCurrentBet}
-                    className="flex-1 py-4 bg-gradient-to-r from-purple-600 to-blue-600 text-white rounded-2xl font-black uppercase tracking-widest text-xs shadow-lg shadow-purple-500/20 active:scale-[0.98]"
+                    className="flex-1 py-4 bg-purple-500 hover:bg-purple-400 text-white font-black text-xs uppercase tracking-widest rounded-2xl transition-all shadow-lg shadow-purple-500/20 active:scale-95"
                   >
-                    FINALIŠI SISTEM
+                    Završi Sistem
                   </button>
                 )}
               </>
             )}
-            <button
-              onClick={() => {
-                setCurrentBet(null);
-                setBetBuilder((prev) => ({ ...prev, visible: false, status: null }));
-                setParlar([]);
-              }}
-              className="flex-1 py-4 bg-transparent text-gray-500 rounded-2xl font-bold uppercase tracking-widest text-xs hover:text-white transition-all"
-            >
-              ODUSTANI
-            </button>
           </div>
         </div>
       </div>
     </div>
   </div>
-</div>
-        )}
+)}
       </div>
     </div>
   );

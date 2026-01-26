@@ -103,7 +103,7 @@ const UserSchema = new mongoose.Schema(
   { timestamps: true }
 );
 const oddsLimiter = rateLimit({
-  windowMs: 3000, // 3 seconds
+  windowMs: 1000, // 3 seconds
   max: 1
 });
 const TipSchema = new mongoose.Schema({
@@ -186,13 +186,24 @@ const paymentLimiter = rateLimit({
   legacyHeaders: false,
 });
 const verifyToken = (req, res, next) => {
-  // middleware to verify jwt token
-  const token = req.header("Authorization").replace("Bearer ", "");
+  const authHeader = req.header("Authorization");
+
+  // 1. Check if the header exists at all
+  if (!authHeader || !authHeader.startsWith("Bearer ")) {
+    return res
+      .status(401)
+      .json({ message: "Doslo je do greske. Probajte se ponovo ulogovati." });
+  }
+
+  // 2. Safely strip the Bearer prefix
+  const token = authHeader.replace("Bearer ", "");
+
   if (!token) {
     return res
       .status(401)
       .json({ message: "Doslo je do greske. Probajte se ponovo ulogovati." });
   }
+
   try {
     const decoded = jwt.verify(token, JWT_SECRET);
     req.user = decoded;
@@ -261,7 +272,7 @@ app.post("/login", async (req, res) => {
 
     // --- "Remember Me" Logic ---
     // Set the token's lifetime based on the flag
-    const expiresIn = rememberMe ? "30d" : "1h";
+    const expiresIn = rememberMe ? "7d" : "24h";
 
     const payload = { userId: user._id, email: user.email, tier: user.tier };
 
@@ -719,25 +730,73 @@ app.put("/removeBet", verifyToken, async (req, res) => {
     const user = await User.findById(userId);
     if (!user) return res.status(404).json({ message: "User not found." });
 
-    // Loop over all months
+    let betToRemove = null;
+    let foundMonth = null;
+
     if (user.statistics?.monthlyStats) {
       for (const month of user.statistics.monthlyStats) {
         if (!month.bets) continue;
 
-        // Loop over all days
         for (let dayIndex = 0; dayIndex < month.bets.length; dayIndex++) {
           const dayBets = month.bets[dayIndex];
           if (!dayBets || !dayBets.length) continue;
 
-          // Filter out the bet / parlay
-          month.bets[dayIndex] = dayBets.filter((b) =>
-            isParlay ? b[0]?.parlayId !== betId : b?.betId !== betId
+          const target = dayBets.find((b) =>
+            isParlay ? b[0]?.parlayId === betId : b?.betId === betId
           );
+
+          if (target) {
+            betToRemove = target;
+            foundMonth = month;
+            // Remove it from the array
+            month.bets[dayIndex] = dayBets.filter((b) =>
+              isParlay ? b[0]?.parlayId !== betId : b?.betId !== betId
+            );
+            break;
+          }
         }
+        if (betToRemove) break;
       }
     }
 
-    await user.save(); // persist changes to DB
+    if (betToRemove) {
+      const stats = user.statistics;
+      const betsToProcess = isParlay ? betToRemove : [betToRemove];
+
+      betsToProcess.forEach((b) => {
+        const stake = Number(b.stake) || 0;
+        const odds = Number(b.odds) || 0;
+        const profit = stake * (odds - 1);
+
+        stats.totalBets -= 1;
+
+        if (b.status === "active") {
+          stats.initialInvestment -= -stake; // Reversing the negative
+        } else if (b.status === "win") {
+          stats.totalWins -= 1;
+          stats.initialInvestment -= profit;
+          if (foundMonth) foundMonth.monthlyProfit -= profit;
+        } else if (b.status === "loss") {
+          stats.totalLosses -= 1;
+          stats.initialInvestment -= -stake;
+          if (foundMonth) foundMonth.monthlyProfit -= -stake;
+        }
+
+        if (foundMonth) {
+          foundMonth.totalBets -= 1;
+          foundMonth.totalWins -= b.status === "win" ? 1 : 0;
+          foundMonth.totalLosses -= b.status === "loss" ? 1 : 0;
+        }
+      });
+
+      // Recalculate derived stats
+      stats.winRate = stats.totalBets > 0 ? stats.totalWins / stats.totalBets : 0;
+      stats.averageReturnOnInvestment = stats.totalBets > 0 ? stats.initialInvestment / stats.totalBets : 0;
+
+      // Force Mongoose to recognize the nested update
+      user.markModified("statistics");
+      await user.save();
+    }
 
     return res.status(200).json({ message: "Bet removed successfully." });
   } catch (err) {
@@ -1212,6 +1271,7 @@ app.post("/oddsChecker/getOdds/", oddsLimiter, async (req, res) => {
 
 
 
+
     if (oktagonJson.esMatches) {
       const filteredGames = oktagonJson.esMatches.filter(
         (game) => game.kickOffTime === date
@@ -1665,7 +1725,6 @@ if (currentOdds && sport === "S") {
         return res.status(404).json({ error: "Nije pronadjen mec." });
       }
 
-     
      const result = await fetch(`https://www.mozzartbet.com/betting/match/${filteredGames[0].id}`, {
   method: "POST",
   headers: {

@@ -2,7 +2,7 @@ import { useSelector } from "react-redux";
 import { RootState } from "../../redux/store";
 import { useNavigate, useLocation } from "react-router";
 import footballerImg from "../../assets/footballer.png"; // ✅ IMPORT IMAGE PROPERLY
-import statisticsPicture from "../../assets/stats3.png"; // ✅ IMPORT IMAGE PROPERLY
+import statisticsPicture from "../../assets/stats.png"; // ✅ IMPORT IMAGE PROPERLY
 
 const PREMIUM_FEATURES = {
   stats: {

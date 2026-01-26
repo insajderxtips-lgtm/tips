@@ -1,6 +1,6 @@
-import React, { useState, useEffect, useRef } from "react";
+import React, { useState, useEffect, useRef, useMemo } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { ChevronDown, ShieldCheck, Star, Zap, AlertTriangle, Loader2, Trophy, Users, SearchX } from "lucide-react";
+import { ChevronDown, ShieldCheck, Zap, Loader2, SearchX, Crown, Check, X, Lock } from "lucide-react";
 import { useSelector } from "react-redux";
 import { RootState } from "../../redux/store";
 import PremiumFallback from "../PremiumFallback";
@@ -10,29 +10,36 @@ interface RenderTipsProps {
 }
 
 const RenderTips: React.FC<RenderTipsProps> = ({ tier }) => {
-  const currentUser = useSelector((state: RootState) => state.user);
+  const currentUserTier = useSelector((state: RootState) => state.user.tier);
   const [tips, setTips] = useState<any[]>([]);
   const [currentTab, setCurrentTab] = useState<number | null>(null);
   const [loading, setLoading] = useState(true);
   const abortControllerRef = useRef<AbortController | null>(null);
 
-  const canViewPremium = tier !== "premium" || currentUser.tier === "premium";
+  const canViewPremium = useMemo(() => {
+    return tier !== "premium" || currentUserTier === "premium";
+  }, [tier, currentUserTier]);
 
   useEffect(() => {
     if (!canViewPremium) return;
-    
-    abortControllerRef.current?.abort();
-    abortControllerRef.current = new AbortController();
-    const signal = abortControllerRef.current.signal;
 
+    abortControllerRef.current?.abort();
+    const controller = new AbortController();
+    abortControllerRef.current = controller;
+    
     const fetchTips = async () => {
       setLoading(true);
       try {
-        const res = await fetch(`/tips/${tier}`, { signal, cache: "no-store" });
-        
+        const res = await fetch(`/tips/${tier}`, { 
+          signal: controller.signal, 
+          cache: "no-store" 
+        });
+
         if (res.status === 404) {
-          setTips([]);
-          setLoading(false);
+          if (!controller.signal.aborted) {
+            setTips([]);
+            setLoading(false);
+          }
           return;
         }
 
@@ -40,35 +47,24 @@ const RenderTips: React.FC<RenderTipsProps> = ({ tier }) => {
         
         const data = await res.json();
         
-        if (Array.isArray(data)) {
-          const filtered = data.filter(tip => tip.type === tier);
-          setTips(filtered);
-        } else {
-          setTips([]);
+        if (!controller.signal.aborted) {
+          setTips(Array.isArray(data) ? data.filter(tip => tip.type === tier) : []);
         }
       } catch (err: any) {
-        if (err.name !== "AbortError") console.error("Fetch error:", err.message);
+        if (err.name !== "AbortError") {
+          console.error("Fetch error:", err.message);
+        }
       } finally {
-        setLoading(false);
+        if (!controller.signal.aborted) {
+          setLoading(false);
+        }
       }
     };
 
     fetchTips();
-    return () => abortControllerRef.current?.abort();
-  }, [tier, canViewPremium]);
 
-  const renderForm = (form: string | undefined) => {
-    if (!form) return <span className="text-[9px] text-slate-700 font-black">N/A</span>;
-    return (
-      <div className="flex gap-1 justify-center lg:justify-start">
-        {form.split("").map((char, i) => (
-          <span key={i} className={`text-[10px] font-black ${char === "W" ? "text-emerald-400" : char === "L" ? "text-red-500" : "text-slate-500"}`}>
-            {char}
-          </span>
-        ))}
-      </div>
-    );
-  };
+    return () => controller.abort();
+  }, [tier, canViewPremium]);
 
   if (!canViewPremium) return <PremiumFallback pageType="tips" />;
 
@@ -79,167 +75,166 @@ const RenderTips: React.FC<RenderTipsProps> = ({ tier }) => {
     </div>
   );
 
-  if (tips.length === 0) return (
-    <div className="w-full py-32 flex flex-col items-center justify-center text-center">
-      <SearchX className="w-12 h-12 text-slate-800 mb-4" />
-      <h3 className="text-xl font-black italic text-white uppercase tracking-tight">Trenutno nema dostupnih tipova</h3>
-    </div>
-  );
-
   return (
     <div className="w-full max-w-6xl mx-auto px-4 py-8 space-y-6 font-sans">
-      <style>{`
-        .custom-scrollbar::-webkit-scrollbar { width: 4px; }
-        .custom-scrollbar::-webkit-scrollbar-track { background: transparent; }
-        .custom-scrollbar::-webkit-scrollbar-thumb { background: rgba(6, 182, 212, 0.2); border-radius: 10px; }
-      `}</style>
+      {tips.length === 0 ? (
+        <div className="w-full py-32 flex flex-col items-center justify-center text-center">
+          <SearchX className="w-12 h-12 text-slate-800 mb-4" />
+          <h3 className="text-xl font-black italic text-white uppercase tracking-tight">Trenutno nema dostupnih tipova</h3>
+        </div>
+      ) : (
+        tips.map((tip, index) => {
+          const isOpen = currentTab === index;
+          const isPremium = tip.type === "premium";
 
-      {tips.map((tip, index) => {
-        const isOpen = currentTab === index;
-        const hasLineups = tip.lineups?.home?.length > 0 && tip.lineups?.away?.length > 0;
+          return (
+            <motion.div 
+              key={tip._id || index} 
+              layout 
+              className={`relative overflow-hidden rounded-[2.5rem] border transition-all duration-500 ${isOpen ? "bg-slate-900 border-white/10 shadow-2xl" : "bg-slate-900/40 border-white/5"}`}
+            >
+              <div className={`absolute top-0 left-1/2 -translate-x-1/2 px-6 py-1 rounded-b-2xl text-[9px] font-black uppercase tracking-[0.2em] ${isPremium ? "bg-cyan-500 text-slate-950 shadow-[0_0_15px_rgba(6,182,212,0.4)]" : "bg-slate-800 text-slate-400"}`}>
+                {isPremium ? "Premium Tip" : "FREE Tip"}
+              </div>
 
-        return (
-          <motion.div
-            key={tip._id || index}
-            layout
-            className={`relative overflow-hidden rounded-[2rem] border transition-all duration-500 ${
-              isOpen ? "bg-slate-900 border-cyan-500/30 shadow-2xl" : "bg-slate-900/40 border-white/5"
-            }`}
-          >
-            <div onClick={() => setCurrentTab(isOpen ? null : index)} className="p-6 md:p-8 cursor-pointer">
-              <div className="flex flex-col md:flex-row md:items-center justify-between gap-6">
-                <div className="flex items-center gap-5">
-                  <div className="flex -space-x-4 shrink-0">
-                    <img src={tip.homeLogo} className="w-14 h-14 md:w-16 md:h-16 object-contain rounded-2xl bg-slate-950 p-2 border border-white/5" alt="H" />
-                    <img src={tip.awayLogo} className="w-14 h-14 md:w-16 md:h-16 object-contain rounded-2xl bg-slate-950 p-2 border border-white/10 relative z-10" alt="A" />
-                  </div>
-                  <div className="min-w-0">
-                    <div className="flex items-center gap-2 mb-1">
-                      <span className="text-[9px] font-black text-cyan-500 uppercase tracking-widest truncate">{tip.league}</span>
-                      <span className="text-[9px] font-bold text-slate-500 shrink-0">{new Date(tip.date).toLocaleDateString('sr-RS')}</span>
+              <div onClick={() => setCurrentTab(isOpen ? null : index)} className="p-8 md:p-10 cursor-pointer pt-12">
+                <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-8">
+                  <div className="flex items-center gap-6">
+                    <div className="flex -space-x-4 shrink-0">
+                      <img src={tip.homeLogo} className="w-16 h-16 md:w-20 md:h-20 object-contain rounded-3xl bg-slate-950 p-3 border border-white/5 shadow-xl" alt="H" />
+                      <img src={tip.awayLogo} className="w-16 h-16 md:w-20 md:h-20 object-contain rounded-3xl bg-slate-950 p-3 border border-white/10 relative z-10 shadow-xl" alt="A" />
                     </div>
-                    <h3 className="text-xl md:text-2xl font-black italic text-white uppercase tracking-tighter leading-none truncate">
-                      {tip.home} <span className="text-cyan-500 not-italic mx-1">VS</span> {tip.away}
-                    </h3>
-                  </div>
-                </div>
-
-                <div className="flex items-center justify-between md:justify-end gap-6 shrink-0">
-                  <div className="text-left md:text-right">
-                    <p className="text-[8px] font-black text-slate-500 uppercase tracking-widest mb-1">Prognoza</p>
-                    <div className={`px-5 py-2 rounded-xl text-slate-950 ${tier === "premium" ? "bg-cyan-500" : "bg-emerald-400"}`}>
-                      <span className="text-sm md:text-lg font-black italic uppercase leading-none">{tip.tip}</span>
+                    <div>
+                      <div className="flex items-center gap-3 mb-2">
+                        <span className={`text-[10px] font-black uppercase tracking-widest ${isPremium ? "text-cyan-500" : "text-emerald-400"}`}>{tip.league}</span>
+                        <div className="w-1 h-1 rounded-full bg-slate-700" />
+                        <span className="text-[10px] font-bold text-slate-500 uppercase">{new Date(tip.date).toLocaleDateString('sr-RS')}</span>
+                      </div>
+                      <h3 className="text-2xl md:text-4xl font-black italic text-white uppercase tracking-tighter leading-none">
+                        {tip.home} <span className="text-slate-700 not-italic mx-1">vs</span> {tip.away}
+                      </h3>
                     </div>
                   </div>
-                  <div className={`p-3 rounded-2xl border transition-all ${isOpen ? 'bg-white text-slate-950' : 'bg-slate-950 text-slate-500 border-white/5'}`}>
-                    <ChevronDown className={`w-5 h-5 transition-transform duration-500 ${isOpen ? 'rotate-180' : ''}`} />
+
+                  <div className="flex items-center justify-between lg:justify-end gap-8 border-t lg:border-t-0 border-white/5 pt-6 lg:pt-0">
+                    <div className="text-left lg:text-right">
+                      <p className="text-[10px] font-black text-slate-500 uppercase tracking-widest mb-2">Prognoza</p>
+                      <div className={`px-6 py-3 rounded-2xl text-slate-950 shadow-xl ${isPremium ? "bg-cyan-500" : "bg-white"}`}>
+                        <span className="text-lg md:text-2xl font-black italic uppercase leading-none">{tip.tip}</span>
+                      </div>
+                    </div>
+                    <div className={`p-4 rounded-full transition-all ${isOpen ? 'bg-white text-slate-950 rotate-180' : 'bg-slate-800 text-slate-500 hover:bg-slate-700'}`}>
+                      <ChevronDown size={24} />
+                    </div>
                   </div>
                 </div>
               </div>
-            </div>
 
-            <AnimatePresence>
-              {isOpen && (
-                <motion.div initial={{ height: 0, opacity: 0 }} animate={{ height: "auto", opacity: 1 }} exit={{ height: 0, opacity: 0 }}>
-                  <div className="px-6 md:px-8 pb-8">
-                    <div className="pt-8 border-t border-white/5 grid grid-cols-1 lg:grid-cols-12 gap-8">
-                      
-                      <div className="lg:col-span-4 space-y-6">
-                        <div className="bg-slate-950/50 p-6 rounded-[2rem] border border-white/5">
-                          <p className="text-[10px] font-black text-slate-500 uppercase tracking-widest mb-4">Sigurnost</p>
-                          <div className="h-2 w-full bg-slate-800 rounded-full overflow-hidden mb-6">
-                            <motion.div initial={{ width: 0 }} animate={{ width: `${tip.confidencePercent}%` }} className={`h-full ${tier === "premium" ? "bg-cyan-500 shadow-[0_0_10px_#06b6d4]" : "bg-emerald-400 shadow-[0_0_10px_#34d399]"}`} />
+              <AnimatePresence>
+                {isOpen && (
+                  <motion.div initial={{ height: 0, opacity: 0 }} animate={{ height: "auto", opacity: 1 }} exit={{ height: 0, opacity: 0 }}>
+                    <div className="px-8 md:px-10 pb-10">
+                      {!isPremium ? (
+                        <div className="pt-10 border-t border-white/5 space-y-8">
+                          <div className="text-center max-w-2xl mx-auto space-y-3">
+                            <h4 className="text-xl md:text-2xl font-black text-white uppercase italic">Ovaj meč i tip je deo besplatne ponude.</h4>
+                            <p className="text-sm text-slate-400 font-medium">Premium tipovi sadrže skroz drugacije mečeve, detaljnu profesionalnu analizu, postave pre meča, formu, povrede kao i medjusobne mečeve.</p>
                           </div>
-                          <div className="space-y-3">
-                            <div className="flex justify-between items-center bg-white/5 p-3 rounded-xl">
-                              <span className="text-[10px] font-black text-white uppercase truncate max-w-[120px] font-sans">{tip.home}</span>
-                              {renderForm(tip.stats?.form)}
-                            </div>
-                            <div className="flex justify-between items-center bg-white/5 p-3 rounded-xl">
-                              <span className="text-[10px] font-black text-white uppercase truncate max-w-[120px] font-sans">{tip.away}</span>
-                              {renderForm(tip.stats?.form)}
-                            </div>
-                          </div>
-                        </div>
 
-                        <div className="bg-red-500/5 border border-red-500/10 p-6 rounded-[2rem] space-y-4">
-                          <h5 className="text-[10px] font-black text-red-500 uppercase flex items-center gap-2">
-                            <AlertTriangle size={14} /> Izostanci
-                          </h5>
-                          <div className="space-y-4">
-                            <div>
-                              <p className="text-[9px] font-black text-slate-600 uppercase mb-1 font-sans">{tip.home}</p>
-                              <p className="text-xs text-slate-300 font-medium leading-relaxed font-sans">{tip.injuries?.home?.join(", ") || "Nema podataka"}</p>
+                          <div className="grid grid-cols-1 md:grid-cols-2 gap-4 max-w-4xl mx-auto">
+                            <div className="bg-slate-950/50 p-8 rounded-[2rem] border border-white/5 flex flex-col items-center text-center">
+                              <span className="text-[10px] font-black text-slate-500 uppercase tracking-[0.3em] mb-6">Besplatan Član</span>
+                              <ul className="space-y-4 w-full text-xs font-bold">
+                                <li className="flex items-center justify-between text-slate-300">Tip meča <Check size={16} className="text-emerald-500" /></li>
+                                <li className="flex items-center justify-between text-slate-500">Detaljna analiza <X size={16} className="text-red-500" /></li>
+                                <li className="flex items-center justify-between text-slate-500">Startne postave <X size={16} className="text-red-500" /></li>
+                                <li className="flex items-center justify-between text-slate-500">Povrede i izostanci <X size={16} className="text-red-500" /></li>
+                              </ul>
                             </div>
-                            <div className="pt-3 border-t border-white/5">
-                              <p className="text-[9px] font-black text-slate-600 uppercase mb-1 font-sans">{tip.away}</p>
-                              <p className="text-xs text-slate-300 font-medium leading-relaxed font-sans">{tip.injuries?.away?.join(", ") || "Nema podataka"}</p>
+
+                            <div className="bg-cyan-500/10 p-8 rounded-[2rem] border-2 border-cyan-500/30 flex flex-col items-center text-center relative overflow-hidden">
+                              <div className="absolute top-4 right-4"><Crown size={20} className="text-cyan-500" /></div>
+                              <span className="text-[10px] font-black text-cyan-500 uppercase tracking-[0.3em] mb-6">Premium Član</span>
+                              <ul className="space-y-4 w-full mb-8 text-xs font-bold text-white">
+                                <li className="flex items-center justify-between">Mečevi <Check size={16} className="text-cyan-500" /></li>
+                                <li className="flex items-center justify-between">Analiza <Check size={16} className="text-cyan-500" /></li>
+                                <li className="flex items-center justify-between">Postave <Check size={16} className="text-cyan-500" /></li>
+                                <li className="flex items-center justify-between">Povrede <Check size={16} className="text-cyan-500" /></li>
+                              </ul>
+                              <a href="/kupi" className="w-full py-4 bg-cyan-500 text-slate-950 rounded-2xl text-[11px] font-black uppercase tracking-widest hover:scale-[1.02] transition-transform">
+                                Nadogradi Nalog (30 €)
+                              </a>
                             </div>
                           </div>
                         </div>
-                      </div>
-
-                      <div className="lg:col-span-8 space-y-6 min-w-0">
-                        <div className="relative rounded-[2rem] bg-slate-950/50 border border-white/5 overflow-hidden">
-                          <div className="p-6 md:p-8">
-                            <h4 className={`text-[10px] font-black uppercase tracking-[0.3em] mb-4 flex items-center gap-2 ${tier === "premium" ? "text-cyan-500" : "text-emerald-400"}`}>
-                              <ShieldCheck size={14} /> {tier === "premium" ? "Insajder Analiza" : "Ekspert Analiza"}
-                            </h4>
-                            <div className="max-h-[200px] overflow-y-auto custom-scrollbar pr-4">
-                              <p className="text-sm md:text-base text-slate-300 leading-relaxed font-medium italic font-sans">
-                                {tip.analysis || "Analiza se učitava..."}
-                              </p>
+                      ) : (
+                        <div className="pt-10 border-t border-white/5 grid grid-cols-1 lg:grid-cols-12 gap-10">
+                          <div className="lg:col-span-4 space-y-6">
+                            <div className="bg-slate-950/50 p-6 rounded-[2rem] border border-white/5">
+                              <p className="text-[10px] font-black text-slate-500 uppercase tracking-widest mb-4">Sigurnost</p>
+                              <div className="h-2 w-full bg-slate-800 rounded-full overflow-hidden mb-4">
+                                <motion.div initial={{ width: 0 }} animate={{ width: `${tip.confidencePercent}%` }} className="h-full bg-cyan-500" />
+                              </div>
+              
                             </div>
-                            <div className="absolute bottom-0 left-0 right-0 h-10 bg-gradient-to-t from-slate-950 to-transparent pointer-events-none" />
+                            <div className="bg-red-500/5 border border-red-500/10 p-6 rounded-[2rem]">
+                              <h5 className="text-[10px] font-black text-red-500 uppercase flex items-center gap-2 mb-4">
+                                <Lock size={14} /> Izostanci
+                              </h5>
+                              <div className="space-y-4 text-xs">
+                                <div>
+                                  <p className="font-black text-slate-600 uppercase mb-1">{tip.home}</p>
+                                  <p className="text-slate-300 font-medium">{tip.injuries?.home?.join(", ") || "Nema podataka"}</p>
+                                </div>
+                                <div className="pt-3 border-t border-white/5">
+                                  <p className="font-black text-slate-600 uppercase mb-1">{tip.away}</p>
+                                  <p className="text-slate-300 font-medium">{tip.injuries?.away?.join(", ") || "Nema podataka"}</p>
+                                </div>
+                              </div>
+                            </div>
                           </div>
-                        </div>
-
-                        <div className="p-6 md:p-8 rounded-[2rem] bg-slate-950/50 border border-white/5">
-                          <h4 className="text-[10px] font-black text-emerald-500 uppercase tracking-[0.3em] mb-6 flex items-center gap-2">
-                            <Users size={14} /> Startne Postave
-                          </h4>
-                          {hasLineups ? (
-                            <div className="grid grid-cols-2 gap-8">
+                          <div className="lg:col-span-8 space-y-8">
+                            <div className="bg-slate-950/30 p-8 rounded-[2rem] border border-white/5">
+                              <h4 className="text-[10px] font-black text-cyan-500 uppercase tracking-[0.3em] mb-4 flex items-center gap-2">
+                                <ShieldCheck size={14} /> Insajder Analiza
+                              </h4>
+                              <p className="text-base text-slate-300 leading-relaxed font-medium italic">{tip.analysis}</p>
+                              {tip.bestOdds && (
+                                <a
+                                  href={tip.bestOdds.startsWith("http") ? tip.bestOdds : `https://${tip.bestOdds}`}
+                                  target="_blank"
+                                  rel="noopener noreferrer"
+                                  className="mt-6 inline-block w-full text-center py-4 bg-emerald-500 text-slate-950 font-black uppercase rounded-2xl hover:bg-emerald-600 transition-colors shadow-lg"
+                                >
+                                  Pogledaj Najbolju Kvotu
+                                </a>
+                              )}
+                            </div>
+                            <div className="grid grid-cols-2 gap-8 bg-slate-950/50 p-8 rounded-[2rem] border border-white/5">
                               <div className="min-w-0">
-                                <p className="text-[9px] font-black text-slate-600 uppercase mb-4 border-b border-white/5 pb-2 truncate font-sans">{tip.home}</p>
+                                <p className="text-[9px] font-black text-slate-600 uppercase mb-4 border-b border-white/5 pb-2 truncate">Postava: {tip.home}</p>
                                 <ul className="space-y-2">
-                                  {tip.lineups.home.map((player: string, i: number) => (
-                                    <li key={i} className="text-[11px] md:text-xs text-slate-300 flex items-center gap-2 truncate font-sans">
-                                      <span className="w-1 h-1 shrink-0 rounded-full bg-emerald-500" /> {player}
-                                    </li>
-                                  ))}
+                                  {tip.lineups?.home?.map((p: any, i: number) => <li key={i} className="text-xs text-slate-300 flex items-center gap-2 truncate font-medium"><span className="w-1 h-1 rounded-full bg-cyan-500" /> {p}</li>)}
                                 </ul>
                               </div>
                               <div className="min-w-0">
-                                <p className="text-[9px] font-black text-slate-600 uppercase mb-4 border-b border-white/5 pb-2 truncate font-sans">{tip.away}</p>
+                                <p className="text-[9px] font-black text-slate-600 uppercase mb-4 border-b border-white/5 pb-2 truncate">Postava: {tip.away}</p>
                                 <ul className="space-y-2">
-                                  {tip.lineups.away.map((player: string, i: number) => (
-                                    <li key={i} className="text-[11px] md:text-xs text-slate-300 flex items-center gap-2 truncate font-sans">
-                                      <span className="w-1 h-1 shrink-0 rounded-full bg-emerald-500" /> {player}
-                                    </li>
-                                  ))}
+                                  {tip.lineups?.away?.map((p: any, i: number) => <li key={i} className="text-xs text-slate-300 flex items-center gap-2 truncate font-medium"><span className="w-1 h-1 rounded-full bg-cyan-500" /> {p}</li>)}
                                 </ul>
                               </div>
                             </div>
-                          ) : (
-                            <div className="flex flex-col items-center py-6 text-center">
-                              <Star className="w-6 h-6 text-slate-800 mb-3" />
-                              <p className="text-[10px] text-slate-500 font-bold uppercase tracking-widest font-sans">
-                                Postave biće u Live sekciji 60m pre meča
-                              </p>
-                            </div>
-                          )}
+                          </div>
                         </div>
-                      </div>
-
+                      )}
                     </div>
-                  </div>
-                </motion.div>
-              )}
-            </AnimatePresence>
-          </motion.div>
-        );
-      })}
+                  </motion.div>
+                )}
+              </AnimatePresence>
+            </motion.div>
+          );
+        })
+      )}
     </div>
   );
 };

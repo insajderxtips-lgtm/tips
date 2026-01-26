@@ -1,4 +1,4 @@
-import { useState, useCallback, useEffect } from "react";
+import { useState, useCallback, useEffect, useRef } from "react";
 import { useDispatch, useSelector } from "react-redux";
 import { logout, setUser } from "../../redux/slices/UserSlice";
 import { useNavigate } from "react-router";
@@ -13,66 +13,77 @@ export default function MyAccount(): React.ReactNode {
   const [isCurrencyOpen, setIsCurrencyOpen] = useState(false);
   const [selectedCurrency, setSelectedCurrency] = useState<string>("RSD");
 
-  const JWT = localStorage.getItem("insajder_token");
   const currentUser = useSelector((state: RootState) => state.user);
-  const nav = useNavigate();
   const dispatch = useDispatch();
+  const nav = useNavigate();
+  const toastTimerRef = useRef<NodeJS.Timeout | null>(null);
 
   const currencies = ["RSD", "EUR", "BAM"];
 
   useEffect(() => {
-    setSelectedCurrency(currentUser?.defaultCurrency || "RSD");
-  }, [currentUser]);
+    if (currentUser?.defaultCurrency) {
+      setSelectedCurrency(currentUser.defaultCurrency);
+    }
+  }, [currentUser?.defaultCurrency]);
 
-  const saveChanges = useCallback(() => {
+  const saveChanges = useCallback(async () => {
     setError(null);
+    const token = localStorage.getItem("insajder_token");
+    
     if (!newUsername || newUsername.length < 4 || newUsername === currentUser?.username) {
       setError("Ime mora biti duže od 3 karaktera.");
       return;
     }
 
-    fetch("/updateName", {
-      method: "PUT",
-      headers: { "Content-Type": "application/json", Authorization: "Bearer " + JWT },
-      body: JSON.stringify({ newName: newUsername, oldName: currentUser?.username }),
-    })
-      .then((res) => {
-        if (res.ok) {
-          dispatch(setUser({ ...currentUser, username: newUsername }));
-          setError("Uspešno: Korisničko ime promenjeno!");
-          setNewUsername("");
-        } else setError("Greška pri ažuriranju imena.");
-      })
-      .catch(() => setError("Greška u komunikaciji sa serverom."));
-  }, [newUsername, currentUser, dispatch, JWT]);
+    try {
+      const res = await fetch("/updateName", {
+        method: "PUT",
+        headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
+        body: JSON.stringify({ newName: newUsername, oldName: currentUser?.username }),
+      });
+
+      if (res.ok) {
+        dispatch(setUser({ ...currentUser, username: newUsername }));
+        setError("Uspešno: Korisničko ime promenjeno!");
+        setNewUsername("");
+      } else {
+        setError("Greška pri ažuriranju imena.");
+      }
+    } catch {
+      setError("Greška u komunikaciji sa serverom.");
+    }
+  }, [newUsername, currentUser, dispatch]);
 
   const saveCurrency = async (val: string) => {
+    const token = localStorage.getItem("insajder_token");
     setSelectedCurrency(val);
     setIsCurrencyOpen(false);
+    
     try {
       const res = await fetch("/api/user/currency", {
         method: "PUT",
-        headers: { "Content-Type": "application/json", Authorization: "Bearer " + JWT },
+        headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
         body: JSON.stringify({ currency: val }),
       });
       if (res.ok) {
         dispatch(setUser({ ...currentUser, defaultCurrency: val }));
         setError(`Uspešno: Valuta postavljena na ${val}`);
       }
-    } catch (err) {
+    } catch {
       setError("Neuspešno ažuriranje valute");
     }
   };
 
   const handleConfirmReset = async () => {
+    const token = localStorage.getItem("insajder_token");
     setLoadingReset(true);
     try {
       const response = await fetch("/resetStatistics", {
         method: "PUT",
-        headers: { "Content-Type": "application/json", Authorization: "Bearer " + JWT },
+        headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
       });
       if (response.ok) setError("Uspešno: Statistika resetovana!");
-    } catch (err) {
+    } catch {
       setError("Greška pri resetovanju.");
     } finally {
       setLoadingReset(false);
@@ -81,29 +92,30 @@ export default function MyAccount(): React.ReactNode {
   };
 
   useEffect(() => {
-    if (!error) return;
-    const timer = setTimeout(() => setError(null), 4000);
-    return () => clearTimeout(timer);
+    if (error) {
+      if (toastTimerRef.current) clearTimeout(toastTimerRef.current);
+      toastTimerRef.current = setTimeout(() => setError(null), 4000);
+    }
+    return () => {
+      if (toastTimerRef.current) clearTimeout(toastTimerRef.current);
+    };
   }, [error]);
 
   return (
     <div className="w-full min-h-screen flex items-center justify-center p-6 bg-[#030712] text-slate-200 selection:bg-cyan-500/30">
       <div className="w-full max-w-6xl relative">
-        {/* Animated Background Orbs */}
         <motion.div 
           animate={{ scale: [1, 1.2, 1], opacity: [0.15, 0.25, 0.15] }}
-          transition={{ duration: 10, repeat: Infinity }}
+          transition={{ duration: 10, repeat: Infinity, ease: "linear" }}
           className="absolute -top-40 -left-40 w-[500px] h-[500px] bg-cyan-600/20 rounded-full blur-[120px] pointer-events-none" 
         />
         <motion.div 
           animate={{ scale: [1.2, 1, 1.2], opacity: [0.1, 0.2, 0.1] }}
-          transition={{ duration: 12, repeat: Infinity }}
+          transition={{ duration: 12, repeat: Infinity, ease: "linear" }}
           className="absolute -bottom-40 -right-40 w-[500px] h-[500px] bg-indigo-600/20 rounded-full blur-[120px] pointer-events-none" 
         />
 
         <div className="relative grid grid-cols-1 lg:grid-cols-12 gap-8 items-start">
-          
-          {/* LEFT COLUMN: MINI PROFILE */}
           <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} className="lg:col-span-4 space-y-4">
             <div className="bg-gray-900/40 backdrop-blur-3xl border border-white/[0.08] rounded-[3rem] p-10 flex flex-col items-center shadow-[0_25px_50px_-12px_rgba(0,0,0,0.5)]">
               <div className="relative">
@@ -128,7 +140,7 @@ export default function MyAccount(): React.ReactNode {
                 </div>
                 <div className="bg-black/40 rounded-[1.5rem] p-4 border border-white/[0.05] text-center">
                   <span className="block text-[9px] font-black text-gray-600 uppercase tracking-[0.2em] mb-1">Valuta</span>
-                  <span className="text-xs font-black text-white uppercase">{currentUser?.defaultCurrency || 'RSD'}</span>
+                  <span className="text-xs font-black text-white uppercase">{selectedCurrency}</span>
                 </div>
               </div>
             </div>
@@ -139,7 +151,6 @@ export default function MyAccount(): React.ReactNode {
             </button>
           </motion.div>
 
-          {/* RIGHT COLUMN: MAIN SETTINGS */}
           <motion.div initial={{ opacity: 0, x: 20 }} animate={{ opacity: 1, x: 0 }} className="lg:col-span-8">
             <div className="bg-gray-900/40 backdrop-blur-3xl border border-white/[0.08] rounded-[3rem] shadow-2xl overflow-hidden">
               <div className="p-10 border-b border-white/[0.05] flex justify-between items-center">
@@ -153,7 +164,6 @@ export default function MyAccount(): React.ReactNode {
               </div>
 
               <div className="p-10 space-y-12">
-                {/* Username Section */}
                 <div>
                   <label className="text-[10px] font-black uppercase tracking-[0.3em] text-cyan-500 mb-5 block">Promena imena</label>
                   <div className="flex flex-col sm:flex-row gap-4">
@@ -170,7 +180,6 @@ export default function MyAccount(): React.ReactNode {
                   </div>
                 </div>
 
-                {/* PREMIUM: Custom Currency Dropdown */}
                 {currentUser?.tier !== "free" && (
                   <div>
                     <label className="text-[10px] font-black uppercase tracking-[0.3em] text-indigo-400 mb-5 block">Valuta prikaza</label>
@@ -206,7 +215,6 @@ export default function MyAccount(): React.ReactNode {
                   </div>
                 )}
 
-                {/* Danger Zone */}
                 {currentUser?.tier !== "free" && (
                   <div className="pt-8 border-t border-white/[0.05]">
                     <div className="bg-gradient-to-br from-amber-500/[0.03] to-transparent border border-amber-500/10 rounded-[2.5rem] p-8 flex flex-col sm:flex-row items-center justify-between gap-6">
@@ -226,7 +234,6 @@ export default function MyAccount(): React.ReactNode {
         </div>
       </div>
 
-      {/* Confirmation Modal */}
       <AnimatePresence>
         {showConfirmModal && (
           <div className="fixed inset-0 z-[100] flex items-center justify-center p-4">
@@ -248,7 +255,6 @@ export default function MyAccount(): React.ReactNode {
         )}
       </AnimatePresence>
 
-      {/* Toast Notification */}
       <AnimatePresence>
         {error && (
           <motion.div initial={{ y: 50, opacity: 0 }} animate={{ y: 0, opacity: 1 }} exit={{ y: 50, opacity: 0 }} className={`fixed bottom-10 left-1/2 -translate-x-1/2 z-[110] px-8 py-5 rounded-[2rem] border backdrop-blur-3xl shadow-2xl flex items-center gap-4 min-w-[350px] ${error.startsWith("Uspešno") ? "bg-cyan-500/10 border-cyan-500/20 text-cyan-400" : "bg-red-500/10 border-red-500/20 text-red-400"}`}>
