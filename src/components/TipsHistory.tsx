@@ -87,8 +87,8 @@ export default function TipsHistory() {
         </button>
 
         {expandedGroups[type] && (
-          <div className="mt-1 overflow-x-auto rounded-xl border border-white/5 bg-slate-950/20">
-            <table className="min-w-full divide-y divide-white/5">
+          <div className="mt-1 overflow-x-auto rounded-xl border border-white/5 bg-slate-950/20 max-w-full">
+            <table className="min-w-[600px] lg:min-w-full divide-y divide-white/5">
               <thead className="bg-white/5">
                 <tr>
                   {["meč", "tip", "kvota", "status", "profit", "datum"].map((h) => (

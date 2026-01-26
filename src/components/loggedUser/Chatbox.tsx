@@ -81,7 +81,7 @@ export default function Chatbox() {
   }
 
   return (
-    <div className="flex flex-col w-full max-w-3xl mx-auto h-screen p-4">
+    <div className="flex flex-col w-full max-w-full lg:max-w-3xl mx-auto h-[500px] md:h-screen p-4 overflow-x-hidden">
       <h1 className="text-3xl font-bold text-transparent bg-clip-text bg-gradient-to-r from-cyan-400 to-blue-500 mb-4">
         Dobrodosli, {userData.username}.
       </h1>

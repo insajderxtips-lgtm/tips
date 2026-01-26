@@ -14,7 +14,7 @@ export default function Homepage(): React.ReactNode {
   const nav = useNavigate();
   if (isLoggedIn) {
     return (
-      <div className="flex flex-col w-full h-full">
+      <div className="flex flex-col w-full max-w-full overflow-x-hidden">
         <Chatbox />
         <TipsHistory />
       </div>
