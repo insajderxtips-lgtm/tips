@@ -272,6 +272,8 @@ html {
 /* Optional: Smooth scrolling behavior */
 html {
   scroll-behavior: smooth;
+  background-color: #030712 !important;
+  overscroll-behavior-y: none;
 }
 
 /* Optional: Custom scrollbar for specific elements */
