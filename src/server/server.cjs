@@ -188,30 +188,31 @@ const paymentLimiter = rateLimit({
 const verifyToken = (req, res, next) => {
   const authHeader = req.header("Authorization");
 
-  // 1. Check if the header exists at all
+  // Log 1: Check if Nginx is actually passing the header
+  console.log("🛡️ Auth Header:", authHeader ? "Received" : "MISSING");
+
   if (!authHeader || !authHeader.startsWith("Bearer ")) {
-    return res
-      .status(401)
-      .json({ message: "Doslo je do greske. Probajte se ponovo ulogovati." });
+    console.error("❌ Auth Header missing or incorrectly formatted");
+    return res.status(401).json({ message: "Doslo je do greske. Probajte se ponovo ulogovati." });
   }
 
-  // 2. Safely strip the Bearer prefix
   const token = authHeader.replace("Bearer ", "");
 
-  if (!token) {
-    return res
-      .status(401)
-      .json({ message: "Doslo je do greske. Probajte se ponovo ulogovati." });
-  }
-
   try {
+    // Log 2: Check the secret being used
+    // NOTE: Don't log the whole secret for security, just the length or first 3 chars
+    console.log("🔑 Using Secret starting with:", JWT_SECRET.substring(0, 3));
+
     const decoded = jwt.verify(token, JWT_SECRET);
     req.user = decoded;
+    
+    console.log("✅ Token verified for user ID:", decoded.userId);
     next();
   } catch (err) {
-    return res
-      .status(401)
-      .json({ message: "Doslo je do greske. Probajte se ponovo ulogovati." });
+    // Log 3: Why did it fail? (Expired? Invalid signature?)
+    console.error("❌ JWT Error:", err.message);
+    
+    return res.status(401).json({ message: "Doslo je do greske. Probajte se ponovo ulogovati." });
   }
 };
 let messages = [];
@@ -573,28 +574,35 @@ app.get("/tips/:type", async (req, res) => {
 });
 
 app.get("/statistics/:user", verifyToken, async (req, res) => {
-  const { user } = req.params; // user who they tried to request statistics on
+  const { user } = req.params;
+  console.log("📩 Statistics requested for username:", user);
+  console.log("🔑 User ID from Token:", req.user?.userId);
+
   if (!user) {
-    return res
-      .status(400)
-      .json({ message: "Doslo je do greske. Molimo prijavite nasoj podrsci." });
+    return res.status(400).json({ message: "Doslo je do greske. Molimo prijavite nasoj podrsci." });
   }
 
-  const actualUserId = req.user.userId; // JWT user id
+  const actualUserId = req.user.userId;
   try {
     const actualUser = await User.findById(actualUserId);
+    console.log("👤 Found user in DB:", actualUser ? actualUser.username : "NOT FOUND");
+
     if (!actualUser) {
       return res.status(404).json({ message: "Korisnik nije pronadjen." });
     }
-    if (user !== actualUser.username) {
-      return res
-        .status(403)
-        .json({ message: "Nemate pristup ovom korisniku." });
-    }
-    const statistics = await User.findOne({ _id: actualUserId });
 
+    if (user !== actualUser.username) {
+      console.warn(`🚫 Access Denied: ${actualUser.username} tried to view ${user}`);
+      return res.status(403).json({ message: "Nemate pristup ovom korisniku." });
+    }
+
+    const statistics = await User.findOne({ _id: actualUserId });
+    console.log("✅ Statistics sent successfully");
     return res.status(200).json(statistics);
-  } catch (err) {}
+  } catch (err) {
+    console.error("❌ Database Error in /statistics:", err);
+    return res.status(500).json({ message: "Server error" });
+  }
 });
 app.put("/updateCapital", verifyToken, async (req, res) => {
   const userId = req.user.userId;

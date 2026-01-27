@@ -154,7 +154,7 @@ export default function Chatbox() {
           disabled={!currentMessage.trim()}
           className="bg-gradient-to-br from-cyan-500 to-blue-600 p-3 rounded-xl text-white font-bold shadow-lg hover:scale-105 transform transition"
         >
-          Send
+          Posalji
         </button>
       </div>
     </div>

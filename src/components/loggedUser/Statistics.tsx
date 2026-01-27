@@ -443,6 +443,7 @@ const saveCurrentBet = async () => {
   userStats.statistics.initialInvestment += investmentChange;
   userStats.statistics.monthlyStats[currentMonth].monthlyProfit +=
     monthlyProfitChange;
+    
 
   if (currentBet.status === "win") {
     userStats.statistics.monthlyStats[currentMonth].totalWins += 1;

@@ -16,7 +16,7 @@ type Bet = {
 export default function TipsHistory() {
   const [activeFilter, setActiveFilter] = useState<"all" | "fudbal" | "kosarka" | "tenis">("all");
   const [tipStats, setTipStats] = useState<Bet[]>([]);
-  const [expandedGroups, setExpandedGroups] = useState({ free: true, premium: true });
+  const [expandedGroups, setExpandedGroups] = useState({ free: false, premium: false });
   const [sortConfig, setSortConfig] = useState<{ key: keyof Bet; direction: "asc" | "desc" } | null>({
     key: "date",
     direction: "desc",
@@ -130,7 +130,7 @@ export default function TipsHistory() {
           <h1 className="text-2xl font-black text-white italic tracking-tighter uppercase">Naši rezultati</h1>
         </div>
         <div className="flex bg-slate-900/80 p-1 rounded-lg border border-white/5">
-          {["all", "fudbal", "kosarka", "tenis"].map((f) => (
+          {["sve", "fudbal", "kosarka", "tenis"].map((f) => (
             <button key={f} onClick={() => setActiveFilter(f as any)} className={`px-3 py-1 rounded-md text-[10px] font-black uppercase transition-all ${activeFilter === f ? "bg-white text-black" : "text-slate-500 hover:text-white"}`}>
               {f}
             </button>
