@@ -806,13 +806,14 @@ useEffect(() => {
   <div className="h-96 w-full flex items-center justify-center">
     <div className="w-8 h-8 border-2 border-cyan-500/20 border-t-cyan-500 rounded-full animate-spin" />
   </div>
-) : !userStats?.statistics?.initialInvestment ? (
+) : (userStats?.statistics?.initialInvestment === undefined || userStats?.statistics?.initialInvestment === null) ? (
   /* 2. Actual Missing Capital State */
   <div className="h-full w-full flex flex-col justify-center items-center p-6 animate-in fade-in duration-500">
     <div className="bg-slate-900/60 backdrop-blur-xl shadow-2xl border border-white/5 rounded-[2rem] p-8 max-w-lg text-center">
       <h2 className="text-xl font-black text-white mb-2 uppercase italic tracking-tighter">
         Početni kapital nije postavljen
       </h2>
+
       <p className="text-slate-400 text-xs font-bold uppercase tracking-widest mb-6 leading-relaxed">
         Unesite iznos da biste aktivirali praćenje profita i statistike.
       </p>
@@ -850,63 +851,37 @@ useEffect(() => {
   </div>
 )  : (
             <>
-              <div className="w-full bg-gradient-to-r from-indigo-900/20 to-purple-900/20 border-2 border-indigo-900/30 shadow-2xl shadow-indigo-900/20 rounded-t-lg">
-                <div className="w-full bg-gradient-to-r from-indigo-900/20 to-purple-900/20 border-2 border-indigo-900/30 shadow-2xl shadow-indigo-900/20 rounded-t-lg relative">
-                  <div className="container mx-auto px-4 sm:px-6 lg:px-8">
-                    <div className="flex items-center justify-center py-4">
-                      {/* Title is centered using justify-center */}
-                      <span className="raceFont text-md md:text-xl font-bold bg-gradient-to-r from-sky-400 to-indigo-500 bg-clip-text text-transparent drop-shadow-[0_2px_4px_rgba(59,130,246,0.5)]">
-                        Moje Statistike kladjenja
-                      </span>
+        
 
-                      {/* Button is ABSOLUTELY positioned to the right. 
-          It will ignore the title's centering and sit on the far right. */}
-                      {userStats?.statistics?.initialInvestment && (
-                        <button
-                          onClick={() =>
-                            !betBuilder.visible &&
-                            setBetBuilder((prev) => ({
-                              ...prev,
-                              visible: true,
-                            }))
-                          }
-                          className="group flex items-center justify-center rounded-full 
-                     bg-slate-800/70 text-white transition-all duration-300 ease-in-out 
-                     border border-sky-600 shadow-md shadow-sky-800/50 
-                     hover:scale-105 hover:bg-sky-700 hover:shadow-sky-500/80 
-                     focus:outline-none focus:ring-4 focus:ring-sky-500/50 
-                     
-                     // POSITIONING: Absolute, centered vertically, locked to the right
-                     absolute right-4 top-1/2 -translate-y-1/2 sm:right-6 lg:right-8
-                     
-                     // MOBILE STYLES: Tiny button, no text
-                     p-2 text-sm whitespace-nowrap gap-0 sm:gap-2
-                     
-                     // DESKTOP STYLES: Full button with text
-                     sm:px-4 sm:py-2 sm:text-sm sm:font-semibold"
-                        >
-                          <svg
-                            xmlns="http://www.w3.org/2000/svg"
-                            viewBox="0 0 24 24"
-                            fill="currentColor"
-                            className="h-5 w-5 sm:h-5 sm:w-5 text-sky-400 transition-transform duration-300 group-hover:text-white group-hover:rotate-45"
-                          >
-                            <path
-                              fillRule="evenodd"
-                              d="M12 2.25c-5.385 0-9.75 4.365-9.75 9.75s4.365 9.75 9.75 9.75 9.75-4.365 9.75-9.75S17.385 2.25 12 2.25zM12.75 9a.75.75 0 00-1.5 0v2.25H9a.75.75 0 000 1.5h2.25V15a.75.75 0 001.5 0v-2.25H15a.75.75 0 000-1.5h-2.25V9z"
-                              clipRule="evenodd"
-                            />
-                          </svg>
-                          {/* Hide text on mobile (default) and show it on screens larger than 'sm' */}
-                          <span className="hidden sm:inline whitespace-nowrap">
-                            Dodaj Opkladu
-                          </span>
-                        </button>
-                      )}
-                    </div>
-                  </div>
-                </div>
-              </div>
+  
+    {userStats?.statistics?.initialInvestment !== undefined && userStats?.statistics?.initialInvestment !== null && (
+  <button
+    onClick={() =>
+      !betBuilder.visible &&
+      setBetBuilder((prev) => ({
+        ...prev,
+        visible: true,
+      }))
+    }
+   className="group fixed right-4 top-4 md:top-auto md:bottom-4 z-50 flex h-14 w-14 items-center justify-center rounded-full border border-sky-400 bg-sky-600 text-white shadow-[0_0_20px_rgba(56,189,248,0.4)] transition-all duration-300 hover:scale-110 hover:bg-sky-500 active:scale-95 sm:h-auto sm:w-auto sm:rounded-xl sm:px-5 sm:py-2.5 sm:font-bold sm:uppercase sm:tracking-wider sm:shadow-md"
+  >
+    <svg
+      xmlns="http://www.w3.org/2000/svg"
+      viewBox="0 0 24 24"
+      fill="currentColor"
+      className="h-7 w-7 transition-transform duration-300 group-hover:rotate-90 sm:h-5 sm:w-5 sm:group-hover:rotate-0"
+    >
+      <path
+        fillRule="evenodd"
+        d="M12 2.25c-5.385 0-9.75 4.365-9.75 9.75s4.365 9.75 9.75 9.75 9.75-4.365 9.75-9.75S17.385 2.25 12 2.25zM12.75 9a.75.75 0 00-1.5 0v2.25H9a.75.75 0 000 1.5h2.25V15a.75.75 0 001.5 0v-2.25H15a.75.75 0 000-1.5h-2.25V9z"
+        clipRule="evenodd"
+      />
+    </svg>
+    <span className="ml-2 hidden text-[11px] sm:inline">Dodaj Opkladu</span>
+  </button>
+)}
+
+
             <div className="grid grid-cols-1 gap-3 p-2 md:grid-cols-2 lg:gap-4">
   {/* Card 1: Total Bets */}
   <div className="group relative flex items-center justify-between overflow-hidden rounded-2xl border border-slate-800 bg-slate-900/50 p-4 transition-all hover:bg-slate-800/80">
@@ -1400,98 +1375,3 @@ useEffect(() => {
     </div>
   );
 }
-const TrashIcon = ({ className }) => (
-  <svg
-    className={className}
-    fill="none"
-    viewBox="0 0 24 24"
-    stroke="currentColor"
-  >
-    <path
-      strokeLinecap="round"
-      strokeLinejoin="round"
-      strokeWidth={1.5}
-      d="M14.74 9l-.346 9m-4.788 0L9.26 9m9.968-3.21c.342.052.682.107 1.022.166m-1.022-.165L18.16 19.673a2.25 2.25 0 01-2.244 2.077H8.084a2.25 2.25 0 01-2.244-2.077L4.772 5.79m14.456 0a48.108 48.108 0 00-3.478-.397m-12 .562c.34-.059.68-.114 1.022-.165m0 0a48.11 48.11 0 013.478-.397m7.5 0v-.916c0-1.18-.91-2.164-2.09-2.201a51.964 51.964 0 00-3.32 0c-1.18.037-2.09 1.022-2.09 2.201v.916m7.5 0a48.667 48.667 0 00-7.5 0"
-    />
-  </svg>
-);
-
-const XMarkIcon = ({ className }) => (
-  <svg
-    className={className}
-    fill="none"
-    viewBox="0 0 24 24"
-    stroke="currentColor"
-  >
-    <path
-      strokeLinecap="round"
-      strokeLinejoin="round"
-      strokeWidth={1.5}
-      d="M6 18L18 6M6 6l12 12"
-    />
-  </svg>
-);
-
-const ChevronDownIcon = ({ className }) => (
-  <svg
-    className={className}
-    fill="none"
-    viewBox="0 0 24 24"
-    stroke="currentColor"
-  >
-    <path
-      strokeLinecap="round"
-      strokeLinejoin="round"
-      strokeWidth={1.5}
-      d="M19 9l-7 7-7-7"
-    />
-  </svg>
-);
-
-const CheckCircleIcon = ({ className }) => (
-  <svg
-    className={className}
-    fill="none"
-    viewBox="0 0 24 24"
-    stroke="currentColor"
-  >
-    <path
-      strokeLinecap="round"
-      strokeLinejoin="round"
-      strokeWidth={1.5}
-      d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"
-    />
-  </svg>
-);
-
-const PlusCircleIcon = ({ className }) => (
-  <svg
-    className={className}
-    fill="none"
-    viewBox="0 0 24 24"
-    stroke="currentColor"
-  >
-    <path
-      strokeLinecap="round"
-      strokeLinejoin="round"
-      strokeWidth={1.5}
-      d="M12 9v6m3-3H9m12 0a9 9 0 11-18 0 9 9 0 0118 0z"
-    />
-  </svg>
-);
-
-const XCircleIcon = ({ className }) => (
-  <svg
-    className={className}
-    fill="none"
-    viewBox="0 0 24 24"
-    stroke="currentColor"
-  >
-    <path
-      strokeLinecap="round"
-      strokeLinejoin="round"
-      strokeWidth={1.5}
-      d="M9.75 9.75l4.5 4.5m0-4.5l-4.5 4.5M21 12a9 9 0 11-18 0 9 9 0 0118 0z"
-    />
-  </svg>
-);

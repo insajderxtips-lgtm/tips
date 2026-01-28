@@ -1,92 +1,72 @@
 @import url("https://fonts.googleapis.com/css2?family=Raleway:ital,wght@0,100..900;1,100..900&display=swap");
+@import url("https://fonts.googleapis.com/css2?family=Roboto:wght@300;400;500;700;900&display=swap");
 @import "tailwindcss";
 
-html,
-body,
-#root,
+/* 1. CORE RESET & IPHONE FIXES */
 html {
+  scroll-behavior: smooth;
+  /* Use the dark background as a fallback for overscroll */
+  background-color: #030712 !important;
+  /* Prevents the 'bouncing' address bar issues on iOS */
+  height: -webkit-fill-available;
+  overflow-x: hidden;
+}
+
+body, #root {
   margin: 0;
   padding: 0;
   box-sizing: border-box;
   color: white;
   font-family: Raleway, sans-serif;
   min-width: 100% !important;
-  min-height: 100vh !important;
-  overflow: auto;
+  /* THE FIX: Dynamic Viewport Height (dvh) reacts to the iPhone search bar */
+  min-height: 100dvh !important;
+  min-height: -webkit-fill-available;
+  
+  /* Safe area padding ensures content isn't under the home bar/search bar */
+  padding-bottom: env(safe-area-inset-bottom);
+  
+  overflow-x: hidden;
   background: hsla(224, 71%, 4%, 1);
-
   background: linear-gradient(
     225deg,
     hsla(224, 71%, 4%, 1) 65%,
     hsla(224, 60%, 14%, 1) 100%
   );
-
-  background: -moz-linear-gradient(
-    225deg,
-    hsla(224, 71%, 4%, 1) 65%,
-    hsla(224, 60%, 14%, 1) 100%
-  );
-
-  background: -webkit-linear-gradient(
-    225deg,
-    hsla(224, 71%, 4%, 1) 65%,
-    hsla(224, 60%, 14%, 1) 100%
-  );
-
-  filter: progid: DXImageTransform.Microsoft.gradient( startColorstr="#030712", endColorstr="#0E1938", GradientType=1 );
 }
 
+/* 2. FONTS */
 @font-face {
-  font-family: "Vampire Wars"; /* Define the font family name */
-  src: url("./assets/wars.ttf") format("truetype"); /* Path to the font file */
+  font-family: "Vampire Wars";
+  src: url("./assets/wars.ttf") format("truetype");
   font-weight: normal;
   font-style: normal;
 }
 
-.testFont {
-  font-family: "Vampire Wars", sans-serif; /* Use the same font family name */
-}
-.raceFont {
-  font-family: Race Sport, Arial, Helvetica, sans-serif;
-}
 @font-face {
   font-family: Race Sport;
-  src: url("/src/assets/Race\ Sport.ttf");
+  src: url("/src/assets/Race Sport.ttf");
 }
-.burger {
-  display: none;
-}
-.font-main {
-  font-family: Raleway, sans-serif;
-}
+
+.testFont { font-family: "Vampire Wars", sans-serif; }
+.raceFont { font-family: Race Sport, Arial, Helvetica, sans-serif; }
+.font-main { font-family: Raleway, sans-serif; }
+
+/* 3. UTILITIES & THEMES */
 @theme {
   --color-gold: #ffd700;
   --color-card: #102330;
 }
-.main-gradient {
-  background: hsla(224, 71%, 4%, 1);
 
+.main-gradient {
   background: linear-gradient(
     225deg,
     hsla(224, 71%, 4%, 1) 65%,
     hsla(224, 60%, 14%, 1) 100%
   );
-
-  background: -moz-linear-gradient(
-    225deg,
-    hsla(224, 71%, 4%, 1) 65%,
-    hsla(224, 60%, 14%, 1) 100%
-  );
-
-  background: -webkit-linear-gradient(
-    225deg,
-    hsla(224, 71%, 4%, 1) 65%,
-    hsla(224, 60%, 14%, 1) 100%
-  );
-
-  filter: progid: DXImageTransform.Microsoft.gradient( startColorstr="#030712", endColorstr="#0E1938", GradientType=1 );
 }
-@import url("https://fonts.googleapis.com/css2?family=Roboto:wght@300;400;500;700;900&display=swap");
+
+/* 4. COMPONENTS */
 @layer base {
   input[type="number"]::-webkit-inner-spin-button,
   input[type="number"]::-webkit-outer-spin-button {
@@ -94,6 +74,7 @@ html {
     margin: 0;
   }
 }
+
 :root {
   --color-text: #616161;
   --color-text-btn: #ffffff;
@@ -106,6 +87,8 @@ html {
   --card4-gradient-color1: #11998e;
   --card4-gradient-color2: #38ef7d;
 }
+
+/* 5. CARDS */
 .card-wrap {
   width: 220px;
   background: #fff;
@@ -117,22 +100,19 @@ html {
   cursor: pointer;
   transition: all 0.2s ease-in-out;
 }
-.card-wrap:hover {
-  transform: scale(1.03);
-}
+
+.card-wrap:hover { transform: scale(1.03); }
+
 .card-header {
   height: 200px;
   width: 100%;
-  background: red;
   border-radius: 100% 0% 100% 0% / 0% 50% 50% 100%;
   display: grid;
   place-items: center;
 }
 
-.card-header i {
-  color: #fff;
-  font-size: 72px;
-}
+.card-header i { color: #fff; font-size: 72px; }
+
 .card-content {
   display: flex;
   flex-direction: column;
@@ -140,6 +120,7 @@ html {
   width: 60%;
   margin: 0 auto;
 }
+
 .card-title {
   text-align: center;
   text-transform: uppercase;
@@ -147,11 +128,13 @@ html {
   margin-top: 10px;
   margin-bottom: 20px;
 }
+
 .card-text {
   text-align: center;
   font-size: 12px;
   margin-bottom: 20px;
 }
+
 .card-btn {
   border: none;
   border-radius: 100px;
@@ -160,63 +143,19 @@ html {
   margin-bottom: 15px;
   text-transform: uppercase;
 }
-.card-header.one {
-  background: linear-gradient(
-    to bottom left,
-    var(--card1-gradient-color1),
-    var(--card1-gradient-color2)
-  );
-}
-.card-header.two {
-  background: linear-gradient(
-    to bottom left,
-    var(--card2-gradient-color1),
-    var(--card2-gradient-color2)
-  );
-}
-.card-header.three {
-  background: linear-gradient(
-    to bottom left,
-    var(--card3-gradient-color1),
-    var(--card3-gradient-color2)
-  );
-}
-.card-header.four {
-  background: linear-gradient(
-    to bottom left,
-    var(--card4-gradient-color1),
-    var(--card4-gradient-color2)
-  );
-}
 
-.card-btn.one {
-  background: linear-gradient(
-    to left,
-    var(--card1-gradient-color1),
-    var(--card1-gradient-color2)
-  );
-}
-.card-btn.two {
-  background: linear-gradient(
-    to left,
-    var(--card2-gradient-color1),
-    var(--card2-gradient-color2)
-  );
-}
-.card-btn.three {
-  background: linear-gradient(
-    to left,
-    var(--card3-gradient-color1),
-    var(--card3-gradient-color2)
-  );
-}
-.card-btn.four {
-  background: linear-gradient(
-    to left,
-    var(--card4-gradient-color1),
-    var(--card4-gradient-color2)
-  );
-}
+/* Card Coloring */
+.card-header.one { background: linear-gradient(to bottom left, var(--card1-gradient-color1), var(--card1-gradient-color2)); }
+.card-header.two { background: linear-gradient(to bottom left, var(--card2-gradient-color1), var(--card2-gradient-color2)); }
+.card-header.three { background: linear-gradient(to bottom left, var(--card3-gradient-color1), var(--card3-gradient-color2)); }
+.card-header.four { background: linear-gradient(to bottom left, var(--card4-gradient-color1), var(--card4-gradient-color2)); }
+
+.card-btn.one { background: linear-gradient(to left, var(--card1-gradient-color1), var(--card1-gradient-color2)); }
+.card-btn.two { background: linear-gradient(to left, var(--card2-gradient-color1), var(--card2-gradient-color2)); }
+.card-btn.three { background: linear-gradient(to left, var(--card3-gradient-color1), var(--card3-gradient-color2)); }
+.card-btn.four { background: linear-gradient(to left, var(--card4-gradient-color1), var(--card4-gradient-color2)); }
+
+/* 6. LOADER & SCROLLBAR */
 .loader {
   width: fit-content;
   font-size: 40px;
@@ -235,58 +174,27 @@ html {
 }
 
 @keyframes l9 {
-  to {
-    background-position: calc(50% + 1.6em) 0, calc(50% + 3.2em) 0.8em;
-  }
+  to { background-position: calc(50% + 1.6em) 0, calc(50% + 3.2em) 0.8em; }
 }
-/* Custom Scrollbar Styling */
-/* Works for Chrome, Edge, Safari */
+
 ::-webkit-scrollbar {
-  width: 12px; /* Vertical scrollbar width */
-  height: 4px; /* Horizontal scrollbar height */
+  width: 10px;
+  height: 4px;
 }
 
 ::-webkit-scrollbar-track {
-  background: #0f172a; /* Track color (dark blue) */
-  border-radius: 8px;
+  background: #0f172a;
 }
 
 ::-webkit-scrollbar-thumb {
-  background: #334155; /* Thumb color (slate-700) */
+  background: #334155;
   border-radius: 8px;
-  border: 2px solid #0f172a; /* Creates border effect */
-  transition: all 0.3s ease;
+  border: 2px solid #0f172a;
 }
 
-::-webkit-scrollbar-thumb:hover {
-  background: #475569; /* Hover color (slate-600) */
-  transform: scale(1.02);
-}
+::-webkit-scrollbar-thumb:hover { background: #475569; }
 
-/* For Firefox */
 * {
   scrollbar-width: thin;
-  scrollbar-color: #334155 #0f172a; /* thumb and track color */
-}
-
-/* Optional: Smooth scrolling behavior */
-html {
-  scroll-behavior: smooth;
-  background-color: #030712 !important;
-  overscroll-behavior-y: none;
-}
-
-/* Optional: Custom scrollbar for specific elements */
-.scrollbar-custom {
-  scrollbar-width: thin;
-  scrollbar-color: #475569 #1e293b;
-}
-
-.scrollbar-custom::-webkit-scrollbar-track {
-  background: #1e293b;
-}
-
-.scrollbar-custom::-webkit-scrollbar-thumb {
-  background: #475569;
-  border: 2px solid #1e293b;
+  scrollbar-color: #334155 #0f172a;
 }

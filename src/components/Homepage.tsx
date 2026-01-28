@@ -153,7 +153,7 @@ export default function Homepage(): React.ReactNode {
           <svg className="w-6 h-6 text-cyan-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M13 7h8m0 0v8m0-8l-8 8-4-4-6 6" /></svg>
         </div>
         <div>
-          <h3 className="raceFont text-lg text-white mb-3">Forma i medjusobni mečevi.</h3>
+          <h3 className="raceFont text-lg text-white mb-3">Forma i medjusobni mecevi.</h3>
           <div className="flex gap-2.5">
             {["W", "W", "D", "L", "W"].map((result, i) => (
               <div key={i} className={`w-8 h-8 rounded-lg flex items-center justify-center text-[10px] raceFont border ${
@@ -179,7 +179,7 @@ export default function Homepage(): React.ReactNode {
         <div className="p-8 border-b border-white/5 bg-gradient-to-b from-white/5 to-transparent">
           <div className="flex justify-between items-center mb-4">
             <span className="px-3 py-1 rounded-md bg-blue-500/10 border border-blue-500/20 text-blue-400 text-[10px] raceFont tracking-widest">PREMIUM ANALIZA</span>
-            <span className="text-slate-500 text-[11px] font-main uppercase tracking-widest">Premier League</span>
+            <span className="text-slate-500 text-[11px] font-main uppercase tracking-widest">Premier Liga</span>
           </div>
           <h3 className="text-2xl md:text-3xl raceFont text-white mb-2">Liverpool vs Man City</h3>
           <div className="flex items-center gap-4 text-slate-400 text-xs">
@@ -214,12 +214,7 @@ export default function Homepage(): React.ReactNode {
 
 
 
-          <button 
-            onClick={() => nav("/login")}
-            className="w-full py-5 bg-gradient-to-r from-blue-600 to-blue-800 rounded-2xl raceFont text-sm text-white tracking-widest shadow-xl shadow-blue-900/40 hover:scale-[1.02] active:scale-95 transition-all"
-          >
-            OTKLJUČAJ PREMIUM ANALIZU
-          </button>
+
         </div>
       </div>
     </div>
