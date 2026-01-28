@@ -922,14 +922,12 @@ app.post("/requestPasswordResetCode", async (req, res) => {
 
   // 4. Send email with link
  const transport = nodemailer.createTransport({
-  host: "smtp.gmail.com",
-  port: 465,
-  secure: true,
-  auth: {
-    user: "insajderxtips@gmail.com",
-    pass: "krdp zpun xpku cdmk",
-  },
-});
+    service: "gmail",
+    auth: {
+      user: "insajderxtips@gmail.com",
+      pass: "jyyc nkmw uvsp plmn",
+    },
+  });
 
 await transport.sendMail({
   from: '"Insajder Tips" <insajderxtips@gmail.com>', // Correct format
