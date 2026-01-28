@@ -1102,6 +1102,37 @@ app.get("/oddsChecker/getSearch/:query", async (req, res) => {
     res.status(500).json({ error: "Internal server error" });
   }
 });
+app.post("/updateBalance", verifyToken, async (req, res) => {
+  try {
+    const { balance } = req.body;
+    const userId = req.user.id; 
+
+    if (balance === undefined || isNaN(balance)) {
+      return res.status(400).json({ message: "Invalid balance value" });
+    }
+
+    const updatedUser = await User.findByIdAndUpdate(
+      userId,
+      {
+        $set: {
+          "statistics.initialInvestment": Number(balance),
+        },
+      },
+      { new: true }
+    );
+
+    if (!updatedUser) {
+      return res.status(404).json({ message: "User not found" });
+    }
+
+    res.status(200).json({
+      success: true,
+      initialInvestment: updatedUser.statistics.initialInvestment,
+    });
+  } catch (error) {
+    res.status(500).json({ message: "Internal server error", error: error.message });
+  }
+});
 
 app.post("/oddsChecker/getOdds/", oddsLimiter, async (req, res) => {
   // attempts to get the odds for a specific match on all the bet stores.

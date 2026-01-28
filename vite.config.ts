@@ -7,8 +7,7 @@ export default defineConfig({
   plugins: [react(), tailwindcss()],
   server: {
     proxy: {
-      // Your API Endpoints
-      "/api": "http://localhost:1337",
+      "/updateBalance": "http://localhost:1337", // Added this to fix your 404
       "/updateName": "http://localhost:1337",
       "/requestPasswordResetCode": "http://localhost:1337",
       "/resetStatistics": "http://localhost:1337",

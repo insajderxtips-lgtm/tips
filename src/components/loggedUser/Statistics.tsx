@@ -143,139 +143,44 @@ const [JWT, setJWT] = useState(localStorage.getItem("insajder_token"));  const d
       return updatedParlay;
     });
   };
-  const chartOptions = {
-    maintainAspectRatio: false,
-    responsive: true,
-    scales: {
-      x: {
-        grid: {
-          color: "rgba(255, 255, 255, 0.1)",
-          drawOnChartArea: false,
-        },
-        ticks: {
-          color: "#94a3b8", // slate-400
-          font: {
-            size: 12,
-            weight: "500",
-          },
-          padding: 4,
-          autoSkipPadding: 10,
-        },
-      },
-      y: {
-        position: "left",
-        grid: {
-          color: "rgba(255, 255, 255, 0.05)",
-        },
-        ticks: {
-          color: "#7dd3fc", // sky-300
-          font: {
-            size: 12,
-            weight: "600",
-          },
-          callback: (value) => `${value}%`,
-          padding: 5,
-        },
-      },
-      y2: {
-        position: "right",
-        grid: {
-          drawOnChartArea: false,
-        },
-        ticks: {
-          color: "#f87171", // red-400
-          font: {
-            size: 12,
-            weight: "600",
-          },
-          callback: (value) => `${Number(value).toFixed(0)}`,
-          padding: 5,
-        },
-      },
-    },
-    plugins: {
-      legend: {
-        display: true,
-        position: "top",
-        align: "center",
-        labels: {
-          color: "#e2e8f0", // slate-200
-          font: {
-            size: 14,
-            weight: "bold",
-          },
-          padding: 16,
-          boxWidth: 16,
-          usePointStyle: true,
-        },
-      },
-      tooltip: {
-        // Your existing tooltip configuration can go here
-      },
-    },
-    layout: {
-      padding: {
-        top: 15,
-        bottom: 5,
-        left: 15,
-        right: 15,
-      },
-    },
-  };
-  const StatCard = ({ icon, title, value, variant = "neutral" }) => {
-    const styles = {
-      neutral: {
-        glow: "from-sky-500/10 via-transparent",
-        hoverBorder: "hover:border-sky-500/40",
-        iconColor: "text-sky-400",
-        valueColor: "text-white",
-      },
-      success: {
-        glow: "from-green-500/10 via-transparent",
-        hoverBorder: "hover:border-green-500/40",
-        iconColor: "text-green-400",
-        valueColor: "text-green-400",
-      },
-      danger: {
-        glow: "from-red-500/10 via-transparent",
-        hoverBorder: "hover:border-red-500/40",
-        iconColor: "text-red-400",
-        valueColor: "text-red-400",
-      },
-    };
-
-    const selectedStyle = styles[variant] || styles.neutral;
-
-    return (
-      <div
-        className={`group relative overflow-hidden rounded-2xl border border-slate-800 bg-slate-900/50 p-4 sm:p-5 transition-all duration-300 ${selectedStyle.hoverBorder}`}
-      >
-        <div
-          className={`absolute -right-1/4 -top-1/4 h-1/2 w-1/2 rounded-full bg-gradient-radial ${selectedStyle.glow} opacity-0 transition-opacity duration-500 group-hover:opacity-100`}
-        ></div>
-
-        <div className="relative z-10 flex items-center gap-4">
-          <div className={`flex-shrink-0 text-3xl ${selectedStyle.iconColor}`}>
-            {icon}
-          </div>
-          <div className="flex-1">
-            <p className="text-xs font-semibold uppercase text-slate-500">
-              {title}
-            </p>
-            <p className={`text-2xl font-bold ${selectedStyle.valueColor}`}>
-              {value}
-            </p>
-          </div>
-        </div>
-      </div>
-    );
-  };
   const removeParlayItem = (index: number) => {
     // Removes an item from the parlay bet.
     setParlay((prev) =>
       prev.filter((_, currentIndex) => currentIndex !== index)
     );
   };
+  const [isEditModalOpen, setIsEditModalOpen] = useState(false);
+const [newBalance, setNewBalance] = useState(Math.round(userStats?.statistics?.initialInvestment || 0));
+const [isUpdating, setIsUpdating] = useState(false);
+
+const handleUpdateBalance = async () => {
+  setIsUpdating(true);
+  try {
+    // Get token (adjust this based on where you store it)
+    const token = localStorage.getItem("insajder_token"); 
+
+    const response = await fetch("updateBalance", {
+      method: "POST",
+      headers: { 
+        "Content-Type": "application/json",
+        "Authorization": `Bearer ${token}` // ADD THIS LINE
+      },
+      body: JSON.stringify({ 
+        balance: Number(newBalance)
+        // You can remove userId here since the server gets it from the token
+      }),
+    });
+
+    if (response.ok) {
+      // Logic to refresh UI goes here (e.g., window.location.reload() or Redux dispatch)
+      setIsEditModalOpen(false);
+    }
+  } catch (error) {
+    console.error("Greška pri ažuriranju stanja:", error);
+  } finally {
+    setIsUpdating(false);
+  }
+};
   const getDailyStats = () => {
     // Get statistics for the day chosen by the user and return as object.
     let winCount = 0;
@@ -854,7 +759,7 @@ useEffect(() => {
         
 
   
-    {userStats?.statistics?.initialInvestment !== undefined && userStats?.statistics?.initialInvestment !== null && (
+{userStats?.statistics?.initialInvestment !== undefined && userStats?.statistics?.initialInvestment !== null && (
   <button
     onClick={() =>
       !betBuilder.visible &&
@@ -863,7 +768,13 @@ useEffect(() => {
         visible: true,
       }))
     }
-   className="group fixed right-4 top-4 md:top-auto md:bottom-4 z-50 flex h-14 w-14 items-center justify-center rounded-full border border-sky-400 bg-sky-600 text-white shadow-[0_0_20px_rgba(56,189,248,0.4)] transition-all duration-300 hover:scale-110 hover:bg-sky-500 active:scale-95 sm:h-auto sm:w-auto sm:rounded-xl sm:px-5 sm:py-2.5 sm:font-bold sm:uppercase sm:tracking-wider sm:shadow-md"
+    /* CHANGE EXPLANATION:
+       - bottom-[calc(env(safe-area-inset-bottom)+1rem)]: 
+         Pushes the button up so it never sits behind the iPhone search bar.
+       - md:top-auto md:bottom-6: 
+         Keeps your desktop positioning clean.
+    */
+    className="group fixed right-4 bottom-[calc(env(safe-area-inset-bottom)+1.5rem)] md:bottom-8 z-50 flex h-14 w-14 items-center justify-center rounded-full border border-sky-400 bg-sky-600 text-white shadow-[0_0_20px_rgba(56,189,248,0.4)] transition-all duration-300 hover:scale-110 hover:bg-sky-500 active:scale-95 sm:h-auto sm:w-auto sm:rounded-xl sm:px-5 sm:py-2.5 sm:font-bold sm:uppercase sm:tracking-wider sm:shadow-md"
   >
     <svg
       xmlns="http://www.w3.org/2000/svg"
@@ -901,26 +812,38 @@ useEffect(() => {
     <div className="h-1 w-12 rounded-full bg-slate-800 group-hover:bg-sky-500/30 transition-colors"></div>
   </div>
 
-  {/* Card 2: Total Balance */}
-  <div className="group relative flex items-center justify-between overflow-hidden rounded-2xl border border-slate-800 bg-slate-900/50 p-4 transition-all hover:bg-slate-800/80">
-    <div className="flex items-center gap-4">
-      <div className={`flex h-10 w-10 items-center justify-center rounded-xl border ${userStats?.statistics?.initialInvestment > 0 ? 'bg-emerald-500/10 text-emerald-400 border-emerald-500/20' : 'bg-red-500/10 text-red-400 border-red-500/20'}`}>
-        <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor" className="h-5 w-5">
-          <path strokeLinecap="round" strokeLinejoin="round" d="M2.25 18.75a60.07 60.07 0 0115.797 2.101c.727.198 1.453-.342 1.453-1.096V18.75M3.75 4.5v.75A.75.75 0 013 6h-.75m0 0v-.375c0-.621.504-1.125 1.125-1.125H20.25" />
-        </svg>
-      </div>
-      <div>
-        <p className="text-[10px] font-bold uppercase tracking-wider text-slate-500">Ukupno Stanje</p>
-        <p className={`text-xl font-bold leading-tight ${userStats?.statistics?.initialInvestment > 0 ? 'text-emerald-400' : 'text-red-400'}`}>
-          {Math.round(userStats?.statistics?.initialInvestment || 0)}
-          <span className="ml-1 text-xs font-medium text-slate-500 font-sans">{defaultCurrency}</span>
-        </p>
-      </div>
+{/* Card 2: Total Balance */}
+<div className="group relative flex items-center justify-between overflow-hidden rounded-2xl border border-slate-800 bg-slate-900/50 p-4 transition-all hover:bg-slate-800/80">
+  <div className="flex items-center gap-4">
+    <div className={`flex h-10 w-10 items-center justify-center rounded-xl border ${userStats?.statistics?.initialInvestment > 0 ? 'bg-emerald-500/10 text-emerald-400 border-emerald-500/20' : 'bg-red-500/10 text-red-400 border-red-500/20'}`}>
+      <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor" className="h-5 w-5">
+        <path strokeLinecap="round" strokeLinejoin="round" d="M2.25 18.75a60.07 60.07 0 0115.797 2.101c.727.198 1.453-.342 1.453-1.096V18.75M3.75 4.5v.75A.75.75 0 013 6h-.75m0 0v-.375c0-.621.504-1.125 1.125-1.125H20.25" />
+      </svg>
     </div>
-    <div className={`h-6 rounded-lg px-2 flex items-center text-[10px] font-black tracking-tighter uppercase ${userStats?.statistics?.initialInvestment > 0 ? 'bg-emerald-500/10 text-emerald-500' : 'bg-red-500/10 text-red-500'}`}>
-      {userStats?.statistics?.initialInvestment > 0 ? '↑' : '↓'}
+    <div>
+      <div className="flex items-center gap-2 mb-0.5">
+        <p className="text-[10px] font-bold uppercase tracking-wider text-slate-500">Ukupno Stanje</p>
+        <button 
+          onClick={() => setIsEditModalOpen(true)}
+          className="flex items-center justify-center rounded-md bg-slate-800/50 p-1 text-cyan-500 hover:bg-cyan-500/10 hover:text-cyan-400 transition-colors border border-white/5"
+          title="Izmeni stanje"
+        >
+          <svg className="w-2.5 h-2.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" strokeWidth={2.5} strokeLinecap="round" strokeLinejoin="round"/>
+          </svg>
+        </button>
+      </div>
+      <p className={`text-xl font-bold leading-tight ${userStats?.statistics?.initialInvestment > 0 ? 'text-emerald-400' : 'text-red-400'}`}>
+        {Math.round(userStats?.statistics?.initialInvestment || 0)}
+        <span className="ml-1 text-xs font-medium text-slate-500 font-sans">{defaultCurrency}</span>
+      </p>
     </div>
   </div>
+  
+  <div className={`h-6 rounded-lg px-2 flex items-center text-[10px] font-black tracking-tighter uppercase ${userStats?.statistics?.initialInvestment > 0 ? 'bg-emerald-500/10 text-emerald-500' : 'bg-red-500/10 text-red-500'}`}>
+    {userStats?.statistics?.initialInvestment > 0 ? '↑' : '↓'}
+  </div>
+</div>
 </div>
               <div className="flex flex-col w-full  mx-auto  gap-2 0 p-1 md:p-4 ">
              <div className="flex h-fit min-w-full flex-col gap-6 p-2 lg:flex-row">
@@ -1170,9 +1093,11 @@ useEffect(() => {
         setUserStats={setUserStats}
       />
     </div>
+ 
   </div>
 </div>
-              </div>
+              </div>  
+           
             </>
           )}
         </div>
@@ -1370,8 +1295,63 @@ useEffect(() => {
       </div>
     </div>
   </div>
+
+  
 )}
       </div>
+  {isEditModalOpen && (
+    <div className="fixed inset-0 z-[100] flex items-center justify-center p-4">
+      <div 
+        initial={{ opacity: 0 }}
+        animate={{ opacity: 1 }}
+        exit={{ opacity: 0 }}
+        onClick={() => setIsEditModalOpen(false)}
+        className="absolute inset-0 bg-gray-950/90 backdrop-blur-md"
+      />
+      <div 
+        initial={{ scale: 0.9, opacity: 0, y: 20 }}
+        animate={{ scale: 1, opacity: 1, y: 0 }}
+        exit={{ scale: 0.9, opacity: 0, y: 20 }}
+        className="relative w-full max-w-sm bg-slate-900 border border-white/10 rounded-3xl p-8 shadow-2xl"
+      >
+        <div className="text-center mb-6">
+          <h3 className="text-xl font-bold text-white mb-2">Promeni bilans</h3>
+          <p className="text-sm text-slate-400">Unesite novi iznos vašeg bilansa</p>
+        </div>
+
+        <div className="relative mb-8">
+          <input
+            type="number"
+            value={newBalance}
+            maxLength={3}
+            onChange={(e) => setNewBalance(e.target.value)}
+            className="w-full bg-black/40 border border-slate-700 rounded-2xl py-4 px-6 text-2xl font-bold text-center text-cyan-400 focus:outline-none focus:border-cyan-500 focus:ring-1 focus:ring-cyan-500 transition-all"
+            placeholder="0"
+          />
+          <div className="absolute right-4 top-1/2 -translate-y-1/2 text-slate-500 font-bold uppercase text-xs">
+            {defaultCurrency}
+          </div>
+        </div>
+
+        <div className="flex flex-col gap-3">
+          <button
+            onClick={handleUpdateBalance}
+            disabled={isUpdating}
+            className="w-full bg-cyan-600 hover:bg-cyan-500 disabled:opacity-50 text-white font-bold py-4 rounded-2xl shadow-lg shadow-cyan-900/20 transition-all active:scale-95"
+          >
+            {isUpdating ? "Sačuvaj..." : "Sačuvaj Promene"}
+          </button>
+          <button
+            onClick={() => setIsEditModalOpen(false)}
+            className="w-full bg-white/5 hover:bg-white/10 text-slate-400 font-bold py-4 rounded-2xl transition-all"
+          >
+            Odustani
+          </button>
+        </div>
+      </div>
+    </div>
+  )}
+
     </div>
   );
 }
