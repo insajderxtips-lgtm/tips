@@ -59,10 +59,6 @@ export default function TipsHistory() {
     return { wins, wr };
   };
 
-  const totalStats = {
-    profit: tipStats.reduce((sum, b) => sum + Number(b.profit), 0),
-    total: tipStats.length
-  };
 
   const TableSection = ({ title, bets, type }: { title: string; bets: Bet[]; type: "free" | "premium" }) => {
     const { wins, wr } = getGroupStats(bets);
@@ -91,7 +87,7 @@ export default function TipsHistory() {
             <table className="min-w-[600px] lg:min-w-full divide-y divide-white/5">
               <thead className="bg-white/5">
                 <tr>
-                  {["meč", "tip", "kvota", "status", "profit", "datum"].map((h) => (
+                  {["meč", "tip", "kvota", "status", "datum"].map((h) => (
                     <th key={h} onClick={() => requestSort(h as any)} className="px-4 py-2 text-left text-[9px] font-black text-slate-500 uppercase cursor-pointer hover:text-white">
                       {h} {sortConfig?.key === h && (sortConfig.direction === "asc" ? "↑" : "↓")}
                     </th>
@@ -109,9 +105,7 @@ export default function TipsHistory() {
                         {bet.status === "win" ? "prolaz" : "gubitan"}
                       </span>
                     </td>
-                    <td className={`px-4 py-2 text-xs font-black ${Number(bet.profit) >= 0 ? "text-emerald-400" : "text-rose-400"}`}>
-                      {Number(bet.profit) >= 0 ? "+" : ""}{Number(bet.profit).toFixed(2)}
-                    </td>
+                 
                     <td className="px-4 py-2 text-[10px] font-mono text-slate-500">{formatDate(bet.date)}</td>
                   </tr>
                 ))}
