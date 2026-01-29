@@ -156,23 +156,29 @@ const [isUpdating, setIsUpdating] = useState(false);
 const handleUpdateBalance = async () => {
   setIsUpdating(true);
   try {
-    // Get token (adjust this based on where you store it)
     const token = localStorage.getItem("insajder_token"); 
 
     const response = await fetch("updateBalance", {
       method: "POST",
       headers: { 
         "Content-Type": "application/json",
-        "Authorization": `Bearer ${token}` // ADD THIS LINE
+        "Authorization": `Bearer ${token}`
       },
       body: JSON.stringify({ 
         balance: Number(newBalance)
-        // You can remove userId here since the server gets it from the token
       }),
     });
 
     if (response.ok) {
-      // Logic to refresh UI goes here (e.g., window.location.reload() or Redux dispatch)
+      // THE FIX: Use the setter function instead of direct assignment
+      setUserStats((prev) => ({
+        ...prev,
+        statistics: {
+          ...prev.statistics,
+          initialInvestment: Number(newBalance)
+        }
+      }));
+
       setIsEditModalOpen(false);
     }
   } catch (error) {
@@ -415,6 +421,7 @@ const saveCurrentBet = async () => {
     setBetBuilder((prev) => ({
       ...prev,
       status: "Vaša opklada je uspešno sačuvana!",
+      visible:false
     }));
   } catch (error) {
     console.error(error);
@@ -768,19 +775,16 @@ useEffect(() => {
         visible: true,
       }))
     }
-    /* CHANGE EXPLANATION:
-       - bottom-[calc(env(safe-area-inset-bottom)+1rem)]: 
-         Pushes the button up so it never sits behind the iPhone search bar.
-       - md:top-auto md:bottom-6: 
-         Keeps your desktop positioning clean.
+    /* MOBILE: Top-right with safe area margin 
+      DESKTOP: Remains Bottom-right as before (md:bottom-8 md:top-auto)
     */
-    className="group fixed right-4 bottom-[calc(env(safe-area-inset-bottom)+1.5rem)] md:bottom-8 z-50 flex h-14 w-14 items-center justify-center rounded-full border border-sky-400 bg-sky-600 text-white shadow-[0_0_20px_rgba(56,189,248,0.4)] transition-all duration-300 hover:scale-110 hover:bg-sky-500 active:scale-95 sm:h-auto sm:w-auto sm:rounded-xl sm:px-5 sm:py-2.5 sm:font-bold sm:uppercase sm:tracking-wider sm:shadow-md"
+    className="group fixed right-4 top-[calc(env(safe-area-inset-top)+1rem)] md:top-auto md:bottom-8 z-[60] flex h-12 w-12 items-center justify-center rounded-full border border-sky-400 bg-sky-600 text-white shadow-[0_0_20px_rgba(56,189,248,0.4)] transition-all duration-300 hover:scale-110 hover:bg-sky-500 active:scale-95 sm:h-auto sm:w-auto sm:rounded-xl sm:px-5 sm:py-2.5 sm:font-bold sm:uppercase sm:tracking-wider"
   >
     <svg
       xmlns="http://www.w3.org/2000/svg"
       viewBox="0 0 24 24"
       fill="currentColor"
-      className="h-7 w-7 transition-transform duration-300 group-hover:rotate-90 sm:h-5 sm:w-5 sm:group-hover:rotate-0"
+      className="h-6 w-6 transition-transform duration-300 group-hover:rotate-90 sm:h-5 sm:w-5 sm:group-hover:rotate-0"
     >
       <path
         fillRule="evenodd"
@@ -791,7 +795,6 @@ useEffect(() => {
     <span className="ml-2 hidden text-[11px] sm:inline">Dodaj Opkladu</span>
   </button>
 )}
-
 
             <div className="grid grid-cols-1 gap-3 p-2 md:grid-cols-2 lg:gap-4">
   {/* Card 1: Total Bets */}
@@ -1187,43 +1190,55 @@ useEffect(() => {
             </div>
 
             {/* Status & Stake for Single */}
-            {betBuilder.mode === "single" && (
-              <div className="animate-in fade-in slide-in-from-top-2 duration-300 space-y-5">
-                <div className="space-y-2">
-                  <label className="text-[10px] font-bold text-slate-500 uppercase tracking-widest ml-1">Ulog ({currentUser.defaultCurrency || ""})</label>
-                  <input
-                    onChange={(e) => setCurrentBet((prev) => ({ ...prev, stake: e.target.value }))}
-                    type="number"
-                    placeholder="100"
-                    className="w-full bg-slate-900/50 border border-white/5 focus:border-emerald-500/50 text-emerald-400 font-mono text-lg rounded-2xl p-4 outline-none transition-all"
-                  />
-                </div>
-                
-                <div className="p-4 bg-slate-900/40 rounded-2xl border border-white/5 flex items-center justify-between">
-                  <span className="text-[10px] font-bold text-slate-500 uppercase tracking-widest">Status:</span>
-            <div className="flex gap-2">
-  {[
-    { label: 'aktivan', value: 'active' },
-    { label: 'prolazan', value: 'win' },
-    { label: 'gubitan', value: 'loss' }
-  ].map((s) => (
-    <button
-      key={s.value}
-      type="button" // Uvek dodaj type="button" unutar formi
-      onClick={() => setCurrentBet(prev => ({ ...prev, status: s.value }))}
-      className={`px-4 py-2 rounded-xl text-[10px] font-black uppercase transition-all border ${
-        currentBet?.status === s.value 
-        ? "bg-white text-black border-white shadow-lg scale-105" 
-        : "bg-slate-900 text-slate-500 border-white/5"
-      }`}
-    >
-      {s.label}
-    </button>
-  ))}
-</div>
-                </div>
-              </div>
+           {betBuilder.mode === "single" && (
+  <div className="animate-in fade-in slide-in-from-top-2 duration-300 space-y-5">
+    {/* Stake Input Section */}
+    <div className="space-y-2">
+      <label className="text-[10px] font-black text-slate-500 uppercase tracking-[0.2em] ml-1">
+        Ulog ({currentUser.defaultCurrency || ""})
+      </label>
+      <input
+        onChange={(e) => setCurrentBet((prev) => ({ ...prev, stake: e.target.value }))}
+        type="number"
+        placeholder="100"
+        className="w-full bg-slate-900/50 border border-white/5 focus:border-emerald-500/50 text-emerald-400 font-mono text-xl rounded-2xl p-5 outline-none transition-all shadow-inner"
+      />
+    </div>
+    
+    {/* Status Selection Section */}
+    <div className="p-4 bg-slate-900/40 rounded-[2rem] border border-white/5 space-y-4">
+      <div className="flex items-center justify-between px-1">
+        <span className="text-[10px] font-black text-slate-500 uppercase tracking-[0.2em]">Status Tiketa</span>
+        <span className="h-1 w-1 rounded-full bg-slate-700"></span>
+      </div>
+
+      {/* Grid Layout: 3 columns that collapse nicely */}
+      <div className="grid grid-cols-3 gap-2">
+        {[
+          { label: 'aktivan', value: 'active', activeColor: 'bg-sky-500' },
+          { label: 'prolazan', value: 'win', activeColor: 'bg-emerald-500' },
+          { label: 'gubitan', value: 'loss', activeColor: 'bg-rose-500' }
+        ].map((s) => (
+          <button
+            key={s.value}
+            type="button"
+            onClick={() => setCurrentBet(prev => ({ ...prev, status: s.value }))}
+            className={`relative py-3 rounded-xl text-[9px] md:text-[10px] font-black uppercase transition-all duration-300 border ${
+              currentBet?.status === s.value 
+                ? `border-transparent text-white shadow-xl scale-[1.02] ${s.activeColor}` 
+                : "bg-slate-950/50 text-slate-500 border-white/5 hover:border-white/10"
+            }`}
+          >
+            {s.label}
+            {currentBet?.status === s.value && (
+              <span className="absolute inset-0 rounded-xl bg-white/20 animate-pulse"></span>
             )}
+          </button>
+        ))}
+      </div>
+    </div>
+  </div>
+)}
 
             {/* Parlay List */}
             {betBuilder.mode === "parlay" && (
@@ -1251,7 +1266,7 @@ useEffect(() => {
                   </div>
                 )}
                 <div className="space-y-2">
-                  <label className="text-[10px] font-bold text-slate-500 uppercase tracking-widest ml-1">Ukupan Ulog (€)</label>
+                  <label className="text-[10px] font-bold text-slate-500 uppercase tracking-widest ml-1">Ukupan Ulog ({currentUser?.defaultCurrency})</label>
                   <input
                     onChange={(e) => setCurrentBet((prev) => ({ ...prev, stake: e.target.value }))}
                     type="number"

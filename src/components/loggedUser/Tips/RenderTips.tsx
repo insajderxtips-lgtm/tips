@@ -137,7 +137,7 @@ const RenderTips: React.FC<RenderTipsProps> = ({ tier }) => {
                       {!isPremium ? (
                         <div className="pt-10 border-t border-white/5 space-y-8">
                           <div className="text-center max-w-2xl mx-auto space-y-3">
-                            <h4 className="text-xl md:text-2xl font-black text-white uppercase italic">Ovaj meč i tip je deo besplatne ponude.</h4>
+                            <h4 className="text-xl md:text-2xl font-black text-white uppercase italic">Ovaj meč i tip su deo besplatne ponude.</h4>
                             <p className="text-sm text-slate-400 font-medium">Premium tipovi sadrže skroz drugacije mečeve, detaljnu profesionalnu analizu, postave pre meča, formu, povrede kao i medjusobne mečeve.</p>
                           </div>
 

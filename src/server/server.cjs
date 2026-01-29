@@ -10,7 +10,7 @@ const nodemailer = require("nodemailer");
 const { v4: uuidv4 } = require("uuid");
 const cookieParser = require("cookie-parser");
 const rateLimit = require("express-rate-limit");
-
+const {gunzipSync} = require("zlib")
 app.use(cookieParser());
 app.use(express.json());
 app.use(cors());
@@ -1103,14 +1103,19 @@ app.get("/oddsChecker/getSearch/:query", async (req, res) => {
 app.post("/updateBalance", verifyToken, async (req, res) => {
   try {
     const { balance } = req.body;
-    const userId = req.user.id; 
+    
+    // According to your debug_payload, the key is 'userId'
+    const idFromToken = req.user.userId; 
 
-    if (balance === undefined || isNaN(balance)) {
-      return res.status(400).json({ message: "Invalid balance value" });
+    if (!idFromToken) {
+      return res.status(401).json({ 
+        message: "No User ID found in token",
+        payload_received: req.user 
+      });
     }
 
     const updatedUser = await User.findByIdAndUpdate(
-      userId,
+      idFromToken,
       {
         $set: {
           "statistics.initialInvestment": Number(balance),
@@ -1120,7 +1125,7 @@ app.post("/updateBalance", verifyToken, async (req, res) => {
     );
 
     if (!updatedUser) {
-      return res.status(404).json({ message: "User not found" });
+      return res.status(404).json({ message: "User not found in database" });
     }
 
     res.status(200).json({
@@ -1128,14 +1133,11 @@ app.post("/updateBalance", verifyToken, async (req, res) => {
       initialInvestment: updatedUser.statistics.initialInvestment,
     });
   } catch (error) {
-    res.status(500).json({ message: "Internal server error", error: error.message });
+    res.status(500).json({ message: "Server error", error: error.message });
   }
 });
 
 app.post("/oddsChecker/getOdds/", oddsLimiter, async (req, res) => {
-  // attempts to get the odds for a specific match on all the bet stores.
-
-  console.log("Entered getOdds.");
 
   const { home, away, date, soccerId, searchQuery, sport } = req.body;
   // the info we will use to find the actual game
@@ -1278,35 +1280,58 @@ app.post("/oddsChecker/getOdds/", oddsLimiter, async (req, res) => {
     const maxbetSearch = `https://www.maxbet.rs/restapi/offer/sr/search/${searchQuery}/mob?mobileVersion=1.2.1.14&locale=sr`;
     const mozzartSearch = `https://www.mozzartbet.com/betting/search?term=${searchQuery}`;
     const oktagonSearch = `https://www.oktagonbet.com/restapi/offer/sr/search/${searchQuery}/mob?annex=1&mobileVersion=2.38.5.1&locale=sr`;
+    const merkurSearch = `https://www.merkurxtip.rs/restapi/offer/sr/search/${searchQuery}/mob?annex=0&mobileVersion=1.16.2.18&locale=sr`;
+    const brazilSearch = `https://www.brazilbet.rs/restapi/offer/sr/search/${searchQuery}/mob?annex=51&mobileVersion=2.44.9.7&locale=sr`;
     // Fetch both API responses in parallel
-    const [
-      soccerResponse,
-      maxbetSearchResponse,
-      mozzartResponse,
-      oktagonSearchResponse,
-    ] = await Promise.all([
-      request(soccerApi),
-      request(maxbetSearch),
-      request(mozzartSearch, {
-        headers: {
-          "Content-Type": "application/json",
-          Accept: "application/json",
-          Medium: "WEB",
-          "User-Agent":
-            "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/134.0.0.0 Safari/537.36",
-          Referer: "https://www.mozzartbet.com/sr/kladjenje/sport/1?date=today",
-          "X-Requested-With": "XMLHttpRequest",
-        },
-      }),
-      request(oktagonSearch),
-    ]);
 
-    const soccerJson = await soccerResponse.body.json();
-    const maxbetJson = await maxbetSearchResponse.body.json();
-    const mozzartJson = await mozzartResponse.body.json();
-    const oktagonJson = await oktagonSearchResponse.body.json();
+ const [
+  soccerResponse,
+  maxbetSearchResponse,
+  mozzartResponse,
+  oktagonSearchResponse,
+  merkurSearchResponse,
+  brazilSearchResponse,
+] = await Promise.all([
+  request(soccerApi),
+  request(maxbetSearch),
+  request(mozzartSearch, {
+    headers: {
+      "Content-Type": "application/json",
+      "Accept": "application/json",
+      "Medium": "WEB",
+      "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/134.0.0.0 Safari/537.36",
+      "Referer": "https://www.mozzartbet.com/sr/kladjenje/sport/1?date=today",
+      "X-Requested-With": "XMLHttpRequest",
+    },
+  }),
+  request(oktagonSearch),
+  request(merkurSearch, {
+    method: "GET",
+    headers: {
+      "Accept": "application/json",
+      "Accept-Encoding": "gzip",
+      "X-Requested-With": "XMLHttpRequest",
+      "User-Agent": "Mozilla/5.0 (iPhone; CPU iPhone OS 18_5 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/18.5 Mobile/15E148 Safari/604.1",
+    },
+  }),
+  request(brazilSearch),
+]); 
 
+const soccerJson = await soccerResponse.body.json();
+const maxbetJson = await maxbetSearchResponse.body.json();
+const mozzartJson = await mozzartResponse.body.json();
+const oktagonJson = await oktagonSearchResponse.body.json();
+const brazilJson = await brazilSearchResponse.body.json();
+const merkurBuffer = Buffer.from(
+  await merkurSearchResponse.body.arrayBuffer()
+);
 
+const merkurDecompressed =
+  merkurSearchResponse.headers["content-encoding"] === "gzip"
+    ? gunzipSync(merkurBuffer).toString("utf-8")
+    : merkurBuffer.toString("utf-8");
+
+const merkurJson = JSON.parse(merkurDecompressed);
 
 
     if (oktagonJson.esMatches) {
@@ -1320,7 +1345,7 @@ app.post("/oddsChecker/getOdds/", oddsLimiter, async (req, res) => {
         await fetch(match).then((res) => {
           res.json().then((json) => {
             const currentOdds = json.odds;
-            console.log(currentOdds);
+         
     
 if (currentOdds && sport === "S") {
   odds["ki"]["awayAndAway3Plus"]["oktagon"] = currentOdds["50267"];
@@ -1954,6 +1979,241 @@ odds["secondHalf"]["ki2"]["mozzartBet"] = groups[18]?.odds?.[2]?.value ?? null;
 
       }
     }
+   if (merkurJson?.esMatches) {
+    const filteredGames = merkurJson.esMatches.filter(
+        (game) => game.kickOffTime === date
+    );
+
+    if (filteredGames.length > 0) {
+        const matchId = filteredGames[0].id;
+        const matchUrl = `https://www.merkurxtip.rs/restapi/offer/sr/match/${matchId}?annex=0&mobileVersion=1.16.2.18&locale=sr`;
+
+        try {
+            const response = await fetch(matchUrl);
+            const detailJson = await response.json();
+            const currentOdds = detailJson.odds;
+
+            console.log("MERKUR DATA FETCHED FOR ID:", matchId);
+
+            if (currentOdds) {
+                odds["ki"]["awayAndAway3Plus"]["merkur"] = currentOdds["50267"];
+                odds["ki"]["homeAndHome3Plus"]["merkur"] = currentOdds["50266"];
+                odds["ki"]["1"]["merkur"] = currentOdds["1"];
+                odds["ki"]["homeAndGG"]["merkur"] = currentOdds["365"];
+                odds["ki"]["x"]["merkur"] = currentOdds["2"];
+                odds["ki"]["2"]["merkur"] = currentOdds["3"];
+                odds["ki"]["doubleChance_1X"]["merkur"] = currentOdds["7"];
+                odds["ki"]["doubleChance_12"]["merkur"] = currentOdds["8"];
+                odds["ki"]["doubleChance_X2"]["merkur"] = currentOdds["9"];
+                odds["goals"]["gg"]["merkur"] = currentOdds["272"];
+                odds["goals"]["ng"]["merkur"] = currentOdds["273"];
+                odds["goals"]["over1_5"]["merkur"] = currentOdds["242"];
+                odds["goals"]["over2_5"]["merkur"] = currentOdds["24"];
+                odds["goals"]["over_3_5"]["merkur"] = currentOdds["25"];
+                odds["goals"]["over_4_5"]["merkur"] = currentOdds["27"];
+                odds["goals"]["over_5_5"]["merkur"] = currentOdds["223"];
+                odds["goals"]["under2_5"]["merkur"] = currentOdds["22"];
+                odds["goals"]["under1_5"]["merkur"] = currentOdds["21"];
+                odds["goals"]["twoToFour"]["merkur"] = currentOdds["243"];
+                odds["goals"]["twoToSix"]["merkur"] = currentOdds["220"];
+                odds["goals"]["threeToSix"]["merkur"] = currentOdds["382"];
+                odds["goals"]["firstMore"]["merkur"] = currentOdds["29"];
+                odds["goals"]["secondMore"]["merkur"] = currentOdds["31"];
+                odds["goals"]["equalGoals"]["merkur"] = currentOdds["30"];
+                odds["ki"]["w1"]["merkur"] = currentOdds["264"];
+                odds["ki"]["w2"]["merkur"] = currentOdds["265"];
+                odds["secondHalf"]["gg"]["merkur"] = currentOdds["299"];
+                odds["goals"]["under3_5"]["merkur"] = currentOdds["219"];
+                odds["goals"]["oneToTwo"]["merkur"] = currentOdds["278"];
+                odds["goals"]["oneToThree"]["merkur"] = currentOdds["279"];
+                odds["goals"]["oneToFour"]["merkur"] = currentOdds["280"];
+                odds["goals"]["twoToThree"]["merkur"] = currentOdds["23"];
+                odds["goals"]["twoToFive"]["merkur"] = currentOdds["333"];
+                odds["goals"]["threeToFour"]["merkur"] = currentOdds["244"];
+                odds["goals"]["threeToFive"]["merkur"] = currentOdds["281"];
+                odds["goals"]["even"]["merkur"] = currentOdds["231"];
+                odds["goals"]["odd"]["merkur"] = currentOdds["232"];
+                odds["homeGoals"]["second_0_5"]["merkur"] = currentOdds["312"];
+                odds["homeGoals"]["second_1_5"]["merkur"] = currentOdds["297"];
+                odds["awayGoals"]["second_0_5"]["merkur"] = currentOdds["313"];
+                odds["awayGoals"]["second_1_5"]["merkur"] = currentOdds["298"];
+                odds["homeGoals"]["over_0_5"]["merkur"] = currentOdds["238"];
+                odds["homeGoals"]["over_1_5"]["merkur"] = currentOdds["248"];
+                odds["homeGoals"]["over_2_5"]["merkur"] = currentOdds["276"];
+                odds["homeGoals"]["over_3_5"]["merkur"] = currentOdds["555"];
+                odds["homeGoals"]["zeroToOne"]["merkur"] = currentOdds["247"];
+                odds["homeGoals"]["zeroToTwo"]["merkur"] = currentOdds["551"];
+                odds["awayGoals"]["over_0_5"]["merkur"] = currentOdds["240"];
+                odds["awayGoals"]["over_1_5"]["merkur"] = currentOdds["250"];
+                odds["awayGoals"]["over_2_5"]["merkur"] = currentOdds["277"];
+                odds["awayGoals"]["over_3_5"]["merkur"] = currentOdds["556"];
+                odds["awayGoals"]["zeroToOne"]["merkur"] = currentOdds["249"];
+                odds["homeGoals"]["first_0_5"]["merkur"] = currentOdds["307"];
+                odds["homeGoals"]["first_1_5"]["merkur"] = currentOdds["274"];
+                odds["awayGoals"]["first_0_5"]["merkur"] = currentOdds["308"];
+                odds["awayGoals"]["first_1_5"]["merkur"] = currentOdds["275"];
+                odds["firstHalf"]["ki1"]["merkur"] = currentOdds["4"];
+                odds["firstHalf"]["kix"]["merkur"] = currentOdds["5"];
+                odds["firstHalf"]["ki2"]["merkur"] = currentOdds["6"];
+                odds["firstHalf"]["gg"]["merkur"] = currentOdds["291"];
+                odds["firstHalf"]["over_0_5_both"]["merkur"] = currentOdds["363"];
+                odds["firstHalf"]["first05Second15"]["merkur"] = currentOdds["316"];
+                odds["secondHalf"]["ki1"]["merkur"] = currentOdds["235"];
+                odds["secondHalf"]["kix"]["merkur"] = currentOdds["236"];
+                odds["secondHalf"]["ki2"]["merkur"] = currentOdds["237"];
+                odds["secondHalf"]["over_0_5"]["merkur"] = currentOdds["213"];
+                odds["secondHalf"]["over_1_5"]["merkur"] = currentOdds["214"];
+                odds["secondHalf"]["over_2_5"]["merkur"] = currentOdds["215"];
+                odds["htft"]["hh"]["merkur"] = currentOdds["10"];
+                odds["htft"]["hx"]["merkur"] = currentOdds["11"];
+                odds["htft"]["ha"]["merkur"] = currentOdds["12"];
+                odds["htft"]["xh"]["merkur"] = currentOdds["13"];
+                odds["htft"]["xx"]["merkur"] = currentOdds["14"];
+                odds["htft"]["xa"]["merkur"] = currentOdds["15"];
+                odds["htft"]["ah"]["merkur"] = currentOdds["16"];
+                odds["htft"]["ax"]["merkur"] = currentOdds["17"];
+                odds["htft"]["aa"]["merkur"] = currentOdds["18"];
+                odds["ki"]["homeAnd3Plus"]["merkur"] = currentOdds["287"];
+                odds["ki"]["homeAnd4Plus"]["merkur"] = currentOdds["314"];
+                odds["ki"]["awayAnd3Plus"]["merkur"] = currentOdds["288"];
+                odds["ki"]["awayAnd4Plus"]["merkur"] = currentOdds["315"];
+                odds["ki"]["awayAndGG"]["merkur"] = currentOdds["366"];
+                odds["firstHalf"]["over_0_5"]["merkur"] = currentOdds["207"];
+                odds["firstHalf"]["over_1_5"]["merkur"] = currentOdds["208"];
+                odds["firstHalf"]["over_2_5"]["merkur"] = currentOdds["209"];
+                odds["goals"]["gg3"]["merkur"] = currentOdds["303"];
+            }
+        } catch (error) {
+            console.error("Merkur fetch failed:", error);
+        }
+    }
+}
+if (brazilJson?.esMatches) {
+   const filteredGames = brazilJson.esMatches.filter(
+        (game) => game.kickOffTime === date
+    );
+
+    if (filteredGames.length > 0) {
+        const matchId = filteredGames[0].id;
+        const matchUrl = `https://www.brazilbet.rs/restapi/offer/sr/match/${matchId}?annex=51&mobileVersion=2.44.9.7&locale=sr`;
+
+        try {
+            const response = await fetch(matchUrl);
+            const detailJson = await response.json();
+            const currentOdds = detailJson.odds;
+
+            console.log("BRAZIL DATA FETCHED FOR ID:", matchId);
+
+           if (currentOdds) {
+  odds["ki"]["awayAndAway3Plus"]["brazil"] = currentOdds["50267"];
+  odds["ki"]["homeAndHome3Plus"]["brazil"] = currentOdds["50266"];
+  odds["ki"]["1"]["brazil"] = currentOdds["1"];
+  odds["ki"]["homeAndGG"]["brazil"] = currentOdds["365"];
+
+  odds["ki"]["x"]["brazil"] = currentOdds["2"];
+  odds["ki"]["2"]["brazil"] = currentOdds["3"];
+  odds["ki"]["doubleChance_1X"]["brazil"] = currentOdds["7"];
+  odds["ki"]["doubleChance_12"]["brazil"] = currentOdds["8"];
+  odds["ki"]["doubleChance_X2"]["brazil"] = currentOdds["9"];
+
+  odds["goals"]["gg"]["brazil"] = currentOdds["272"];
+  odds["goals"]["ng"]["brazil"] = currentOdds["273"];
+  odds["goals"]["over1_5"]["brazil"] = currentOdds["242"];
+  odds["goals"]["over2_5"]["brazil"] = currentOdds["24"];
+  odds["goals"]["over_3_5"]["brazil"] = currentOdds["25"];
+  odds["goals"]["over_4_5"]["brazil"] = currentOdds["27"];
+  odds["goals"]["over_5_5"]["brazil"] = currentOdds["223"];
+  odds["goals"]["under2_5"]["brazil"] = currentOdds["22"];
+  odds["goals"]["under1_5"]["brazil"] = currentOdds["21"];
+
+  odds["goals"]["twoToFour"]["brazil"] = currentOdds["243"];
+  odds["goals"]["twoToSix"]["brazil"] = currentOdds["220"];
+  odds["goals"]["threeToSix"]["brazil"] = currentOdds["382"];
+  odds["goals"]["firstMore"]["brazil"] = currentOdds["29"];
+  odds["goals"]["secondMore"]["brazil"] = currentOdds["31"];
+  odds["goals"]["equalGoals"]["brazil"] = currentOdds["30"];
+
+  odds["ki"]["w1"]["brazil"] = currentOdds["264"];
+  odds["ki"]["w2"]["brazil"] = currentOdds["265"];
+
+  odds["secondHalf"]["gg"]["brazil"] = currentOdds["299"];
+
+  odds["goals"]["under3_5"]["brazil"] = currentOdds["219"];
+  odds["goals"]["oneToTwo"]["brazil"] = currentOdds["278"];
+  odds["goals"]["oneToThree"]["brazil"] = currentOdds["279"];
+  odds["goals"]["oneToFour"]["brazil"] = currentOdds["280"];
+  odds["goals"]["twoToThree"]["brazil"] = currentOdds["23"];
+  odds["goals"]["twoToFive"]["brazil"] = currentOdds["333"];
+  odds["goals"]["threeToFour"]["brazil"] = currentOdds["244"];
+  odds["goals"]["threeToFive"]["brazil"] = currentOdds["281"];
+
+  odds["goals"]["even"]["brazil"] = currentOdds["231"];
+  odds["goals"]["odd"]["brazil"] = currentOdds["232"];
+
+  odds["homeGoals"]["second_0_5"]["brazil"] = currentOdds["312"];
+  odds["homeGoals"]["second_1_5"]["brazil"] = currentOdds["297"];
+  odds["awayGoals"]["second_0_5"]["brazil"] = currentOdds["313"];
+  odds["awayGoals"]["second_1_5"]["brazil"] = currentOdds["298"];
+
+  odds["homeGoals"]["over_0_5"]["brazil"] = currentOdds["238"];
+  odds["homeGoals"]["over_1_5"]["brazil"] = currentOdds["248"];
+  odds["homeGoals"]["over_2_5"]["brazil"] = currentOdds["276"];
+  odds["homeGoals"]["over_3_5"]["brazil"] = currentOdds["555"];
+  odds["homeGoals"]["zeroToOne"]["brazil"] = currentOdds["247"];
+  odds["homeGoals"]["zeroToTwo"]["brazil"] = currentOdds["551"];
+
+  odds["awayGoals"]["over_0_5"]["brazil"] = currentOdds["240"];
+  odds["awayGoals"]["over_1_5"]["brazil"] = currentOdds["250"];
+  odds["awayGoals"]["over_2_5"]["brazil"] = currentOdds["277"];
+  odds["awayGoals"]["over_3_5"]["brazil"] = currentOdds["556"];
+  odds["awayGoals"]["zeroToOne"]["brazil"] = currentOdds["249"];
+
+  odds["homeGoals"]["first_0_5"]["brazil"] = currentOdds["307"];
+  odds["homeGoals"]["first_1_5"]["brazil"] = currentOdds["274"];
+  odds["awayGoals"]["first_0_5"]["brazil"] = currentOdds["308"];
+  odds["awayGoals"]["first_1_5"]["brazil"] = currentOdds["275"];
+
+  odds["firstHalf"]["ki1"]["brazil"] = currentOdds["4"];
+  odds["firstHalf"]["kix"]["brazil"] = currentOdds["5"];
+  odds["firstHalf"]["ki2"]["brazil"] = currentOdds["6"];
+  odds["firstHalf"]["gg"]["brazil"] = currentOdds["291"];
+  odds["firstHalf"]["over_0_5_both"]["brazil"] = currentOdds["363"];
+  odds["firstHalf"]["first05Second15"]["brazil"] = currentOdds["316"];
+
+  odds["secondHalf"]["ki1"]["brazil"] = currentOdds["235"];
+  odds["secondHalf"]["kix"]["brazil"] = currentOdds["236"];
+  odds["secondHalf"]["ki2"]["brazil"] = currentOdds["237"];
+  odds["secondHalf"]["over_0_5"]["brazil"] = currentOdds["213"];
+  odds["secondHalf"]["over_1_5"]["brazil"] = currentOdds["214"];
+  odds["secondHalf"]["over_2_5"]["brazil"] = currentOdds["215"];
+
+  odds["htft"]["hh"]["brazil"] = currentOdds["10"];
+  odds["htft"]["hx"]["brazil"] = currentOdds["11"];
+  odds["htft"]["ha"]["brazil"] = currentOdds["12"];
+  odds["htft"]["xh"]["brazil"] = currentOdds["13"];
+  odds["htft"]["xx"]["brazil"] = currentOdds["14"];
+  odds["htft"]["xa"]["brazil"] = currentOdds["15"];
+  odds["htft"]["ah"]["brazil"] = currentOdds["16"];
+  odds["htft"]["ax"]["brazil"] = currentOdds["17"];
+  odds["htft"]["aa"]["brazil"] = currentOdds["18"];
+
+  odds["ki"]["homeAnd3Plus"]["brazil"] = currentOdds["287"];
+  odds["ki"]["homeAnd4Plus"]["brazil"] = currentOdds["314"];
+  odds["ki"]["awayAnd3Plus"]["brazil"] = currentOdds["288"];
+  odds["ki"]["awayAnd4Plus"]["brazil"] = currentOdds["315"];
+  odds["ki"]["awayAndGG"]["brazil"] = currentOdds["366"];
+
+  odds["firstHalf"]["over_0_5"]["brazil"] = currentOdds["207"];
+  odds["firstHalf"]["over_1_5"]["brazil"] = currentOdds["208"];
+  odds["firstHalf"]["over_2_5"]["brazil"] = currentOdds["209"];
+
+  odds["goals"]["gg3"]["brazil"] = currentOdds["303"];
+}
+        } catch (error) {
+            console.error("BRAZIL fetch failed:", error);
+        }
+    }
+}
 
     return res.status(200).json(sport === "S" ? odds : null);
   } catch (err) {

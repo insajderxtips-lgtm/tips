@@ -67,7 +67,7 @@ export default function BestOdds() {
     if (!tipSearch) return gameOdds;
     const result: any = {};
     const query = tipSearch.toLowerCase();
-
+   
     Object.keys(gameOdds).forEach((category) => {
       const categoryData = gameOdds[category];
       if (categoryData.name) {
@@ -102,6 +102,8 @@ export default function BestOdds() {
           Mozzart: bet.mozzartBet || 1.0,
           Soccer: bet.soccerBet || 1.0,
           Oktagon: bet.oktagon || 1.0,
+          Merkur: bet.merkur || 1.0,
+          Brazil: bet.brazil || 1.0,
         },
       }
     ]);
@@ -122,6 +124,7 @@ export default function BestOdds() {
       .then(json => {
         setUpcomingGames(json);
         setLoading(false);
+   
       })
       .catch(() => {
         setUpcomingGames([]);
@@ -259,86 +262,98 @@ export default function BestOdds() {
               </div>
             </div>
 
-            <div className="flex-1 overflow-x-auto p-2 sm:p-8 custom-scrollbar">
-              {loading ? (
-                <div className="p-10 sm:p-20 text-center">
-                  <div className="animate-spin inline-block w-8 h-8 border-4 border-cyan-500 border-t-transparent rounded-full mb-4"></div>
-                  <p className="text-cyan-500 font-bold uppercase text-xs">Ažuriranje kvota...</p>
-                </div>
-              ) : (
-                <div className="min-w-[600px] lg:min-w-full overflow-hidden rounded-xl sm:rounded-2xl border border-white/5 bg-black/10">
-                  <table className="w-full text-xs sm:text-sm text-left">
-                    <thead>
-                      <tr className="bg-white/5">
-                        <th className="px-4 sm:px-6 py-4 sm:py-5 font-black text-gray-400 uppercase text-[9px] sm:text-[10px]">Market i Tip</th>
-                        {["Soccer", "Mozzart", "MaxBet", "Oktagon"].map(b => (
-                          <th key={b} className="px-2 sm:px-4 py-4 sm:py-5 text-center font-bold text-gray-500 text-[9px] sm:text-[10px] uppercase">{b}</th>
-                        ))}
-                      </tr>
-                    </thead>
-                    <tbody className="divide-y divide-white/5">
-                      {Object.keys(filteredOdds).map(category => (
-                        <React.Fragment key={category}>
-                          <tr onClick={() => setExpandedCategory(expandedCategory === category ? null : category)} className="bg-white/[0.03] hover:bg-white/[0.06] cursor-pointer transition-colors">
-                            <td colSpan={5} className="px-4 sm:px-6 py-3 sm:py-4">
-                              <div className="flex items-center gap-2 sm:gap-3">
-                                <motion.div 
-                                  animate={{ rotate: expandedCategory === category ? 0 : -90 }}
-                                  className="p-1 rounded bg-cyan-500/20 text-cyan-500"
-                                >
-                                  <svg className="h-3 w-3 sm:h-4 sm:w-4" viewBox="0 0 20 20" fill="currentColor"><path d="M5.293 7.293a1 1 0 011.414 0L10 10.586l3.293-3.293a1 1 0 111.414 1.414l-4 4a1 1 0 01-1.414 0l-4-4a1 1 0 010-1.414z" /></svg>
-                                </motion.div>
-                                <span className="font-black text-white uppercase text-[11px] sm:text-sm">{filteredOdds[category].name}</span>
-                              </div>
-                            </td>
-                          </tr>
-                          {expandedCategory === category && Object.values(filteredOdds[category]).map((bet: any, idx) => {
-                            if (!bet.reference || bet.reference === "name") return null;
-                            const currentOdds = [bet.soccerBet || 0, bet.mozzartBet || 0, bet.maxBet || 0, bet.oktagon || 0];
-                            const highest = Math.max(...currentOdds);
+        <div className="flex-1 overflow-x-auto p-2 sm:p-8 custom-scrollbar">
+  {loading ? (
+    <div className="p-10 sm:p-20 text-center">
+      <div className="animate-spin inline-block w-8 h-8 border-4 border-cyan-500 border-t-transparent rounded-full mb-4"></div>
+      <p className="text-cyan-500 font-bold uppercase text-xs">Ažuriranje kvota...</p>
+    </div>
+  ) : (
+    /* Increased min-w to 800px to give the 7 columns (Market + 6 Books) enough breathing room */
+    <div className="min-w-[800px] lg:min-w-full overflow-hidden rounded-xl sm:rounded-2xl border border-white/5 bg-black/10">
+      <table className="w-full text-xs sm:text-sm text-left table-fixed">
+        <thead>
+          <tr className="bg-white/5">
+            {/* Adjusted width for the Market column */}
+            <th className="w-[180px] sm:w-[220px] px-4 sm:px-6 py-4 sm:py-5 font-black text-gray-400 uppercase text-[9px] sm:text-[10px]">Market i Tip</th>
+            {["Soccer", "Mozzart", "MaxBet", "Oktagon", "Merkur", "Brazil"].map(b => (
+              <th key={b} className="px-1 sm:px-2 py-4 sm:py-5 text-center font-bold text-gray-500 text-[9px] sm:text-[10px] uppercase">{b}</th>
+            ))}
+          </tr>
+        </thead>
+        <tbody className="divide-y divide-white/5">
+          {Object.keys(filteredOdds).map(category => (
+            <React.Fragment key={category}>
+              <tr onClick={() => setExpandedCategory(expandedCategory === category ? null : category)} className="bg-white/[0.03] hover:bg-white/[0.06] cursor-pointer transition-colors">
+                {/* colSpan updated to 7 to account for the new column */}
+                <td colSpan={7} className="px-4 sm:px-6 py-3 sm:py-4">
+                  <div className="flex items-center gap-2 sm:gap-3">
+                    <motion.div 
+                      animate={{ rotate: expandedCategory === category ? 0 : -90 }}
+                      className="p-1 rounded bg-cyan-500/20 text-cyan-500"
+                    >
+                      <svg className="h-3 w-3 sm:h-4 sm:w-4" viewBox="0 0 20 20" fill="currentColor"><path d="M5.293 7.293a1 1 0 011.414 0L10 10.586l3.293-3.293a1 1 0 111.414 1.414l-4 4a1 1 0 01-1.414 0l-4-4a1 1 0 010-1.414z" /></svg>
+                    </motion.div>
+                    <span className="font-black text-white uppercase text-[11px] sm:text-sm">{filteredOdds[category].name}</span>
+                  </div>
+                </td>
+              </tr>
+              {expandedCategory === category && Object.values(filteredOdds[category]).map((bet: any, idx) => {
+                if (!bet.reference || bet.reference === "name") return null;
+                
+                // Added bet.brazil to the array
+                const currentOddsValues = [
+                  bet.soccerBet || 0, 
+                  bet.mozzartBet || 0, 
+                  bet.maxBet || 0, 
+                  bet.oktagon || 0, 
+                  bet.merkur || 0,
+                  bet.brazil || 0,
+                ];
+                const highest = Math.max(...currentOddsValues);
 
-                            return (
-                              <motion.tr 
-                                key={idx} 
-                                initial={{ opacity: 0, y: -10 }}
-                                animate={{ opacity: 1, y: 0 }}
-                                className="group hover:bg-cyan-500/[0.02] transition-colors"
-                              >
-                                <td className="px-4 sm:px-6 py-4 sm:py-5 cursor-pointer" onClick={() => addToSlip(bet)}>
-                                  <div className="flex flex-col">
-                                    <span className="text-white font-bold group-hover:text-cyan-400 transition-colors text-[11px] sm:text-sm">
-                                      {bet.reference === "1" ? `${selectedGame.home} POBEĐUJE` : bet.reference === "2" ? `${selectedGame.away} POBEĐUJE` : bet.reference === "x" ? "NEREŠENO" : bet.reference}
-                                    </span>
-                                    <span className="text-[8px] sm:text-[9px] text-gray-500 uppercase font-black">Klikni za dodavanje</span>
-                                  </div>
-                                </td>
-                                {currentOdds.map((val, i) => (
-                                  <td key={i} className="px-1 sm:px-2 py-3 sm:py-4 text-center">
-                                    <button
-                                      disabled={val <= 0}
-                                      onClick={() => addToSlip(bet)}
-                                      className={`w-full max-w-[70px] sm:max-w-[85px] py-2 sm:py-3.5 rounded-lg sm:rounded-xl font-mono font-bold text-xs sm:text-sm transition-all ${val === highest && val > 0 ? "bg-cyan-500 text-black shadow-lg scale-105" : "bg-white/5 text-gray-300 hover:bg-white/10"}`}
-                                    >
-                                      {val > 0 ? val.toFixed(2) : "—"}
-                                    </button>
-                                  </td>
-                                ))}
-                              </motion.tr>
-                            );
-                          })}
-                        </React.Fragment>
-                      ))}
-                    </tbody>
-                  </table>
-                </div>
-              )}
-            </div>
+                return (
+                  <motion.tr 
+                    key={idx} 
+                    initial={{ opacity: 0, y: -10 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    className="group hover:bg-cyan-500/[0.02] transition-colors"
+                  >
+                    <td className="px-4 sm:px-6 py-4 sm:py-5 cursor-pointer" onClick={() => addToSlip(bet)}>
+                      <div className="flex flex-col">
+                        <span className="text-white font-bold group-hover:text-cyan-400 transition-colors text-[11px] sm:text-sm whitespace-nowrap overflow-hidden text-ellipsis">
+                          {bet.reference === "1" ? `${selectedGame.home} POBEĐUJE` : bet.reference === "2" ? `${selectedGame.away} POBEĐUJE` : bet.reference === "x" ? "NEREŠENO" : bet.reference}
+                        </span>
+                        <span className="text-[8px] sm:text-[9px] text-gray-500 uppercase font-black">Klikni za dodavanje</span>
+                      </div>
+                    </td>
+                    {currentOddsValues.map((val, i) => (
+                      <td key={i} className="px-1 sm:px-1.5 py-3 sm:py-4 text-center">
+                        <button
+                          disabled={val <= 0}
+                          onClick={() => addToSlip(bet)}
+                          className={`w-full max-w-[65px] sm:max-w-[80px] py-2 sm:py-3 rounded-lg font-mono font-bold text-[10px] sm:text-sm transition-all ${val === highest && val > 0 ? "bg-cyan-500 text-black shadow-lg scale-105" : "bg-white/5 text-gray-300 hover:bg-white/10"}`}
+                        >
+                          {val > 0 ? val.toFixed(2) : "—"}
+                        </button>
+                      </td>
+                    ))}
+                  </motion.tr>
+                );
+              })}
+            </React.Fragment>
+          ))}
+        </tbody>
+      </table>
+    </div>
+  )}
+</div>
           </div>
         )}
-        <div className="text-center py-4 text-[9px] sm:text-[10px] font-black text-gray-600 uppercase">Uskoro sve kladionice dostupne</div>
+        <div className="text-center py-4 text-[9px] sm:text-[10px] font-black text-gray-600 uppercase">Sve kvote se ažuriraju u realnom vremenu</div>
       </div>
 
-      <div className={`fixed bottom-0 right-0 sm:right-8 w-full sm:w-[420px] z-50 transition-all duration-500 ${isSlipVisible ? "translate-y-0" : "translate-y-[calc(100%-60px)] sm:translate-y-[calc(100%-70px)]"}`}>
+      <div className={`fixed bottom-0 right-0 sm:right-8 w-full sm:w-[500px] z-50 transition-all duration-500 ${isSlipVisible ? "translate-y-0" : "translate-y-[calc(100%-60px)] sm:translate-y-[calc(100%-70px)]"}`}>
         <div onClick={() => setIsSlipVisible(!isSlipVisible)} className="cursor-pointer bg-cyan-600 p-4 sm:p-5 sm:rounded-t-3xl flex items-center justify-between shadow-2xl active:bg-cyan-700">
           <div className="flex items-center gap-3">
             <div className="bg-white text-cyan-600 w-6 h-6 sm:w-7 sm:h-7 rounded-lg flex items-center justify-center font-black text-xs sm:text-sm">{betslip.length}</div>
@@ -364,7 +379,7 @@ export default function BestOdds() {
                     <button onClick={() => removeFromSlip(bet)} className="absolute -top-1 -right-1 bg-red-500 text-white w-5 h-5 rounded-full flex items-center justify-center text-[10px] font-bold shadow-lg hover:bg-red-600 transition-colors">✕</button>
                     <span className="text-[10px] sm:text-xs text-gray-400 block truncate">{bet.home} – {bet.away}</span>
                     <div className="text-white font-bold text-sm sm:text-lg">{bet.tip === "1" ? "1" : bet.tip === "2" ? "2" : bet.tip}</div>
-                    <div className="text-right"><span className="text-[10px] sm:text-[11px] text-gray-500 font-mono">Kvota: {Math.max(...Object.values(bet.odds as any)).toFixed(2)}</span></div>
+                    <div className="text-right"><span className="text-[10px] sm:text-[11px] text-gray-500 font-mono">Max Kvota: {Math.max(...Object.values(bet.odds as any)).toFixed(2)}</span></div>
                   </motion.div>
                 ))}
               </AnimatePresence>
@@ -372,13 +387,15 @@ export default function BestOdds() {
           </div>
           {betslip.length > 0 && (
             <div className="p-4 sm:p-6 bg-black/60 border-t border-white/10">
-              <div className="grid grid-cols-3 gap-2">
-                {["Soccer", "Mozzart", "MaxBet"].map(bookie => {
+              <div className="grid grid-cols-5 gap-1 sm:gap-2">
+                {["Soccer", "Mozzart", "MaxBet", "Oktagon", "Merkur", "Brazil"].map(bookie => {
                   const total = betslip.reduce((t, b) => t * (b.odds[bookie] || 1), 1);
                   return (
-                    <div key={bookie} className="p-2 bg-white/5 rounded-lg sm:rounded-xl border border-white/5 text-center">
-                      <div className="text-[11px] sm:text-sm font-black text-cyan-400 font-mono">{total.toFixed(2)}</div>
-                      <div className="text-[7px] sm:text-[8px] uppercase font-bold text-gray-600">{bookie}</div>
+                    <div key={bookie} className="p-1 sm:p-2 bg-white/5 rounded-lg border border-white/5 text-center">
+                      <div className="text-[9px] sm:text-[13px] font-black text-cyan-400 font-mono">
+                        {total > 1 ? total.toFixed(2) : "—"}
+                      </div>
+                      <div className="text-[6px] sm:text-[8px] uppercase font-bold text-gray-600">{bookie}</div>
                     </div>
                   );
                 })}
