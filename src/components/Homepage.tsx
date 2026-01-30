@@ -6,7 +6,7 @@ import TipsHistory from "./TipsHistory";
 import Verification from "./Verification";
 import stats from "../assets/stats.png";
 import stats2 from "../assets/stats2.png";
-import bestOdds from "../assets/bestOdds.png";
+import bestodds from "../assets/bestodds.png";
 
 export default function Homepage(): React.ReactNode {
   const isLoggedIn = useSelector(
@@ -447,13 +447,13 @@ export default function Homepage(): React.ReactNode {
 
               <div className="w-full border border-blue-500/20 rounded-2xl overflow-hidden bg-[#0a0f1d] shadow-[0_0_50px_-12px_rgba(59,130,246,0.3)] transform transition-transform duration-500 hover:scale-[1.01]">
                 <div className="bg-[#111827] px-4 py-2 border-b border-white/5 flex gap-1.5">
-                  <div className="w-2.5 h-2.5 rounded-full bg-red-500/20"></div>
+                  <div className="w-2.5 h-2.5 rounde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d-full bg-red-500/20"></div>
                   <div className="w-2.5 h-2.5 rounded-full bg-yellow-500/20"></div>
                   <div className="w-2.5 h-2.5 rounded-full bg-green-500/20"></div>
                 </div>
 
                 <img
-                  src={bestOdds}
+                  src={bestodds}
                   alt="Best Odds Real-time"
                   className="w-full h-auto block object-contain"
                 />
