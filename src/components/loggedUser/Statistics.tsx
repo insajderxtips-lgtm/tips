@@ -658,15 +658,12 @@ useEffect(() => {
 
   const activeToken = localStorage.getItem("insajder_token");
   
-  // 1. If token is missing, log off immediately
   if (!activeToken) {
-    console.warn("LOG: No token found. Logging off...");
-   dispatch(logout());
+    dispatch(logout());
     nav("/");
     return;
   }
 
-  // 2. If user object isn't ready yet, just wait (don't log off yet)
   if (!currentUser?.username) {
     return;
   }
@@ -680,12 +677,10 @@ useEffect(() => {
     },
   })
     .then((res) => {
-      if (res.status === 401) {
-        // 3. If server rejects the token, log off
-
-        throw new Error("Unauthorized");
+      if (res.status === 401 || res.status === 403) {
+        throw new Error("AUTH_EXPIRED");
       }
-      if (!res.ok) throw new Error("Server Error");
+      if (!res.ok) throw new Error("SERVER_ERROR");
       return res.json();
     })
     .then((json) => {
@@ -693,14 +688,17 @@ useEffect(() => {
       setError(null);
     })
     .catch((err) => {
-      if (err.message !== "Unauthorized") {
+      if (err.message === "AUTH_EXPIRED") {
+        dispatch(logout());
+        nav("/");
+      } else {
         setError({ message: "Greška pri učitavanju." });
       }
     })
     .finally(() => {
       setLoading(false);
     });
-}, [currentUser?.username]); // Added activeToken here
+}, [currentUser?.username, dispatch, nav]); // Added activeToken here
   if (loading) {
     return (
       <div className="h-full w-full justify-center items-center flex text-center">

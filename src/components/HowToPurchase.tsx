@@ -348,7 +348,7 @@ export function StepTwo() {
                     <div className="flex justify-between">
                       <span className="text-blue-200">Iznos:</span>
                       <span className="font-bold text-yellow-400">
-                        29.99 EUR (3500 RSD)
+                        25 EUR (3.000 RSD)
                       </span>
                     </div>
                   </div>
@@ -596,109 +596,51 @@ export function StepOne() {
   useEffect(() => {
     setStatus({ status: null, message: null });
   }, [currentImage]);
-  const confirmPayment = async () => {
-    if (!currentImage || !userEmail) {
-      console.error("Missing image or email");
+const confirmPayment = async () => {
+  if (!currentImage || !userEmail) {
+    console.error("Missing image or email");
+    return;
+  }
+  setUploading(true);
+  setStatus({ status: null, message: null });
+
+  const formData = new FormData();
+  formData.append("file", currentImage); 
+  formData.append("userEmail", userEmail);
+  formData.append("userName", username);
+  formData.append("paymentType", "uplatnica");
+
+  try {
+    const response = await fetch("/addPayment", {
+      method: "POST",
+      body: formData, // No JSON.stringify, browser handles boundaries for FormData
+    });
+
+    const data = await response.json();
+
+    if (!response.ok) {
+      setStatus({
+        status: response.status,
+        message: data.message || "Došlo je do greške.",
+      });
+      setUploading(false);
       return;
     }
-    setUploading(true);
-    setStatus({ status: null, message: null });
 
-    const formData = new FormData();
-    formData.append("image", currentImage);
-
-    try {
-      // 1. Upload to ImgBB
-      const imgbbResponse = await fetch(
-        `https://api.imgbb.com/1/upload?key=5af3555a7b86283ddc9c73904655cb26`,
-        {
-          method: "POST",
-          body: formData,
-        }
-      );
-
-      const imgbbData = await imgbbResponse.json();
-
-      if (!imgbbData.success) {
-        setStatus({
-          status: 400,
-          message:
-            "Doslo je do greske sa uploadovanjem slike. Molimo kontaktirajte podrsku (podrska@insajder.tips)",
-        });
-        setUploading(false);
-        throw new Error(imgbbData.error?.message || "Image upload failed");
-      }
-
-      // 2. Save to your backend
-      // 2. Save to your backend
-      const backendResponse = await fetch("/addPayment", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-          userEmail: userEmail,
-          userName: username,
-          paymentType: "uplatnica",
-          imageUrl: imgbbData.data.display_url,
-        }),
-      });
-
-      const backendData = await backendResponse.json();
-
-      if (backendResponse.status === 429) {
-        // --- RATE LIMITING HANDLING ---
-        setUploading(false);
-        setStatus({
-          status: 429,
-          // Display the custom message provided by the server
-          message:
-            backendData.message ||
-            "Prekoračen je broj pokušaja slanja. Molimo pokušajte ponovo kasnije.",
-        });
-        // Throw an error to stop execution and skip the success part
-        throw new Error(backendData.message || "Rate limit exceeded");
-      } else if (!backendResponse.ok) {
-        // Handle other server errors (e.g., validation errors)
-        setUploading(false);
-        setStatus({
-          status: 400,
-          message:
-            "Doslo je do greske sa uploadovanjem slike. Molimo kontaktirajte podrsku (podrska@insajder.tips)",
-        });
-        throw new Error(backendData.message || "Failed to save payment");
-      }
-
-      console.log("Payment successfully processed!", backendData);
-      setUploading(false);
-      setStatus({
-        status: 200,
-        message:
-          "Uspesno ste poslali sliku nasim administratorima! Ukoliko je sve u redu, Premium ce biti aktiviran u sto kracem mogucem roku.",
-      });
-      // Add success notification here
-    } catch (err) {
-      // This catch block will now catch the error thrown from the 429 check
-      // or the other general errors. You might want to update the message here
-      // to be less specific if it's handling multiple types of errors.
-
-      // Check if the error is due to an earlier check (like the 24h limit)
-      // or a network issue. If the status state was set (e.g., 429), it will
-      // retain that message.
-
-      // Only update status if it wasn't already set by a specific error handler above
-      if (!status.message) {
-        setStatus({
-          status: 400,
-          message:
-            "Doslo je do greske. Proverite da li ste vec poslali sliku uplatnice. Ukoliko imate problema, javite nam se (podrska@insajder.tips)",
-        });
-      }
-
-      setUploading(false);
-      // Add error notification here
-    }
-  };
+    setUploading(false);
+    setStatus({
+      status: 200,
+      message: "Uspesno ste poslali sliku! Premium ce biti aktiviran u sto kracem roku.",
+    });
+  } catch (err) {
+    console.error(err);
+    setStatus({
+      status: 400,
+      message: "Greška u komunikaciji sa serverom.",
+    });
+    setUploading(false);
+  }
+};
   return (
     <div className="w-full min-h-screen md:p-6 flex flex-col items-center justify-center">
       <div className="w-full text-white p-4 md:p-6 rounded-xl md:rounded-2xl shadow-lg md:shadow-2xl shadow-blue-950/50 border border-cyan-500/50">

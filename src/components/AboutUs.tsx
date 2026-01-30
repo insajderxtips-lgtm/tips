@@ -44,10 +44,7 @@ export default function AboutUs(): React.ReactNode {
       title: "Kako mogu da kupim članstvo na Insajder platformi?",
       content: (
         <div className="flex flex-col gap-2">
-          <p>Za kupovinu Lite/Premium članstva, možete koristiti:</p>
-          <div className="border-l-2 pl-3 bg-gray-900/20 rounded-sm border-emerald-500/30 hover:border-emerald-400/50 transition-colors">
-            <strong>PayPal / kartica:</strong> Brz i jednostavan proces. Nakon uplate odmah dobijate pristup.
-          </div>
+          <p>Za kupovinu Premium članstva, možete koristiti:</p>
           <div className="border-l-2 pl-3 bg-gray-900/20 rounded-sm border-emerald-500/30 hover:border-emerald-400/50 transition-colors">
             <strong>Uplatnica:</strong> Uploadujte sliku uplate, naši admini će vam odobriti pristup u kratkom roku.
           </div>

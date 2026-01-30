@@ -1,9 +1,12 @@
 import React, { useState, useEffect, useRef, useMemo } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { ChevronDown, ShieldCheck, Zap, Loader2, SearchX, Crown, Check, X, Lock } from "lucide-react";
-import { useSelector } from "react-redux";
+import { useDispatch, useSelector } from "react-redux";
 import { RootState } from "../../redux/store";
 import PremiumFallback from "../PremiumFallback";
+import { useNavigate } from "react-router";
+import { logout } from "../../../redux/slices/UserSlice";
+
 
 interface RenderTipsProps {
   tier: "free" | "premium";
@@ -19,52 +22,75 @@ const RenderTips: React.FC<RenderTipsProps> = ({ tier }) => {
   const canViewPremium = useMemo(() => {
     return tier !== "premium" || currentUserTier === "premium";
   }, [tier, currentUserTier]);
+  const nav = useNavigate();
+  const dispatch = useDispatch();
+  
 
-  useEffect(() => {
-    if (!canViewPremium) return;
+useEffect(() => {
+  if (!canViewPremium) return;
 
-    abortControllerRef.current?.abort();
-    const controller = new AbortController();
-    abortControllerRef.current = controller;
-    
-    const fetchTips = async () => {
-      setLoading(true);
-      try {
-        const res = await fetch(`/tips/${tier}`, { 
-          signal: controller.signal, 
-          cache: "no-store" 
-        });
+  const activeToken = localStorage.getItem("insajder_token");
 
-        if (res.status === 404) {
-          if (!controller.signal.aborted) {
-            setTips([]);
-            setLoading(false);
-          }
-          return;
+  // 1. Immediate logout if token is missing
+  if (!activeToken) {
+    dispatch(logout());
+    nav("/");
+    return;
+  }
+
+  abortControllerRef.current?.abort();
+  const controller = new AbortController();
+  abortControllerRef.current = controller;
+  
+  const fetchTips = async () => {
+    setLoading(true);
+    try {
+      const res = await fetch(`/tips/${tier}`, { 
+        signal: controller.signal, 
+        cache: "no-store",
+        headers: {
+          "Authorization": `Bearer ${activeToken}`,
+          "Content-Type": "application/json"
         }
+      });
 
-        if (!res.ok) throw new Error("Server error");
-        
-        const data = await res.json();
-        
+      // 2. Handle expired or invalid token
+      if (res.status === 401 || res.status === 403) {
+        dispatch(logout());
+        nav("/");
+        return;
+      }
+
+      if (res.status === 404) {
         if (!controller.signal.aborted) {
-          setTips(Array.isArray(data) ? data.filter(tip => tip.type === tier) : []);
-        }
-      } catch (err: any) {
-        if (err.name !== "AbortError") {
-          console.error("Fetch error:", err.message);
-        }
-      } finally {
-        if (!controller.signal.aborted) {
+          setTips([]);
           setLoading(false);
         }
+        return;
       }
-    };
 
-    fetchTips();
+      if (!res.ok) throw new Error("Server error");
+      
+      const data = await res.json();
+      
+      if (!controller.signal.aborted) {
+        setTips(Array.isArray(data) ? data.filter(tip => tip.type === tier) : []);
+      }
+    } catch (err: any) {
+      if (err.name !== "AbortError") {
+        console.error("Fetch error:", err.message);
+      }
+    } finally {
+      if (!controller.signal.aborted) {
+        setLoading(false);
+      }
+    }
+  };
 
-    return () => controller.abort();
-  }, [tier, canViewPremium]);
+  fetchTips();
+
+  return () => controller.abort();
+}, [tier, canViewPremium]);
 
   if (!canViewPremium) return <PremiumFallback pageType="tips" />;
 

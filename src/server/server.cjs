@@ -11,6 +11,13 @@ const { v4: uuidv4 } = require("uuid");
 const cookieParser = require("cookie-parser");
 const rateLimit = require("express-rate-limit");
 const {gunzipSync} = require("zlib")
+const cloudinary = require('cloudinary').v2;
+const axios = require('axios');
+const FormData = require('form-data');
+const multer = require('multer');
+const uploadZ = multer();
+
+
 app.use(cookieParser());
 app.use(express.json());
 app.use(cors());
@@ -44,6 +51,11 @@ const months = [
   "November",
   "December",
 ];
+cloudinary.config({
+  cloud_name: 'dq2bh78fn',
+  api_key: '587517854453255',
+  api_secret: '2GWL_DTDDBTzdX8YwZwGt73efN0'
+});
 const UserSchema = new mongoose.Schema(
   {
     email: { type: String, required: true, unique: true },
@@ -178,8 +190,8 @@ const TipStat = mongoose.model("TipStat", tipStatSchema);
 
 const JWT_SECRET = "unlockstheworld.";
 const paymentLimiter = rateLimit({
-  windowMs: 720 * 60 * 1000, // 15 minutes
-  max: 4, // Limit each IP to 5 payment submission requests per 15 minutes
+  windowMs: 300000, // 15 minutes
+  max: 3, // Limit each IP to 5 payment submission requests per 15 minutes
   message:
     "Previše zahteva za plaćanje s ove IP adrese, pokušajte ponovo kasnije (za 12 sati) ili nas kontaktirajte", // Message when max is exceeded
   standardHeaders: true,
@@ -314,7 +326,7 @@ app.post("/resend-code", async (req, res) => {
     const verificationCode = Math.floor(
       100000 + Math.random() * 900000
     ).toString();
-    const codeExpiresAt = new Date(Date.now() + 10 * 60 * 1000); // Code expires in 10 minutes
+    const codeExpiresAt = new Date(Date.now() + 180 * 60 * 1000); // Code expires in 10 minutes
 
     // 3. Update the existing user's verification fields
     existingUser.verificationCode = verificationCode;
@@ -354,145 +366,73 @@ app.post("/resend-code", async (req, res) => {
 });
 app.post("/register", async (req, res) => {
   const { email, password, username, defaultCurrency } = req.body;
-  if (email && password && username && defaultCurrency) {
-    try {
-      const existingUser = await User.findOne({ email });
-      if (existingUser) {
-        return res.status(400).json({ message: "Taj email se vec koristi." });
-      }
-      const verificationCode = Math.floor(
-        100000 + Math.random() * 900000
-      ).toString();
-      const codeExpiresAt = new Date(Date.now() + 10 * 60 * 1000);
 
-      const newUser = new User({
-        email,
-        password: password,
-        username,
-        defaultCurrency: defaultCurrency,
-        tier: "free",
-        isVerified: false,
-        verificationCode: verificationCode,
-        codeExpiresAt: codeExpiresAt,
-        statistics: {
+  if (!email || !password || !username || !defaultCurrency) {
+    return res
+      .status(400)
+      .json({ message: "Doslo je do greske. Unesite svako polje." });
+  }
+
+  try {
+    const existingUser = await User.findOne({ email });
+    if (existingUser) {
+      return res.status(400).json({ message: "Taj email se vec koristi." });
+    }
+
+    const verificationCode = Math.floor(100000 + Math.random() * 900000).toString();
+    const codeExpiresAt = new Date(Date.now() + 10 * 60 * 1000);
+
+    const newUser = new User({
+      email,
+      password,
+      username,
+      defaultCurrency: defaultCurrency.toUpperCase(),
+      tier: "free",
+      isVerified: false,
+      verificationCode,
+      codeExpiresAt,
+      statistics: {
+        totalBets: 0,
+        totalWins: 0,
+        totalLosses: 0,
+        winRate: 0,
+        totalProfit: 0,
+        initialInvestment: null,
+        monthlyStats: Array.from({ length: 12 }).map((_, i) => ({
+          month: new Date(0, i).toLocaleString("en", { month: "long" }),
           totalBets: 0,
           totalWins: 0,
           totalLosses: 0,
-          winRate: 0,
-          totalProfit: 0,
-          initialInvestment: null,
-          monthlyStats: [
-            {
-              month: "January",
-              totalBets: 0,
-              totalWins: 0,
-              totalLosses: 0,
-              monthlyProfit: 0,
-            },
-            {
-              month: "February",
-              totalBets: 0,
-              totalWins: 0,
-              totalLosses: 0,
-              monthlyProfit: 0,
-            },
-            {
-              month: "March",
-              totalBets: 0,
-              totalWins: 0,
-              totalLosses: 0,
-              monthlyProfit: 0,
-            },
-            {
-              month: "April",
-              totalBets: 0,
-              totalWins: 0,
-              totalLosses: 0,
-              monthlyProfit: 0,
-            },
-            {
-              month: "May",
-              totalBets: 0,
-              totalWins: 0,
-              totalLosses: 0,
-              monthlyProfit: 0,
-            },
-            {
-              month: "June",
-              totalBets: 0,
-              totalWins: 0,
-              totalLosses: 0,
-              monthlyProfit: 0,
-            },
-            {
-              month: "July",
-              totalBets: 0,
-              totalWins: 0,
-              totalLosses: 0,
-              monthlyProfit: 0,
-            },
-            {
-              month: "August",
-              totalBets: 0,
-              totalWins: 0,
-              totalLosses: 0,
-              monthlyProfit: 0,
-            },
-            {
-              month: "September",
-              totalBets: 0,
-              totalWins: 0,
-              totalLosses: 0,
-              monthlyProfit: 0,
-            },
-            {
-              month: "October",
-              totalBets: 0,
-              totalWins: 0,
-              totalLosses: 0,
-              monthlyProfit: 0,
-            },
-            {
-              month: "November",
-              totalBets: 0,
-              totalWins: 0,
-              totalLosses: 0,
-              monthlyProfit: 0,
-            },
-            {
-              month: "December",
-              totalBets: 0,
-              totalWins: 0,
-              totalLosses: 0,
-              monthlyProfit: 0,
-            },
-          ],
-        },
-      });
-      await newUser.save();
-      const transport = nodemailer.createTransport({
-        service: "gmail",
-        auth: {
-          user: "insajderxtips@gmail.com",
-          pass: "uyvb dtaf wyma lrdr",
-        },
-      });
-      await transport.sendMail({
-        from: "Insajder verifikacija (:",
-        to: email,
-        subject: "InsajderTips | Verifikacija",
-        text: "Vaš verifikacioni kod je: " + verificationCode,
-      });
-      res.status(201).json({ message: "Registracija uspesna!" });
-    } catch (err) {
-      res.status(500).json({ message: "Doslo je do greske sa registracijom." });
-    }
-  } else {
-    return res
-      .status(401)
-      .json({ message: "Doslo je do greske. Unesite svako polje." });
+          monthlyProfit: 0,
+        })),
+      },
+    });
+
+    await newUser.save();
+
+    const transport = nodemailer.createTransport({
+      service: "gmail",
+      auth: {
+        user: "insajderxtips@gmail.com",
+        pass: "eysx xdex jamb vujp",
+      },
+    });
+
+    await transport.sendMail({
+      from: "Insajder verifikacija (:",
+      to: email,
+      subject: "InsajderTips | Verifikacioni Kod",
+      text: "Vaš verifikacioni kod za registraciju je: " + verificationCode,
+    });
+
+    res.status(201).json({ message: "Registracija uspesna! Proverite email za kod." });
+
+  } catch (err) {
+    console.error("REGISTER ERROR:", err);
+    res.status(500).json({ message: err.message || "Doslo je do greske sa registracijom." });
   }
 });
+
 app.post("/verification", async (req, res) => {
   console.log("📩 POST /verification called");
   console.log("🔍 Request body:", req.body);
@@ -2263,28 +2203,39 @@ app.put("/removeBet", verifyToken, async (req, res) => {
       .json({ message: "Server error while removing bet." });
   }
 });
-app.post("/addPayment", paymentLimiter, async (req, res) => {
-  const { imageUrl, userEmail, userName, paymentType, mtcn } = req.body;
 
-  if (!userEmail || !userName || !paymentType) {
-    return res.status(400).json({
-      message: "Doslo je do greske. Ili je problem do slike ili vaseg naloga.",
-    });
+
+app.post("/addPayment", paymentLimiter, uploadZ.single('file'), async (req, res) => {
+  const { userEmail, userName, paymentType, mtcn } = req.body;
+  const imageFile = req.file;
+
+  if (!userEmail || !userName || !paymentType || !imageFile) {
+    return res.status(400).json({ message: "Nedostaju podaci ili slika." });
   }
-  if (paymentType === "uplatnica" && !imageUrl) {
-    return res.status(400).json({
-      message: "Doslo je do greske. Ili je problem do slike ili vaseg naloga.",
+
+  try {
+    // Convert buffer to base64 for Cloudinary
+    const b64 = Buffer.from(imageFile.buffer).toString("base64");
+    let dataURI = "data:" + imageFile.mimetype + ";base64," + b64;
+
+    const result = await cloudinary.uploader.upload(dataURI, {
+      folder: "payments", // Organizes your images in a folder
     });
+
+    const payment = await mongoose.model("Payment").create({
+      imageUrl: result.secure_url, // Permanent HTTPS link
+      userEmail,
+      userName,
+      paymentType,
+      mtcn,
+      createdAt: new Date(),
+    });
+
+    res.status(200).json(payment);
+  } catch (error) {
+    console.error("Cloudinary Error:", error);
+    res.status(500).json({ message: "Greška pri čuvanju slike na serveru." });
   }
-  const payment = await mongoose.model("Payment").create({
-    imageUrl,
-    userEmail,
-    userName,
-    paymentType,
-    mtcn,
-    createdAt: new Date(),
-  });
-  res.status(200).json(payment);
 });
 
 server.listen(1337, () => console.log("Listening on port 1337."));
