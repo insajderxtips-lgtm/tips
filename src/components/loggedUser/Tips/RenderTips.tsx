@@ -182,10 +182,12 @@ useEffect(() => {
                               <div className="absolute top-4 right-4"><Crown size={20} className="text-cyan-500" /></div>
                               <span className="text-[10px] font-black text-cyan-500 uppercase tracking-[0.3em] mb-6">Premium Član</span>
                               <ul className="space-y-4 w-full mb-8 text-xs font-bold text-white">
-                                <li className="flex items-center justify-between">Mečevi <Check size={16} className="text-cyan-500" /></li>
+                                <li className="flex items-center justify-between">Tip meča <Check size={16} className="text-cyan-500" /></li>
                                 <li className="flex items-center justify-between">Analiza <Check size={16} className="text-cyan-500" /></li>
                                 <li className="flex items-center justify-between">Postave <Check size={16} className="text-cyan-500" /></li>
                                 <li className="flex items-center justify-between">Povrede <Check size={16} className="text-cyan-500" /></li>
+                                                                <li className="flex items-center justify-between">Mečevi visoke sigurnosti <Check size={16} className="text-cyan-500" /></li>
+
                               </ul>
                               <a href="/kupi" className="w-full py-4 bg-cyan-500 text-slate-950 rounded-2xl text-[11px] font-black uppercase tracking-widest hover:scale-[1.02] transition-transform">
                                 Nadogradi Nalog (30 €)

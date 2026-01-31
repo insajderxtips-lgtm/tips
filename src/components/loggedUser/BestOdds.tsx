@@ -39,7 +39,7 @@ function TipTooltip({ onClose }: { onClose: () => void }) {
 export default function BestOdds() {
   const currentUserTier = useSelector((state: RootState) => state.user.tier);
   const [searchQuery, setSearchQuery] = useState<string>("");
-  const [upcomingGames, setUpcomingGames] = useState<any[]>([]);
+  const [upcomingGames, setUpcomingGames] = useState<any[] | null>(null);
   const [selectedGame, setSelectedGame] = useState<any>(null);
   const [loading, setLoading] = useState(false);
   const [gameOdds, setGameOdds] = useState<any>({});
@@ -67,7 +67,7 @@ export default function BestOdds() {
     if (!tipSearch) return gameOdds;
     const result: any = {};
     const query = tipSearch.toLowerCase();
-   
+    
     Object.keys(gameOdds).forEach((category) => {
       const categoryData = gameOdds[category];
       if (categoryData.name) {
@@ -124,7 +124,6 @@ export default function BestOdds() {
       .then(json => {
         setUpcomingGames(json);
         setLoading(false);
-   
       })
       .catch(() => {
         setUpcomingGames([]);
@@ -133,6 +132,7 @@ export default function BestOdds() {
   }, [searchQuery]);
 
   const selectGameById = useCallback((index: number) => {
+    if (!upcomingGames) return;
     const game = upcomingGames[index];
     if (!game) return;
 
@@ -184,7 +184,7 @@ export default function BestOdds() {
               <div className="relative w-full">
                 <input
                   type="text"
-                  placeholder="Pretraži timove..."
+                  placeholder="Pretraži timove (npr. Real Madrid)..."
                   value={searchQuery}
                   onChange={(e) => setSearchQuery(e.target.value)}
                   onKeyDown={(e) => e.key === "Enter" && find()}
@@ -206,41 +206,61 @@ export default function BestOdds() {
               className="mt-6 sm:mt-10 space-y-3 sm:space-y-4 overflow-y-auto max-h-[60vh] pr-1 sm:pr-2 custom-scrollbar"
             >
               <AnimatePresence mode="popLayout">
-                {upcomingGames.map((game, index) => (
+                {upcomingGames && upcomingGames.length > 0 ? (
+                  upcomingGames.map((game, index) => (
+                    <motion.div 
+                      key={`${game.home}-${index}`}
+                      initial={{ opacity: 0, x: -20 }}
+                      animate={{ opacity: 1, x: 0 }}
+                      exit={{ opacity: 0, scale: 0.95 }}
+                      transition={{ duration: 0.2, delay: index * 0.05 }}
+                      onClick={() => selectGameById(index)} 
+                      className="group bg-white/5 hover:bg-white/10 border border-white/5 rounded-xl sm:rounded-2xl p-4 sm:p-6 cursor-pointer transition-all hover:border-cyan-500/50"
+                    >
+                      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 sm:gap-6">
+                        <div className="flex items-center gap-3 sm:gap-6">
+                          <div className="flex-1 md:flex-none md:min-w-[120px] text-left md:text-right">
+                            <span className="text-white font-bold text-sm sm:text-xl block md:inline">{game.home}</span>
+                          </div>
+                          <div className="bg-cyan-500/10 rounded-lg px-2 sm:px-3 py-1 shrink-0">
+                            <span className="text-cyan-400 text-[10px] sm:text-xs font-black">VS</span>
+                          </div>
+                          <div className="flex-1 md:flex-none md:min-w-[120px] text-right md:text-left">
+                            <span className="text-white font-bold text-sm sm:text-xl block md:inline">{game.away}</span>
+                          </div>
+                        </div>
+                        <div className="flex items-center justify-center md:justify-start gap-4 text-[11px] sm:text-sm text-gray-400 bg-black/20 px-4 py-2 rounded-xl border border-white/5">
+                          <span className="font-medium">
+                            {new Intl.DateTimeFormat("en-US", { day: "2-digit", month: "short", hour: "2-digit", minute: "2-digit" }).format(new Date(game.kickOffTime))}
+                          </span>
+                        </div>
+                      </div>
+                    </motion.div>
+                  ))
+                ) : upcomingGames !== null && !loading ? (
                   <motion.div 
-                    key={`${game.home}-${index}`}
-                    initial={{ opacity: 0, x: -20 }}
-                    animate={{ opacity: 1, x: 0 }}
-                    exit={{ opacity: 0, scale: 0.95 }}
-                    transition={{ duration: 0.2, delay: index * 0.05 }}
-                    onClick={() => selectGameById(index)} 
-                    className="group bg-white/5 hover:bg-white/10 border border-white/5 rounded-xl sm:rounded-2xl p-4 sm:p-6 cursor-pointer transition-all hover:border-cyan-500/50"
+                    initial={{ opacity: 0, y: 10 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    className="flex flex-col items-center justify-center py-20 text-center space-y-4"
                   >
-                    <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 sm:gap-6">
-                      <div className="flex items-center gap-3 sm:gap-6">
-                        <div className="flex-1 md:flex-none md:min-w-[120px] text-left md:text-right">
-                          <span className="text-white font-bold text-sm sm:text-xl block md:inline">{game.home}</span>
-                        </div>
-                        <div className="bg-cyan-500/10 rounded-lg px-2 sm:px-3 py-1 shrink-0">
-                          <span className="text-cyan-400 text-[10px] sm:text-xs font-black">VS</span>
-                        </div>
-                        <div className="flex-1 md:flex-none md:min-w-[120px] text-right md:text-left">
-                          <span className="text-white font-bold text-sm sm:text-xl block md:inline">{game.away}</span>
-                        </div>
-                      </div>
-                      <div className="flex items-center justify-center md:justify-start gap-4 text-[11px] sm:text-sm text-gray-400 bg-black/20 px-4 py-2 rounded-xl border border-white/5">
-                        <span className="font-medium">
-                          {new Intl.DateTimeFormat("en-US", { day: "2-digit", month: "short", hour: "2-digit", minute: "2-digit" }).format(new Date(game.kickOffTime))}
-                        </span>
-                      </div>
+                    <div className="p-6 bg-white/5 rounded-full border border-dashed border-white/10">
+                      <svg className="w-12 h-12 text-gray-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M9.172 16.172a4 4 0 015.656 0M9 10h.01M15 10h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                      </svg>
+                    </div>
+                    <div>
+                      <h3 className="text-xl font-bold text-white">Nema pronađenih mečeva</h3>
+                      <p className="text-gray-400 max-w-xs mt-2">
+                        Izgleda da nema zakazanih utakmica za ovaj upit. Probaj da skratiš naziv tima ili proveri kucanje.
+                      </p>
                     </div>
                   </motion.div>
-                ))}
+                ) : null}
               </AnimatePresence>
             </motion.div>
           </div>
         ) : (
-          <div className="flex flex-col h-full">
+          <div className="flex flex-col h-full overflow-hidden">
             <div className="p-4 sm:p-10 border-b border-white/5 bg-white/[0.02]">
               <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4 sm:gap-6">
                 <div>
@@ -262,92 +282,91 @@ export default function BestOdds() {
               </div>
             </div>
 
-        <div className="flex-1 overflow-x-auto p-2 sm:p-8 custom-scrollbar">
-  {loading ? (
-    <div className="p-10 sm:p-20 text-center">
-      <div className="animate-spin inline-block w-8 h-8 border-4 border-cyan-500 border-t-transparent rounded-full mb-4"></div>
-      <p className="text-cyan-500 font-bold uppercase text-xs">Ažuriranje kvota...</p>
-    </div>
-  ) : (
-    /* Increased min-w to 800px to give the 7 columns (Market + 6 Books) enough breathing room */
-    <div className="min-w-[800px] lg:min-w-full overflow-hidden rounded-xl sm:rounded-2xl border border-white/5 bg-black/10">
-      <table className="w-full text-xs sm:text-sm text-left table-fixed">
-        <thead>
-          <tr className="bg-white/5">
-            {/* Adjusted width for the Market column */}
-            <th className="w-[180px] sm:w-[220px] px-4 sm:px-6 py-4 sm:py-5 font-black text-gray-400 uppercase text-[9px] sm:text-[10px]">Market i Tip</th>
-            {["Soccer", "Mozzart", "MaxBet", "Oktagon", "Merkur", "Brazil"].map(b => (
-              <th key={b} className="px-1 sm:px-2 py-4 sm:py-5 text-center font-bold text-gray-500 text-[9px] sm:text-[10px] uppercase">{b}</th>
-            ))}
-          </tr>
-        </thead>
-        <tbody className="divide-y divide-white/5">
-          {Object.keys(filteredOdds).map(category => (
-            <React.Fragment key={category}>
-              <tr onClick={() => setExpandedCategory(expandedCategory === category ? null : category)} className="bg-white/[0.03] hover:bg-white/[0.06] cursor-pointer transition-colors">
-                {/* colSpan updated to 7 to account for the new column */}
-                <td colSpan={7} className="px-4 sm:px-6 py-3 sm:py-4">
-                  <div className="flex items-center gap-2 sm:gap-3">
-                    <motion.div 
-                      animate={{ rotate: expandedCategory === category ? 0 : -90 }}
-                      className="p-1 rounded bg-cyan-500/20 text-cyan-500"
-                    >
-                      <svg className="h-3 w-3 sm:h-4 sm:w-4" viewBox="0 0 20 20" fill="currentColor"><path d="M5.293 7.293a1 1 0 011.414 0L10 10.586l3.293-3.293a1 1 0 111.414 1.414l-4 4a1 1 0 01-1.414 0l-4-4a1 1 0 010-1.414z" /></svg>
-                    </motion.div>
-                    <span className="font-black text-white uppercase text-[11px] sm:text-sm">{filteredOdds[category].name}</span>
-                  </div>
-                </td>
-              </tr>
-              {expandedCategory === category && Object.values(filteredOdds[category]).map((bet: any, idx) => {
-                if (!bet.reference || bet.reference === "name") return null;
-                
-                // Added bet.brazil to the array
-                const currentOddsValues = [
-                  bet.soccerBet || 0, 
-                  bet.mozzartBet || 0, 
-                  bet.maxBet || 0, 
-                  bet.oktagon || 0, 
-                  bet.merkur || 0,
-                  bet.brazil || 0,
-                ];
-                const highest = Math.max(...currentOddsValues);
+            {/* THE FIX: Added overflow-x-auto to this container and ensured table is scrollable */}
+            <div className="flex-1 overflow-x-auto p-2 sm:p-8 custom-scrollbar">
+              {loading ? (
+                <div className="p-10 sm:p-20 text-center">
+                  <div className="animate-spin inline-block w-8 h-8 border-4 border-cyan-500 border-t-transparent rounded-full mb-4"></div>
+                  <p className="text-cyan-500 font-bold uppercase text-xs">Ažuriranje kvota...</p>
+                </div>
+              ) : (
+                <div className="min-w-[800px] inline-block w-full align-middle">
+                  <div className="overflow-hidden rounded-xl border border-white/5 bg-black/10">
+                    <table className="w-full text-xs sm:text-sm text-left table-fixed">
+                      <thead>
+                        <tr className="bg-white/5">
+                          <th className="w-[180px] sm:w-[220px] px-4 sm:px-6 py-4 sm:py-5 font-black text-gray-400 uppercase text-[9px] sm:text-[10px]">Market i Tip</th>
+                          {["Soccer", "Mozzart", "MaxBet", "Oktagon", "Merkur", "Brazil"].map(b => (
+                            <th key={b} className="px-1 sm:px-2 py-4 sm:py-5 text-center font-bold text-gray-500 text-[9px] sm:text-[10px] uppercase">{b}</th>
+                          ))}
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-white/5">
+                        {Object.keys(filteredOdds).map(category => (
+                          <React.Fragment key={category}>
+                            <tr onClick={() => setExpandedCategory(expandedCategory === category ? null : category)} className="bg-white/[0.03] hover:bg-white/[0.06] cursor-pointer transition-colors">
+                              <td colSpan={7} className="px-4 sm:px-6 py-3 sm:py-4">
+                                <div className="flex items-center gap-2 sm:gap-3">
+                                  <motion.div 
+                                    animate={{ rotate: expandedCategory === category ? 0 : -90 }}
+                                    className="p-1 rounded bg-cyan-500/20 text-cyan-500"
+                                  >
+                                    <svg className="h-3 w-3 sm:h-4 sm:w-4" viewBox="0 0 20 20" fill="currentColor"><path d="M5.293 7.293a1 1 0 011.414 0L10 10.586l3.293-3.293a1 1 0 111.414 1.414l-4 4a1 1 0 01-1.414 0l-4-4a1 1 0 010-1.414z" /></svg>
+                                  </motion.div>
+                                  <span className="font-black text-white uppercase text-[11px] sm:text-sm">{filteredOdds[category].name}</span>
+                                </div>
+                              </td>
+                            </tr>
+                            {expandedCategory === category && Object.values(filteredOdds[category]).map((bet: any, idx) => {
+                              if (!bet.reference || bet.reference === "name") return null;
+                              
+                              const currentOddsValues = [
+                                bet.soccerBet || 0, 
+                                bet.mozzartBet || 0, 
+                                bet.maxBet || 0, 
+                                bet.oktagon || 0, 
+                                bet.merkur || 0,
+                                bet.brazil || 0,
+                              ];
+                              const highest = Math.max(...currentOddsValues);
 
-                return (
-                  <motion.tr 
-                    key={idx} 
-                    initial={{ opacity: 0, y: -10 }}
-                    animate={{ opacity: 1, y: 0 }}
-                    className="group hover:bg-cyan-500/[0.02] transition-colors"
-                  >
-                    <td className="px-4 sm:px-6 py-4 sm:py-5 cursor-pointer" onClick={() => addToSlip(bet)}>
-                      <div className="flex flex-col">
-                        <span className="text-white font-bold group-hover:text-cyan-400 transition-colors text-[11px] sm:text-sm whitespace-nowrap overflow-hidden text-ellipsis">
-                          {bet.reference === "1" ? `${selectedGame.home} POBEĐUJE` : bet.reference === "2" ? `${selectedGame.away} POBEĐUJE` : bet.reference === "x" ? "NEREŠENO" : bet.reference}
-                        </span>
-                        <span className="text-[8px] sm:text-[9px] text-gray-500 uppercase font-black">Klikni za dodavanje</span>
-                      </div>
-                    </td>
-                    {currentOddsValues.map((val, i) => (
-                      <td key={i} className="px-1 sm:px-1.5 py-3 sm:py-4 text-center">
-                        <button
-                          disabled={val <= 0}
-                          onClick={() => addToSlip(bet)}
-                          className={`w-full max-w-[65px] sm:max-w-[80px] py-2 sm:py-3 rounded-lg font-mono font-bold text-[10px] sm:text-sm transition-all ${val === highest && val > 0 ? "bg-cyan-500 text-black shadow-lg scale-105" : "bg-white/5 text-gray-300 hover:bg-white/10"}`}
-                        >
-                          {val > 0 ? val.toFixed(2) : "—"}
-                        </button>
-                      </td>
-                    ))}
-                  </motion.tr>
-                );
-              })}
-            </React.Fragment>
-          ))}
-        </tbody>
-      </table>
-    </div>
-  )}
-</div>
+                              return (
+                                <motion.tr 
+                                  key={idx} 
+                                  initial={{ opacity: 0, y: -10 }}
+                                  animate={{ opacity: 1, y: 0 }}
+                                  className="group hover:bg-cyan-500/[0.02] transition-colors"
+                                >
+                                  <td className="px-4 sm:px-6 py-4 sm:py-5 cursor-pointer" onClick={() => addToSlip(bet)}>
+                                    <div className="flex flex-col">
+                                      <span className="text-white font-bold group-hover:text-cyan-400 transition-colors text-[11px] sm:text-sm whitespace-nowrap overflow-hidden text-ellipsis">
+                                        {bet.reference === "1" ? `${selectedGame.home} POBEĐUJE` : bet.reference === "2" ? `${selectedGame.away} POBEĐUJE` : bet.reference === "x" ? "NEREŠENO" : bet.reference}
+                                      </span>
+                                      <span className="text-[8px] sm:text-[9px] text-gray-500 uppercase font-black">Klikni za dodavanje</span>
+                                    </div>
+                                  </td>
+                                  {currentOddsValues.map((val, i) => (
+                                    <td key={i} className="px-1 sm:px-1.5 py-3 sm:py-4 text-center">
+                                      <button
+                                        disabled={val <= 0}
+                                        onClick={() => addToSlip(bet)}
+                                        className={`w-full max-w-[65px] sm:max-w-[80px] py-2 sm:py-3 rounded-lg font-mono font-bold text-[10px] sm:text-sm transition-all ${val === highest && val > 0 ? "bg-cyan-500 text-black shadow-lg scale-105" : "bg-white/5 text-gray-300 hover:bg-white/10"}`}
+                                      >
+                                        {val > 0 ? val.toFixed(2) : "—"}
+                                      </button>
+                                    </td>
+                                  ))}
+                                </motion.tr>
+                              );
+                            })}
+                          </React.Fragment>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+              )}
+            </div>
           </div>
         )}
         <div className="text-center py-4 text-[9px] sm:text-[10px] font-black text-gray-600 uppercase">Sve kvote se ažuriraju u realnom vremenu</div>
@@ -387,7 +406,7 @@ export default function BestOdds() {
           </div>
           {betslip.length > 0 && (
             <div className="p-4 sm:p-6 bg-black/60 border-t border-white/10">
-              <div className="grid grid-cols-5 gap-1 sm:gap-2">
+              <div className="grid grid-cols-6 gap-1 sm:gap-2">
                 {["Soccer", "Mozzart", "MaxBet", "Oktagon", "Merkur", "Brazil"].map(bookie => {
                   const total = betslip.reduce((t, b) => t * (b.odds[bookie] || 1), 1);
                   return (

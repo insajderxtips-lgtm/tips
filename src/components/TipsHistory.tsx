@@ -14,7 +14,7 @@ type Bet = {
 };
 
 export default function TipsHistory() {
-  const [activeFilter, setActiveFilter] = useState<"all" | "fudbal" | "kosarka" | "tenis">("all");
+  const [activeFilter, setActiveFilter] = useState<"sve" | "fudbal" | "kosarka" | "tenis">("sve");
   const [tipStats, setTipStats] = useState<Bet[]>([]);
   const [expandedGroups, setExpandedGroups] = useState({ free: false, premium: false });
   const [sortConfig, setSortConfig] = useState<{ key: keyof Bet; direction: "asc" | "desc" } | null>({
@@ -49,7 +49,7 @@ export default function TipsHistory() {
     return items;
   }, [tipStats, sortConfig]);
 
-  const filtered = sortedBets.filter(b => activeFilter === "all" || b.sport === activeFilter);
+  const filtered = sortedBets.filter(b => activeFilter === "sve" || b.sport === activeFilter);
   const premiumBets = filtered.filter(b => b.grupa === "premium");
   const freeBets = filtered.filter(b => b.grupa === "free");
 

@@ -1924,6 +1924,8 @@ odds["secondHalf"]["ki2"]["mozzartBet"] = groups[18]?.odds?.[2]?.value ?? null;
         (game) => game.kickOffTime === date
     );
 
+
+
     if (filteredGames.length > 0) {
         const matchId = filteredGames[0].id;
         const matchUrl = `https://www.merkurxtip.rs/restapi/offer/sr/match/${matchId}?annex=0&mobileVersion=1.16.2.18&locale=sr`;
@@ -2042,7 +2044,7 @@ if (brazilJson?.esMatches) {
             const detailJson = await response.json();
             const currentOdds = detailJson.odds;
 
-            console.log("BRAZIL DATA FETCHED FOR ID:", matchId);
+        
 
            if (currentOdds) {
   odds["ki"]["awayAndAway3Plus"]["brazil"] = currentOdds["50267"];
