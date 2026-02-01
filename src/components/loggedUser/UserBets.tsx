@@ -307,7 +307,7 @@ export default function UserBets({
                             <td className={`whitespace-nowrap py-5 pl-6 pr-4 text-base font-medium text-white sticky left-0 bg-slate-900/50 border-l-4 ${statusBorder}`}>{bet.match}</td>
                             <td className="whitespace-nowrap px-4 py-5 text-base text-slate-400">{bet.tip}</td>
                             <td className="whitespace-nowrap px-4 py-5 text-base text-slate-400"><span className="inline-flex items-center rounded-lg bg-slate-700/60 px-2.5 py-1.5 text-sm font-semibold text-sky-300">{Number(bet.odds).toFixed(2)}</span></td>
-                            <td className="whitespace-nowrap px-4 py-5 text-base font-semibold text-white">{bet.stake}€</td>
+                            <td className="whitespace-nowrap px-4 py-5 text-base font-semibold text-white">{bet.stake}</td>
                             <td className="whitespace-nowrap px-4 py-5 text-base">
                               <button onClick={() => openEditor(bet)} className={`inline-flex items-center gap-x-2 rounded-lg px-2.5 py-1.5 text-sm font-semibold ${statusBadge}`}>{status === "active" && <div className="h-2 w-2 rounded-full bg-sky-400 animate-pulse"></div>}{status}</button>
                             </td>
