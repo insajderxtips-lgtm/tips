@@ -1,5 +1,33 @@
 import React, { useState, useMemo } from "react";
 import { createPortal } from "react-dom";
+import { motion, AnimatePresence } from "framer-motion";
+import { ChevronDown, Trash2, Layers } from "lucide-react";
+
+const STATUS: Record<string, { bar: string; pill: string; label: string; dot: string }> = {
+  win: { bar: "border-emerald-500", pill: "bg-emerald-500/10 text-emerald-400 ring-emerald-500/20", label: "prolaz", dot: "bg-emerald-400" },
+  loss: { bar: "border-rose-500", pill: "bg-rose-500/10 text-rose-400 ring-rose-500/20", label: "gubitan", dot: "bg-rose-400" },
+  active: { bar: "border-sky-500", pill: "bg-sky-500/10 text-sky-400 ring-sky-500/20", label: "aktivan", dot: "bg-sky-400" },
+};
+const statusOf = (s: string) => STATUS[s] || STATUS.active;
+
+/** Formats an amount with Serbian thousands separators (e.g. 33500 → "33.500"). */
+const fmtAmount = (n: number): string =>
+  (Math.round(Math.abs(n) * 100) / 100).toLocaleString("sr-RS", { maximumFractionDigits: 2 });
+
+/** A hand-drawn wavy connector (deliberately not an arrow) linking a bet's
+ *  status to its profit/loss amount. */
+function WigglyLine({ className = "" }: { className?: string }) {
+  return (
+    <svg width="36" height="12" viewBox="0 0 36 12" fill="none" aria-hidden className={className}>
+      <path
+        d="M1 6 C 3 1.5, 5 1.5, 7 6 S 11 10.5, 13 6 S 17 1.5, 19 6 S 23 10.5, 25 6 S 29 1.5, 31 6 S 34 8, 35 6"
+        stroke="currentColor"
+        strokeWidth="1.6"
+        strokeLinecap="round"
+      />
+    </svg>
+  );
+}
 
 export default function UserBets({
   bets,
@@ -11,8 +39,8 @@ export default function UserBets({
   setUserStats: any;
 }): React.ReactNode {
   const [openParlayKey, setOpenParlayKey] = useState<string | null>(null);
-  const [openMonths, setOpenMonths] = useState({});
-  const [editor, setEditor] = useState({
+  const [openMonths, setOpenMonths] = useState<Record<string, boolean>>({});
+  const [editor, setEditor] = useState<any>({
     visible: false,
     parlay: false,
     bet: null,
@@ -186,10 +214,10 @@ export default function UserBets({
     }
   }
 
- const removeBet = async (bet) => {
+  const removeBet = async (bet) => {
     const isParlay = bet.type === "parlay";
     const betId = bet.betId;
-    
+
     // 1. Construct datePath for the server (e.g., "0.bets.26")
     const dateParts = (bet.date || "1/1").split("/").map(Number);
     const monthIndex = Math.max(0, (dateParts[0] || 1) - 1);
@@ -246,13 +274,13 @@ export default function UserBets({
     try {
       await fetch("/removeBet", {
         method: "PUT",
-        headers: { 
-          "Content-Type": "application/json", 
-          Authorization: "Bearer " + JWT 
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: "Bearer " + JWT,
         },
-        body: JSON.stringify({ 
-          betId, 
-          datePath // Sending the path the server expects
+        body: JSON.stringify({
+          betId,
+          datePath, // Sending the path the server expects
         }),
       });
     } catch (err) {
@@ -260,139 +288,220 @@ export default function UserBets({
     }
   };
 
+  const monthKeys = Object.keys(groupedBets);
+
+  if (monthKeys.length === 0) {
+    return (
+      <div className="flex flex-col items-center justify-center gap-2 py-12 text-center">
+        <Layers className="h-7 w-7 text-slate-700" />
+        <p className="text-[11px] font-bold uppercase tracking-widest text-slate-600">Nema opklada za prikaz</p>
+      </div>
+    );
+  }
+
   return (
-    <div className="relative max-h-[calc(100vh-200px)] overflow-auto select-none scrollbar-thin scrollbar-track-transparent scrollbar-thumb-gray-700/50">
-      <div className="w-full overflow-hidden rounded-2xl border border-slate-800 bg-slate-900/50 shadow-lg">
-        <div className="overflow-x-auto">
-          <table className="min-w-full divide-y divide-slate-800">
-            <thead className="sticky top-0 z-10 bg-slate-900/80 backdrop-blur-sm">
-              <tr>
-                <th className="sticky left-0 z-20 bg-slate-900/80 py-4 pl-6 pr-4 text-left text-base font-semibold text-white backdrop-blur-sm">Meč</th>
-                <th className="px-4 py-4 text-left text-base font-semibold text-white">Tip</th>
-                <th className="px-4 py-4 text-left text-base font-semibold text-white">Kvota</th>
-                <th className="px-4 py-4 text-left text-base font-semibold text-white">Ulog</th>
-                <th className="px-4 py-4 text-left text-base font-semibold text-white">Status</th>
-                <th className="px-4 py-4 text-left text-base font-semibold text-white">Datum</th>
-                <th className="relative py-4 pl-4 pr-6"><span className="sr-only">Delete</span></th>
-              </tr>
-            </thead>
+    <div className="select-none space-y-3">
+      {monthKeys.map((monthYear) => {
+        const monthBets = groupedBets[monthYear];
+        const isMonthOpen = openMonths[monthYear];
 
-            {Object.entries(groupedBets).map(([monthYear, monthBets]) => (
-              <React.Fragment key={monthYear}>
-                <tbody className="divide-y divide-slate-800 border-t-2 border-slate-700">
-                  <tr onClick={() => toggleMonth(monthYear)} className="bg-slate-900/70 cursor-pointer transition-colors hover:bg-slate-800">
-                    <td colSpan={7} className="py-3 px-6 text-base font-bold text-white tracking-wider">
-                      <div className="flex items-center gap-3">
-                        <svg className={`h-5 w-5 transition-transform ${openMonths[monthYear] ? "rotate-180" : ""}`} fill="none" viewBox="0 0 24 24" strokeWidth="2" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" d="M19 9l-7 7-7-7"/></svg>
-                        <span className="capitalize">{monthYear}</span>
-                        <span className="ml-auto text-sm font-normal text-slate-400">{monthBets.length} opklada</span>
-                      </div>
-                    </td>
-                  </tr>
-                </tbody>
+        return (
+          <div key={monthYear}>
+            {/* Month header */}
+            <button
+              onClick={() => toggleMonth(monthYear)}
+              className="flex w-full items-center gap-3 rounded-xl border border-[#1a3050] bg-[#0b1628] px-4 py-3 transition-colors hover:border-[#2a4d75] hover:bg-[#0b1c2e]"
+            >
+              <motion.span animate={{ rotate: isMonthOpen ? 0 : -90 }} className="text-slate-500">
+                <ChevronDown className="h-4 w-4" />
+              </motion.span>
+              <span className="text-sm font-bold capitalize text-white">{monthYear}</span>
+              <span className="ml-auto rounded-full bg-white/5 px-2.5 py-1 text-[10px] font-bold text-slate-400">
+                {monthBets.length}
+              </span>
+            </button>
 
-                {openMonths[monthYear] && (
-                  <tbody className="divide-y divide-slate-800">
+            {/* Bets */}
+            <AnimatePresence initial={false}>
+              {isMonthOpen && (
+                <motion.div
+                  initial={{ height: 0, opacity: 0 }}
+                  animate={{ height: "auto", opacity: 1 }}
+                  exit={{ height: 0, opacity: 0 }}
+                  transition={{ duration: 0.3, ease: "easeInOut" }}
+                  className="overflow-hidden"
+                >
+                  <div className="space-y-2 pt-2">
                     {monthBets.map((bet, index) => {
                       const uniqueKey = `${monthYear}-${index}`;
-                      const isParlay = bet.type === "parlay";
-                      const status = bet.status;
-
-                      const statusBorder = status === "win" ? "border-green-500" : status === "loss" ? "border-red-500" : "border-sky-500";
-                      const statusBadge = status === "win" ? "bg-green-500/10 text-green-400 ring-1 ring-green-500/20" : status === "loss" ? "bg-red-500/10 text-red-400 ring-1 ring-red-500/20" : "bg-sky-500/10 text-sky-400 ring-1 ring-sky-500/20";
-
-                      if (!isParlay) {
-                        return (
-                          <tr key={uniqueKey} className="transition-colors hover:bg-slate-800/40">
-                            <td className={`whitespace-nowrap py-5 pl-6 pr-4 text-base font-medium text-white sticky left-0 bg-slate-900/50 border-l-4 ${statusBorder}`}>{bet.match}</td>
-                            <td className="whitespace-nowrap px-4 py-5 text-base text-slate-400">{bet.tip}</td>
-                            <td className="whitespace-nowrap px-4 py-5 text-base text-slate-400"><span className="inline-flex items-center rounded-lg bg-slate-700/60 px-2.5 py-1.5 text-sm font-semibold text-sky-300">{Number(bet.odds).toFixed(2)}</span></td>
-                            <td className="whitespace-nowrap px-4 py-5 text-base font-semibold text-white">{bet.stake}</td>
-                            <td className="whitespace-nowrap px-4 py-5 text-base">
-                              <button onClick={() => openEditor(bet)} className={`inline-flex items-center gap-x-2 rounded-lg px-2.5 py-1.5 text-sm font-semibold ${statusBadge}`}>{status === "active" && <div className="h-2 w-2 rounded-full bg-sky-400 animate-pulse"></div>}{status}</button>
-                            </td>
-                            <td className="whitespace-nowrap px-4 py-5 text-base text-slate-500">{bet.date}</td>
-                            <td className="relative whitespace-nowrap py-5 pl-4 pr-6 text-right">
-                              <button onClick={() => removeBet(bet)} className="p-1 rounded-full text-slate-500 hover:text-red-400 hover:bg-slate-800">
-                                <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" strokeWidth="1.5" stroke="currentColor"><path d="M14.74 9l-.346 9m-4.788 0L9.26 9m9.968-3.21c.342.052.682.107 1.022.166m-1.022-.165L18.16 19.673a2.25 2.25 0 01-2.244 2.077H8.084a2.25 2.25 0 01-2.244-2.077L4.772 5.79m14.456 0a48.108 48.108 0 00-3.478-.397m-12 .562c.34-.059.68-.114 1.022-.165m0 0a48.11 48.11 0 013.478-.397m7.5 0v-.916c0-1.18-.91-2.134-2.09-2.201a51.964 51.964 0 00-3.32 0c-1.18.067-2.09 1.022-2.09 2.201v.916m7.5 0a48.667 48.667 0 00-7.5 0"/></svg>
-                              </button>
-                            </td>
-                          </tr>
-                        );
-                      }
+                      // A system ticket is any bet that carries a list of games — not only
+                      // those explicitly typed "parlay" (older tickets may omit the type).
+                      const games: any[] = Array.isArray(bet?.games)
+                        ? bet.games
+                        : Array.isArray(bet)
+                        ? bet
+                        : [];
+                      const isParlay = games.length > 0;
+                      const resolvedStatus = bet.status ?? games[0]?.status;
+                      const st = statusOf(resolvedStatus);
+                      const isParlayOpen = openParlayKey === uniqueKey;
 
                       return (
-                        <React.Fragment key={uniqueKey}>
-                          <tr onClick={() => toggleParlay(uniqueKey)} className="cursor-pointer bg-slate-800/20 transition-colors hover:bg-slate-800/50">
-                            <td className={`whitespace-nowrap py-5 pl-6 pr-4 text-base font-medium text-sky-300 sticky left-0 bg-slate-900/50 border-l-4 ${statusBorder}`}>
+                        <div
+                          key={uniqueKey}
+                          className={`overflow-hidden rounded-xl border border-[#1a3050] border-l-4 bg-[#0b1c2e]/70 ${st.bar}`}
+                        >
+                          <div
+                            className={`flex items-center gap-3 p-3 ${isParlay ? "cursor-pointer" : ""}`}
+                            onClick={isParlay ? () => toggleParlay(uniqueKey) : undefined}
+                          >
+                            {/* Match + meta */}
+                            <div className="min-w-0 flex-1">
                               <div className="flex items-center gap-2">
-                                <span>[Sistem {bet.games?.length || 0} meča]</span>
-                                <svg className={`h-5 w-5 transition-transform ${openParlayKey === uniqueKey ? "rotate-180" : ""}`} fill="none" viewBox="0 0 24 24" strokeWidth="2" stroke="currentColor"><path d="M19 9l-7 7-7-7"/></svg>
+                                {isParlay && (
+                                  <span className="inline-flex items-center gap-1 rounded-md bg-sky-500/10 px-1.5 py-0.5 text-[9px] font-black uppercase tracking-wider text-sky-300">
+                                    <Layers className="h-3 w-3" />
+                                    {games.length}
+                                  </span>
+                                )}
+                                <p className="truncate text-sm font-bold text-white">
+                                  {isParlay ? "Sistem tiket" : bet.match}
+                                </p>
                               </div>
-                            </td>
-                            <td className="whitespace-nowrap px-4 py-5 text-base text-slate-500">Kombinacija</td>
-                            <td className="whitespace-nowrap px-4 py-5 text-base text-slate-400"><span className="inline-flex items-center rounded-lg bg-slate-700/60 px-2.5 py-1.5 text-sm font-semibold text-sky-300">{Number(bet.odds).toFixed(2)}</span></td>
-                            <td className="whitespace-nowrap px-4 py-5 text-base font-semibold text-white">{bet.stake}€</td>
-                            <td className="whitespace-nowrap px-4 py-5 text-base">
-                              <button onClick={(e) => { e.stopPropagation(); openEditor(bet); }} className={`inline-flex items-center gap-x-2 rounded-lg px-2.5 py-1.5 text-sm font-semibold ${statusBadge}`}>{status}</button>
-                            </td>
-                            <td className="whitespace-nowrap px-4 py-5 text-base text-slate-500">{bet.date}</td>
-                            <td className="relative whitespace-nowrap py-5 pl-4 pr-6 text-right">
-                              <button onClick={(e) => { e.stopPropagation(); removeBet(bet); }} className="p-1 rounded-full text-slate-500 hover:text-red-400 hover:bg-slate-800">
-                                <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" strokeWidth="1.5" stroke="currentColor"><path d="M14.74 9l-.346 9m-4.788 0L9.26 9m9.968-3.21c.342.052.682.107 1.022.166m-1.022-.165L18.16 19.673a2.25 2.25 0 01-2.244 2.077H8.084a2.25 2.25 0 01-2.244-2.077L4.772 5.79m14.456 0a48.108 48.108 0 00-3.478-.397m-12 .562c.34-.059.68-.114 1.022-.165m0 0a48.11 48.11 0 013.478-.397m7.5 0v-.916c0-1.18-.91-2.134-2.09-2.201a51.964 51.964 0 00-3.32 0c-1.18.067-2.09 1.022-2.09 2.201v.916m7.5 0a48.667 48.667 0 00-7.5 0"/></svg>
-                              </button>
-                            </td>
-                          </tr>
-                          {openParlayKey === uniqueKey && bet.games?.map((game, gIndex) => (
-                            <tr key={`${uniqueKey}-g-${gIndex}`} className="bg-slate-800/10">
-                              <td className="whitespace-nowrap py-4 pl-12 pr-4 text-sm font-medium text-slate-300">↳ {game.match}</td>
-                              <td className="whitespace-nowrap px-4 py-4 text-sm text-slate-400">{game.tip}</td>
-                              <td className="whitespace-nowrap px-4 py-4 text-sm text-slate-500">{Number(game.odds).toFixed(2)}</td>
-                              <td colSpan={4}></td>
-                            </tr>
-                          ))}
-                        </React.Fragment>
+                              <div className="mt-0.5 flex items-center gap-1.5 text-[10px] text-slate-500">
+                                <span className="truncate">{isParlay ? "Kombinacija" : bet.tip}</span>
+                                <span className="text-slate-700">·</span>
+                                <span className="shrink-0 font-mono">{bet.date}</span>
+                              </div>
+                            </div>
+
+                            {/* Odds + stake */}
+                            <div className="shrink-0 text-right">
+                              <p className="font-mono text-sm font-bold text-sky-300">{Number(bet.odds).toFixed(2)}</p>
+                              <p className="text-[10px] text-slate-500">ulog {bet.stake}</p>
+                            </div>
+
+                            {/* Status pill */}
+                            <button
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                openEditor(bet);
+                              }}
+                              className={`inline-flex shrink-0 items-center gap-1.5 rounded-lg px-2.5 py-1.5 text-[10px] font-black uppercase tracking-wide ring-1 ${st.pill}`}
+                            >
+                              {bet.status === "active" && <span className={`h-1.5 w-1.5 animate-pulse rounded-full ${st.dot}`} />}
+                              {st.label}
+                            </button>
+
+                            {/* Profit / loss — wavy line links the status to the amount */}
+                            {(resolvedStatus === "win" || resolvedStatus === "loss") && (() => {
+                              const win = resolvedStatus === "win";
+                              const stake = Number(bet.stake) || 0;
+                              const odds = Number(bet.odds) || 0;
+                              const amount = win ? stake * (odds - 1) : stake;
+                              return (
+                                <div className="flex shrink-0 items-center gap-0.5">
+                                  <WigglyLine className={win ? "text-emerald-400/60" : "text-rose-400/60"} />
+                                  <span className={`font-mono text-xs font-black tabular-nums ${win ? "text-emerald-400" : "text-rose-400"}`}>
+                                    {win ? "+" : "-"}{fmtAmount(amount)}
+                                  </span>
+                                </div>
+                              );
+                            })()}
+
+                            {/* Parlay chevron */}
+                            {isParlay && (
+                              <motion.span animate={{ rotate: isParlayOpen ? 180 : 0 }} className="shrink-0 text-slate-600">
+                                <ChevronDown className="h-4 w-4" />
+                              </motion.span>
+                            )}
+
+                            {/* Delete (inset; never flush to the viewport edge) */}
+                            <button
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                removeBet(bet);
+                              }}
+                              aria-label="Ukloni opkladu"
+                              className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg text-slate-600 transition-colors hover:bg-rose-500/10 hover:text-rose-400"
+                            >
+                              <Trash2 className="h-4 w-4" />
+                            </button>
+                          </div>
+
+                          {/* Parlay games */}
+                          <AnimatePresence initial={false}>
+                            {isParlay && isParlayOpen && (
+                              <motion.div
+                                initial={{ height: 0, opacity: 0 }}
+                                animate={{ height: "auto", opacity: 1 }}
+                                exit={{ height: 0, opacity: 0 }}
+                                transition={{ duration: 0.25 }}
+                                className="overflow-hidden"
+                              >
+                                <div className="space-y-1 border-t border-[#1a3050] bg-[#07131f]/60 p-3">
+                                  {games.map((game: any, gIndex: number) => (
+                                    <div key={`${uniqueKey}-g-${gIndex}`} className="flex items-center justify-between gap-3 text-xs">
+                                      <span className="min-w-0 flex-1 truncate text-slate-300">↳ {game.match}</span>
+                                      <span className="shrink-0 text-slate-500">{game.tip}</span>
+                                      <span className="shrink-0 font-mono text-slate-400">{Number(game.odds).toFixed(2)}</span>
+                                    </div>
+                                  ))}
+                                </div>
+                              </motion.div>
+                            )}
+                          </AnimatePresence>
+                        </div>
                       );
                     })}
-                  </tbody>
-                )}
-              </React.Fragment>
-            ))}
-          </table>
-        </div>
-      </div>
+                  </div>
+                </motion.div>
+              )}
+            </AnimatePresence>
+          </div>
+        );
+      })}
 
       {editor.visible &&
         createPortal(
-          <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-slate-950/80 backdrop-blur-sm">
-            <div className="w-full max-w-md rounded-2xl border border-slate-800 bg-slate-900 p-6 shadow-2xl">
-              <h2 className="text-xl font-bold text-white mb-6">Ažuriraj Status Opklade</h2>
+          <div className="fixed inset-0 z-[100] flex items-center justify-center bg-slate-950/80 p-4 backdrop-blur-sm">
+            <motion.div
+              initial={{ scale: 0.94, opacity: 0, y: 16 }}
+              animate={{ scale: 1, opacity: 1, y: 0 }}
+              transition={{ type: "spring", stiffness: 280, damping: 22 }}
+              className="w-full max-w-md rounded-2xl border border-[#1a3050] bg-[#07131f] p-6 shadow-2xl"
+            >
+              <h2 className="mb-6 text-xl font-bold text-white">Ažuriraj Status Opklade</h2>
               <div className="space-y-4">
                 <div>
-                  <label className="block text-sm font-medium text-slate-400 mb-2">Novi Status</label>
+                  <label className="mb-2 block text-sm font-medium text-slate-400">Novi Status</label>
                   <select
                     value={editor.newStatus}
                     onChange={(e) => setEditor((prev) => ({ ...prev, newStatus: e.target.value }))}
-                    className="w-full rounded-xl border border-slate-700 bg-slate-800 px-4 py-3 text-white focus:border-sky-500 focus:outline-none"
+                    className="w-full rounded-xl border border-[#1a3050] bg-[#0b1c2e] px-4 py-3 text-white focus:border-sky-500 focus:outline-none"
                   >
-                    <option value="active">Active</option>
-                    <option value="win">Win</option>
-                    <option value="loss">Loss</option>
+                    <option value="active">Aktivan</option>
+                    <option value="win">Prolaz</option>
+                    <option value="loss">Gubitan</option>
                   </select>
                 </div>
 
                 {editor.editorStatus && (
-                  <div className={`rounded-lg p-3 text-sm font-medium ${editor.editorStatus.includes('uspešno') ? 'bg-green-500/10 text-green-400' : 'bg-red-500/10 text-red-400'}`}>
+                  <div className={`rounded-lg p-3 text-sm font-medium ${editor.editorStatus.includes("uspešno") ? "bg-emerald-500/10 text-emerald-400" : "bg-rose-500/10 text-rose-400"}`}>
                     {editor.editorStatus}
                   </div>
                 )}
 
-                <div className="flex gap-3 pt-4">
-                  <button onClick={closeEditor} className="flex-1 rounded-xl bg-slate-800 px-4 py-3 font-semibold text-white transition-colors hover:bg-slate-700">Otkaži</button>
-                  <button onClick={saveChanges} className="flex-1 rounded-xl bg-sky-500 px-4 py-3 font-semibold text-white transition-colors hover:bg-sky-400">Sačuvaj</button>
+                <div className="flex gap-3 pt-2">
+                  <button onClick={closeEditor} className="flex-1 rounded-xl bg-[#0b1c2e] px-4 py-3 font-semibold text-white transition-colors hover:bg-[#0d2035]">
+                    Otkaži
+                  </button>
+                  <button onClick={saveChanges} className="flex-1 rounded-xl bg-gradient-to-r from-blue-600 to-indigo-600 px-4 py-3 font-semibold text-white transition-all hover:shadow-[0_0_20px_rgba(59,130,246,0.4)]">
+                    Sačuvaj
+                  </button>
                 </div>
               </div>
-            </div>
+            </motion.div>
           </div>,
           document.body
         )}

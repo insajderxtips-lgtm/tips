@@ -26,6 +26,9 @@ export default defineConfig({
       "/updateStatistics": "http://localhost:1337",
       "/updateBet": "http://localhost:1337",
       "/resend-code": "http://localhost:1337",
+      "/dropping-odds": "http://localhost:1337",
+      "/teaser-odds": "http://localhost:1337",
+      "/matches": "http://localhost:1337",
 
       // Special configuration for WebSockets
       "/socket.io": {

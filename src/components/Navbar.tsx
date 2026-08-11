@@ -1,8 +1,14 @@
 import { useEffect, useState } from "react";
 import { useSelector } from "react-redux";
 import { Link, useLocation, useNavigate } from "react-router";
+import { motion } from "framer-motion";
 import logo from "../assets/insider_logo.png";
 import { RootState } from "../redux/store";
+
+const NAV_ITEMS = [
+  { text: "Početna", url: "/" },
+  { text: "O nama", url: "/onama" },
+];
 
 export default function Navbar(): React.ReactNode {
   const location = useLocation();
@@ -10,100 +16,99 @@ export default function Navbar(): React.ReactNode {
   const [selectedUrl, setSelectedUrl] = useState<string>("");
   const userData = useSelector((state: RootState) => state.user);
 
-  const navItems = [
-    { text: "Početna", url: "/" },
-    { text: "O nama", url: "/onama" },
-  ];
-
   useEffect(() => {
     setSelectedUrl(location.pathname);
   }, [location.pathname]);
 
   return (
-    <nav className="fixed top-0 left-0 w-full z-[100] px-3 py-4 md:px-6 md:py-6">
-      <div className="max-w-7xl mx-auto">
-        <div className="relative h-16 md:h-20 flex items-center justify-between px-4 md:px-6 bg-slate-900/40 backdrop-blur-2xl border border-white/5 rounded-[1.5rem] md:rounded-[2.5rem] shadow-[0_20px_50px_rgba(0,0,0,0.5)]">
-          
-          {/* 1. Left Section: Logo (Flex-1 ensures it pushes middle to center) */}
-          <div className="flex-1 flex items-center">
-            <div 
-              onClick={() => navigate("/")} 
-              className="cursor-pointer transition-transform hover:scale-105 active:scale-95"
+    <motion.nav
+      initial={{ y: -80, opacity: 0 }}
+      animate={{ y: 0, opacity: 1 }}
+      transition={{ type: "spring", stiffness: 120, damping: 20 }}
+      className="fixed left-0 top-0 z-[100] w-full px-3 py-4 md:px-6 md:py-6"
+    >
+      <div className="mx-auto max-w-7xl">
+        <div className="relative flex h-16 items-center justify-between rounded-[1.5rem] border border-[#1a3050] bg-[#07131f]/60 px-4 shadow-[0_20px_50px_rgba(0,0,0,0.5)] backdrop-blur-2xl md:h-20 md:rounded-[2.5rem] md:px-6">
+          {/* Left: Logo */}
+          <div className="flex flex-1 items-center">
+            <motion.div
+              whileHover={{ scale: 1.08 }}
+              whileTap={{ scale: 0.95 }}
+              onClick={() => navigate("/")}
+              className="cursor-pointer"
             >
-              <img src={logo} alt="Logo" className="w-10 h-10 md:w-14 md:h-14 object-contain drop-shadow-[0_0_10px_rgba(56,189,248,0.3)]" />
-            </div>
+              <img
+                src={logo}
+                alt="Logo"
+                className="h-10 w-10 object-contain drop-shadow-[0_0_10px_rgba(56,189,248,0.3)] md:h-14 md:w-14"
+              />
+            </motion.div>
           </div>
 
-          {/* 2. Middle Section: Navigation (Perfectly Centered) */}
+          {/* Middle: Navigation */}
           <div className="flex items-center gap-5 md:gap-10">
-            {navItems.map((item) => (
-              <Link
-                key={item.url}
-                to={item.url}
-                className={`relative text-[10px] md:text-xs font-black uppercase tracking-[0.25em] transition-all duration-300 ${
-                  selectedUrl === item.url ? "text-white" : "text-slate-500 hover:text-slate-200"
-                }`}
-              >
-                {item.text}
-                {selectedUrl === item.url && (
-                  <span className="absolute -bottom-2 left-1/2 -translate-x-1/2 w-1 h-1 bg-sky-500 rounded-full shadow-[0_0_8px_#38bdf8]"></span>
-                )}
-              </Link>
-            ))}
-            
-            {/* Desktop Premium Button */}
+            {NAV_ITEMS.map((item) => {
+              const active = selectedUrl === item.url;
+              return (
+                <Link
+                  key={item.url}
+                  to={item.url}
+                  className={`relative text-[10px] font-black uppercase tracking-[0.25em] transition-colors duration-300 md:text-xs ${
+                    active ? "text-white" : "text-slate-500 hover:text-slate-200"
+                  }`}
+                >
+                  {item.text}
+                  {active && (
+                    <motion.span
+                      layoutId="navbar-active"
+                      transition={{ type: "spring", stiffness: 380, damping: 30 }}
+                      className="absolute -bottom-2 left-1/2 h-1 w-1 -translate-x-1/2 rounded-full bg-sky-500 shadow-[0_0_8px_#38bdf8]"
+                    />
+                  )}
+                </Link>
+              );
+            })}
+
             <Link
               to="/login"
-              className="hidden lg:block text-[10px] md:text-xs font-black uppercase tracking-[0.25em] text-amber-400 hover:text-amber-200 transition-all hover:drop-shadow-[0_0_10px_rgba(251,191,36,0.4)]"
+              className="hidden text-[10px] font-black uppercase tracking-[0.25em] text-amber-400 transition-all hover:text-amber-200 hover:drop-shadow-[0_0_10px_rgba(251,191,36,0.4)] md:text-xs lg:block"
             >
-              Kupi Premium
+              PRISTUP
             </Link>
           </div>
 
-          {/* 3. Right Section: Action Buttons (Flex-1 pushes middle to center) */}
-          <div className="flex-1 flex justify-end items-center gap-3">
+          {/* Right: Actions */}
+          <div className="flex flex-1 items-center justify-end gap-3">
             {!userData.username ? (
-              <>
-                {/* Clear Login Button */}
-                <button
-                  onClick={() => navigate("/login")}
-                  className="group relative flex items-center justify-center px-5 py-2 md:px-8 md:py-3 rounded-xl md:rounded-2xl overflow-hidden transition-all active:scale-95"
-                >
-                  {/* Button Background & Border */}
-                  <div className="absolute inset-0 bg-white group-hover:bg-sky-400 transition-colors duration-300"></div>
-                  
-                  {/* Text */}
-                  <span className="relative z-10 text-black font-black text-[10px] md:text-xs uppercase tracking-tighter">
-                    Uloguj se
-                  </span>
-                </button>
-
-                {/* Mobile Login Icon (Visible only if user wants tiny icon on mobile) */}
-                <button 
-                  onClick={() => navigate("/login")}
-                  className="hidden md:hidden text-white/50 hover:text-white transition-colors"
-                >
-                  <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth="2.5" stroke="currentColor" className="w-5 h-5">
-                    <path strokeLinecap="round" strokeLinejoin="round" d="M15.75 9V5.25A2.25 2.25 0 0013.5 3h-6a2.25 2.25 0 00-2.25 2.25v13.5A2.25 2.25 0 007.5 21h6a2.25 2.25 0 002.25-2.25V15M12 9l3 3m0 0-3 3m3-3H2.25" />
-                  </svg>
-                </button>
-              </>
-            ) : (
-              <div 
-                onClick={() => navigate("/profile")}
-                className="flex items-center gap-3 cursor-pointer group"
+              <motion.button
+                whileHover={{ scale: 1.04 }}
+                whileTap={{ scale: 0.95 }}
+                onClick={() => navigate("/login")}
+                className="group relative flex items-center justify-center overflow-hidden rounded-xl px-5 py-2 md:rounded-2xl md:px-8 md:py-3"
               >
-                <span className="hidden md:block text-[10px] font-black uppercase tracking-widest text-slate-400 group-hover:text-white transition-colors">
+                <div className="absolute inset-0 bg-gradient-to-r from-blue-500 to-indigo-600 transition-all duration-300 group-hover:from-sky-400 group-hover:to-blue-500" />
+                <span className="relative z-10 text-[10px] font-black uppercase tracking-tighter text-white md:text-xs">
+                  Uloguj se
+                </span>
+              </motion.button>
+            ) : (
+              <motion.div
+                whileHover={{ scale: 1.03 }}
+                whileTap={{ scale: 0.97 }}
+                onClick={() => navigate("/profile")}
+                className="group flex cursor-pointer items-center gap-3"
+              >
+                <span className="hidden text-[10px] font-black uppercase tracking-widest text-slate-400 transition-colors group-hover:text-white md:block">
                   {userData.username}
                 </span>
-                <div className="w-8 h-8 md:w-10 md:h-10 rounded-full border border-white/10 bg-gradient-to-br from-sky-500 to-blue-700 flex items-center justify-center shadow-lg">
-                  <span className="text-white font-black text-xs">{userData.username[0].toUpperCase()}</span>
+                <div className="flex h-8 w-8 items-center justify-center rounded-full border border-white/10 bg-gradient-to-br from-blue-500 to-indigo-700 shadow-lg md:h-10 md:w-10">
+                  <span className="text-xs font-black text-white">{userData.username[0].toUpperCase()}</span>
                 </div>
-              </div>
+              </motion.div>
             )}
           </div>
         </div>
       </div>
-    </nav>
+    </motion.nav>
   );
 }

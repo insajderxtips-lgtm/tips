@@ -2,6 +2,13 @@
 @import url("https://fonts.googleapis.com/css2?family=Roboto:wght@300;400;500;700;900&display=swap");
 @import "tailwindcss";
 
+/* ── Dashboard entrance keyframes ──────────────────────────────────────────── */
+/* Used by StatCard top-border. Pure CSS/GPU – no JS layout recalc.           */
+@keyframes expandX {
+  from { transform: scaleX(0); }
+  to   { transform: scaleX(1); }
+}
+
 /* 1. CORE RESET & MOBILE SCROLL FIXES */
 * {
   box-sizing: border-box;

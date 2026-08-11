@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from "react";
 import { useSearchParams, useNavigate } from "react-router";
+import { motion, AnimatePresence } from "framer-motion";
 import { Lock, Eye, EyeOff, CheckCircle2, AlertCircle, ArrowLeft } from "lucide-react";
 
 const ResetPassword: React.FC = () => {
@@ -54,51 +55,75 @@ const ResetPassword: React.FC = () => {
   };
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-[#0f172a] bg-[radial-gradient(circle_at_top_right,_var(--tw-gradient-stops))] from-slate-900 via-[#0f172a] to-blue-900/20 px-4">
-      <div className="w-full max-w-md">
+    <div className="flex min-h-screen items-center justify-center bg-[#020b18] px-4">
+      {/* Animated ambient glows */}
+      <div aria-hidden className="pointer-events-none fixed inset-0 overflow-hidden">
+        <div className="absolute -right-[10%] -top-[10%] h-[460px] w-[460px] rounded-full bg-blue-600/10 blur-3xl" />
+        <div className="absolute -bottom-[10%] -left-[10%] h-[460px] w-[460px] rounded-full bg-indigo-600/10 blur-3xl" />
+      </div>
+
+      <motion.div
+        initial={{ opacity: 0, y: 28, scale: 0.97 }}
+        animate={{ opacity: 1, y: 0, scale: 1 }}
+        transition={{ type: "spring", stiffness: 120, damping: 18 }}
+        className="relative z-10 w-full max-w-md"
+      >
         <div className="mb-8 text-center">
-          <h1 className="text-3xl font-extrabold text-white tracking-tight">
-            Insajder<span className="text-blue-500">.</span>Tips
+          <h1 className="text-3xl font-black italic tracking-tighter text-white">
+            INSAJDER<span className="text-emerald-400">.</span>
           </h1>
         </div>
 
-        <div className="bg-white/5 backdrop-blur-xl border border-white/10 p-8 rounded-3xl shadow-2xl transition-all duration-300">
-          <div className="flex justify-center mb-6">
-            <div className="p-3 bg-blue-500/10 rounded-2xl border border-blue-500/20">
-              <Lock className="w-8 h-8 text-blue-500" />
+        <div className="rounded-3xl border border-[#1a3050] bg-[#07131f]/70 p-8 shadow-[0_30px_80px_-20px_rgba(0,0,0,0.8)] backdrop-blur-2xl">
+          <motion.div
+            initial={{ scale: 0.6, rotate: -10, opacity: 0 }}
+            animate={{ scale: 1, rotate: 0, opacity: 1 }}
+            transition={{ delay: 0.15, type: "spring", stiffness: 260, damping: 16 }}
+            className="mb-6 flex justify-center"
+          >
+            <div className="rounded-2xl border border-blue-500/20 bg-gradient-to-br from-blue-500/10 to-emerald-500/10 p-3">
+              <Lock className="h-8 w-8 text-blue-400" />
             </div>
-          </div>
+          </motion.div>
 
-          <h2 className="text-xl font-semibold text-white text-center mb-2">
-            Postavite novu lozinku
-          </h2>
-          <p className="text-slate-400 text-sm text-center mb-8">
-            Vaša nova lozinka mora biti drugačija od prethodne.
-          </p>
+          <h2 className="mb-2 text-center text-xl font-bold text-white">Postavite novu lozinku</h2>
+          <p className="mb-8 text-center text-sm text-slate-400">Vaša nova lozinka mora biti drugačija od prethodne.</p>
 
-          {error && (
-            <div className="mb-6 p-4 bg-red-500/10 border border-red-500/20 rounded-xl flex items-center gap-3 text-red-400 text-sm animate-shake">
-              <AlertCircle className="w-5 h-5 flex-shrink-0" />
-              {error}
-            </div>
-          )}
-
-          {success && (
-            <div className="mb-6 p-4 bg-emerald-500/10 border border-emerald-500/20 rounded-xl flex items-center gap-3 text-emerald-400 text-sm">
-              <CheckCircle2 className="w-5 h-5 flex-shrink-0" />
-              {success}
-            </div>
-          )}
+          <AnimatePresence mode="wait">
+            {error && (
+              <motion.div
+                key="err"
+                initial={{ opacity: 0, height: 0, x: 0 }}
+                animate={{ opacity: 1, height: "auto", x: [0, -8, 8, -5, 5, 0] }}
+                exit={{ opacity: 0, height: 0 }}
+                transition={{ x: { duration: 0.4 } }}
+                className="mb-6 flex items-center gap-3 overflow-hidden rounded-xl border border-red-500/20 bg-red-500/10 p-4 text-sm text-red-400"
+              >
+                <AlertCircle className="h-5 w-5 flex-shrink-0" />
+                {error}
+              </motion.div>
+            )}
+            {success && (
+              <motion.div
+                key="ok"
+                initial={{ opacity: 0, height: 0 }}
+                animate={{ opacity: 1, height: "auto" }}
+                exit={{ opacity: 0, height: 0 }}
+                className="mb-6 flex items-center gap-3 overflow-hidden rounded-xl border border-emerald-500/20 bg-emerald-500/10 p-4 text-sm text-emerald-400"
+              >
+                <CheckCircle2 className="h-5 w-5 flex-shrink-0" />
+                {success}
+              </motion.div>
+            )}
+          </AnimatePresence>
 
           <form onSubmit={handleSubmit} className="space-y-5">
-            <div className="relative">
-              <label className="block text-slate-300 text-xs font-medium uppercase tracking-wider mb-2 ml-1">
-                Nova Lozinka
-              </label>
+            <div>
+              <label className="mb-2 ml-1 block text-xs font-medium uppercase tracking-wider text-slate-300">Nova Lozinka</label>
               <div className="relative">
                 <input
                   type={showPassword ? "text" : "password"}
-                  className="w-full pl-4 pr-12 py-3.5 rounded-xl bg-slate-900/50 border border-slate-700 text-white placeholder:text-slate-600 focus:outline-none focus:ring-2 focus:ring-blue-500/50 focus:border-blue-500 transition-all"
+                  className="w-full rounded-xl border border-[#1a3050] bg-[#0b1c2e] py-3.5 pl-4 pr-12 text-white transition-all placeholder:text-slate-600 focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500/30"
                   placeholder="••••••••"
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
@@ -108,7 +133,7 @@ const ResetPassword: React.FC = () => {
                 <button
                   type="button"
                   onClick={() => setShowPassword(!showPassword)}
-                  className="absolute right-4 top-1/2 -translate-y-1/2 text-slate-500 hover:text-white transition-colors"
+                  className="absolute right-4 top-1/2 -translate-y-1/2 text-slate-500 transition-colors hover:text-white"
                 >
                   {showPassword ? <EyeOff size={20} /> : <Eye size={20} />}
                 </button>
@@ -116,12 +141,10 @@ const ResetPassword: React.FC = () => {
             </div>
 
             <div>
-              <label className="block text-slate-300 text-xs font-medium uppercase tracking-wider mb-2 ml-1">
-                Potvrdite Lozinku
-              </label>
+              <label className="mb-2 ml-1 block text-xs font-medium uppercase tracking-wider text-slate-300">Potvrdite Lozinku</label>
               <input
                 type="password"
-                className="w-full px-4 py-3.5 rounded-xl bg-slate-900/50 border border-slate-700 text-white placeholder:text-slate-600 focus:outline-none focus:ring-2 focus:ring-blue-500/50 focus:border-blue-500 transition-all"
+                className="w-full rounded-xl border border-[#1a3050] bg-[#0b1c2e] px-4 py-3.5 text-white transition-all placeholder:text-slate-600 focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500/30"
                 placeholder="••••••••"
                 value={confirmPassword}
                 onChange={(e) => setConfirmPassword(e.target.value)}
@@ -130,24 +153,26 @@ const ResetPassword: React.FC = () => {
               />
             </div>
 
-            <button
+            <motion.button
               type="submit"
               disabled={loading || !!success}
-              className="w-full py-4 px-6 rounded-xl bg-blue-600 hover:bg-blue-500 disabled:opacity-50 disabled:cursor-not-allowed text-white font-bold text-sm uppercase tracking-widest shadow-lg shadow-blue-600/20 active:scale-[0.98] transition-all"
+              whileHover={{ scale: loading || success ? 1 : 1.02 }}
+              whileTap={{ scale: loading || success ? 1 : 0.98 }}
+              className="w-full rounded-xl bg-gradient-to-r from-blue-600 to-indigo-600 px-6 py-4 text-sm font-bold uppercase tracking-widest text-white shadow-lg shadow-blue-900/30 transition-shadow hover:shadow-[0_0_24px_rgba(59,130,246,0.4)] disabled:cursor-not-allowed disabled:opacity-50"
             >
               {loading ? "Slanje..." : "Ažuriraj Lozinku"}
-            </button>
+            </motion.button>
           </form>
 
           <button
             onClick={() => navigate("/login")}
-            className="w-full mt-6 flex items-center justify-center gap-2 text-slate-400 hover:text-white text-sm transition-colors"
+            className="group mt-6 flex w-full items-center justify-center gap-2 text-sm text-slate-400 transition-colors hover:text-white"
           >
-            <ArrowLeft size={16} />
+            <ArrowLeft size={16} className="transition-transform group-hover:-translate-x-1" />
             Nazad na prijavu
           </button>
         </div>
-      </div>
+      </motion.div>
     </div>
   );
 };

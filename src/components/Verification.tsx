@@ -1,69 +1,88 @@
-import React, { useState, useRef, ClipboardEvent, KeyboardEvent } from "react";
+import React, { useState, useRef, useEffect, ClipboardEvent, KeyboardEvent } from "react";
 import { useDispatch, useSelector } from "react-redux";
+import { motion, AnimatePresence } from "framer-motion";
+import { ShieldCheck, CheckCircle2, AlertCircle, RefreshCw, Mail } from "lucide-react";
 import { RootState } from "../redux/store";
 import { setUser } from "../redux/slices/UserSlice";
 import { useNavigate } from "react-router";
 
-const Verifikacija: React.FC = () => {
-  const [otp, setOtp] = useState<string[]>(new Array(6).fill(""));
-  const [message, setMessage] = useState("");
-  const [status, setStatus] = useState<"success" | "error" | "">("");
-  const [resendDisabled, setResendDisabled] = useState(false);
-  const inputRefs = useRef<(HTMLInputElement | null)[]>([]);
+const COOLDOWN = 30;
 
-  const email = useSelector((state: RootState) => state.user?.email);
-  const user = useSelector((state: RootState) => state.user);
+const Verifikacija: React.FC = () => {
+  const [otp, setOtp]               = useState<string[]>(new Array(6).fill(""));
+  const [message, setMessage]       = useState("");
+  const [status, setStatus]         = useState<"success" | "error" | "">("");
+  const [cooldown, setCooldown]     = useState(0);
+  const [isVerifying, setIsVerifying] = useState(false);
+  const inputRefs                   = useRef<(HTMLInputElement | null)[]>([]);
+  const timerRef                    = useRef<ReturnType<typeof setInterval> | null>(null);
+
+  const email    = useSelector((state: RootState) => state.user?.email);
+  const user     = useSelector((state: RootState) => state.user);
   const dispatch = useDispatch();
-  const nav = useNavigate();
+  const nav      = useNavigate();
+
+  useEffect(() => {
+    return () => { if (timerRef.current) clearInterval(timerRef.current); };
+  }, []);
+
+  const startCooldown = () => {
+    setCooldown(COOLDOWN);
+    timerRef.current = setInterval(() => {
+      setCooldown((c) => {
+        if (c <= 1) { clearInterval(timerRef.current!); return 0; }
+        return c - 1;
+      });
+    }, 1000);
+  };
 
   const handleChange = (element: HTMLInputElement, index: number) => {
-    const value = element.value;
-    if (isNaN(Number(value))) return;
-
+    const value = element.value.replace(/\D/g, "").slice(-1);
     const newOtp = [...otp];
     newOtp[index] = value;
     setOtp(newOtp);
-
-    if (value && inputRefs.current[index + 1]) {
-      inputRefs.current[index + 1]?.focus();
-    }
+    if (value && inputRefs.current[index + 1]) inputRefs.current[index + 1]?.focus();
   };
 
   const handleKeyDown = (e: KeyboardEvent<HTMLInputElement>, index: number) => {
-    if (e.key === "Backspace" && !otp[index] && inputRefs.current[index - 1]) {
-      inputRefs.current[index - 1]?.focus();
+    if (e.key === "Backspace") {
+      if (otp[index]) {
+        const newOtp = [...otp];
+        newOtp[index] = "";
+        setOtp(newOtp);
+      } else if (inputRefs.current[index - 1]) {
+        inputRefs.current[index - 1]?.focus();
+      }
     }
   };
 
   const handlePaste = (e: ClipboardEvent<HTMLInputElement>) => {
     e.preventDefault();
-    const paste = e.clipboardData.getData("text");
-    if (paste.length === 6 && /^\d+$/.test(paste)) {
-      const newOtp = paste.split("");
-      setOtp(newOtp);
+    const paste = e.clipboardData.getData("text").replace(/\D/g, "").slice(0, 6);
+    if (paste.length === 6) {
+      setOtp(paste.split(""));
       inputRefs.current[5]?.focus();
     }
   };
 
   const handleVerify = async () => {
-    setMessage("");
-    setStatus("");
-
     const finalCode = otp.join("");
-
     if (finalCode.length < 6 || !email) {
       setStatus("error");
-      setMessage("Došlo je do greške. Unesite kompletan kod.");
+      setMessage("Unesite kompletan 6-cifreni kod.");
       return;
     }
 
-    try {
-      const res = await fetch("/verification", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ email, code: finalCode }),
-      });
+    setIsVerifying(true);
+    setMessage("");
+    setStatus("");
 
+    try {
+      const res  = await fetch("/verification", {
+        method:  "POST",
+        headers: { "Content-Type": "application/json" },
+        body:    JSON.stringify({ email, code: finalCode }),
+      });
       const data = await res.json();
 
       if (!res.ok) {
@@ -73,155 +92,233 @@ const Verifikacija: React.FC = () => {
       }
 
       setStatus("success");
-      setMessage("Uspešno ste verifikovali nalog!");
+      setMessage("Nalog je uspešno verifikovan!");
       dispatch(setUser({ ...user, isVerified: true }));
-
-      setTimeout(() => {
-        nav("/");
-      }, 1500);
-    } catch (err) {
-      console.error("Greška:", err);
+      setTimeout(() => nav("/"), 1800);
+    } catch {
       setStatus("error");
-      setMessage("Došlo je do greške na mreži ili serveru.");
+      setMessage("Greška na mreži. Pokušajte ponovo.");
+    } finally {
+      setIsVerifying(false);
     }
   };
 
   const handleResend = async () => {
-    if (!email) {
-      setStatus("error");
-      setMessage("Email nije dostupan.");
-      return;
-    }
+    if (!email || cooldown > 0) return;
 
-    if (resendDisabled) return;
-
-    setResendDisabled(true);
-    setTimeout(() => setResendDisabled(false), 30000); // 30s cooldown
+    startCooldown();
+    setMessage("");
+    setStatus("");
 
     try {
-      const res = await fetch("/resend-code", {
-        method: "POST",
+      const res  = await fetch("/resend-code", {
+        method:  "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ email }),
+        body:    JSON.stringify({ email }),
       });
-
       const data = await res.json();
 
-      if (!res.ok) {
-        setStatus("error");
-        setMessage(data.message || "Greška pri slanju koda.");
-        return;
-      }
-
-      setStatus("success");
-      setMessage(data.message || "Novi kod je poslat na vašu email adresu.");
-
-      // Optionally, clear OTP inputs after resending
+      setStatus(res.ok ? "success" : "error");
+      setMessage(data.message || (res.ok ? "Kod je poslat!" : "Greška pri slanju."));
       setOtp(new Array(6).fill(""));
       inputRefs.current[0]?.focus();
-    } catch (err) {
-      console.error("Greška:", err);
+    } catch {
       setStatus("error");
-      setMessage("Došlo je do greške na mreži ili serveru.");
+      setMessage("Greška na mreži. Pokušajte ponovo.");
     }
   };
 
+  const isFull    = otp.every((d) => d !== "");
+  const isSuccess = status === "success";
+
   return (
-    <div className="flex items-center justify-center min-h-screen w-full p-4 bg-slate-950">
-      <div className="absolute inset-0 bg-grid-slate-900/[0.04] [mask-image:linear-gradient(to_bottom,white_40%,transparent_90%)]"></div>
-      <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[60vw] h-[60vw] max-w-[800px] max-h-[800px] bg-blue-900/30 rounded-full blur-3xl animate-pulse-slow"></div>
+    <div className="relative flex min-h-screen w-full items-center justify-center overflow-hidden p-4">
+      {/* Ambient orbs */}
+      <div aria-hidden className="pointer-events-none absolute inset-0">
+        <div className="absolute left-1/4 top-1/4 h-96 w-96 -translate-x-1/2 -translate-y-1/2 rounded-full bg-blue-600/10 blur-3xl" />
+        <div className="absolute bottom-1/4 right-1/4 h-80 w-80 translate-x-1/2 translate-y-1/2 rounded-full bg-indigo-500/8 blur-3xl" />
+      </div>
 
-      <div className="relative w-full max-w-md">
-        <div className="relative bg-black/60 backdrop-blur-2xl border-2 border-blue-500/20 rounded-3xl p-6 sm:p-8 shadow-2xl shadow-black/60 text-center">
-          <div className="mx-auto w-16 h-16 mb-6 flex items-center justify-center bg-slate-900/50 border-2 border-blue-800/50 rounded-2xl shadow-lg">
-            <svg
-              xmlns="http://www.w3.org/2000/svg"
-              className="h-8 w-8 text-blue-400"
-              fill="none"
-              viewBox="0 0 24 24"
-              stroke="currentColor"
-              strokeWidth="1.5"
+      <motion.div
+        initial={{ opacity: 0, y: 32, scale: 0.96 }}
+        animate={{ opacity: 1, y: 0, scale: 1 }}
+        transition={{ type: "spring", stiffness: 100, damping: 20 }}
+        className="relative w-full max-w-md"
+      >
+        {/* Card — no border, shadow only */}
+        <div className="overflow-hidden rounded-3xl bg-[#07131f]/80 shadow-[0_40px_100px_-20px_rgba(0,0,0,0.9)] backdrop-blur-2xl">
+
+          {/* Top accent bar */}
+          <div className="h-1 w-full bg-gradient-to-r from-blue-600 via-indigo-500 to-blue-400" />
+
+          <div className="px-8 pb-8 pt-8 text-center">
+            {/* Icon */}
+            <motion.div
+              initial={{ scale: 0.5, opacity: 0, rotate: -20 }}
+              animate={{ scale: 1, opacity: 1, rotate: 0 }}
+              transition={{ delay: 0.2, type: "spring", stiffness: 220, damping: 16 }}
+              className="mx-auto mb-6 flex h-20 w-20 items-center justify-center rounded-2xl bg-gradient-to-br from-blue-500/20 to-indigo-500/10 shadow-[0_0_40px_rgba(59,130,246,0.2)]"
             >
-              <path
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z"
-              />
-            </svg>
-          </div>
+              <ShieldCheck className="h-10 w-10 text-blue-400" />
+            </motion.div>
 
-          <h1 className="text-3xl font-bold mb-2 text-slate-100">
-            Email Verifikacija
-          </h1>
-
-          <p className="text-slate-400 text-sm mb-8">
-            Unesite 6-cifreni kod poslat na{" "}
-            <span className="font-semibold text-blue-300">{email}</span>.
-          </p>
-
-          <div className="flex items-center justify-center gap-2 sm:gap-3 mb-8">
-            {otp.map((data, index) => (
-              <input
-                key={index}
-                ref={(el) => (inputRefs.current[index] = el)}
-                type="text"
-                inputMode="numeric"
-                pattern="[0-9]*"
-                maxLength={1}
-                value={data}
-                onChange={(e) => handleChange(e.target, index)}
-                onKeyDown={(e) => handleKeyDown(e, index)}
-                onPaste={index === 0 ? handlePaste : undefined}
-                className="w-12 h-14 sm:w-14 sm:h-16 text-center text-2xl font-bold text-slate-100 
-                           bg-slate-900/70 border-2 border-slate-700 rounded-xl
-                           focus:outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-500/50 
-                           transition-all duration-300 ease-in-out"
-              />
-            ))}
-          </div>
-
-          <div className="flex flex-col gap-4">
-            <button
-              onClick={handleVerify}
-              className="w-full bg-gradient-to-r from-blue-600 to-indigo-600 p-3.5 rounded-xl font-bold text-lg
-                         text-white shadow-lg shadow-blue-900/40 hover:shadow-indigo-900/40
-                         transition-all duration-300 ease-in-out transform hover:scale-105 active:scale-95"
+            <motion.h1
+              initial={{ opacity: 0, y: 10 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ delay: 0.25 }}
+              className="mb-2 text-3xl font-black tracking-tight text-white"
             >
-              Potvrdi
-            </button>
+              Email Verifikacija
+            </motion.h1>
 
-            <button
-              onClick={handleResend}
-              disabled={resendDisabled}
-              className={`text-sm transition-colors duration-200 ${
-                resendDisabled
-                  ? "text-slate-700 cursor-not-allowed"
-                  : "text-slate-500 hover:text-slate-300"
-              }`}
+            <motion.div
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              transition={{ delay: 0.3 }}
+              className="mb-8 flex items-center justify-center gap-2 text-sm text-slate-400"
             >
-              Niste dobili kod?{" "}
-              <span className="font-semibold text-blue-400 hover:text-blue-300">
-                Pošalji ponovo
+              <Mail className="h-4 w-4 text-slate-500" />
+              <span>
+                Kod je poslat na{" "}
+                <span className="font-semibold text-blue-400">{email}</span>
               </span>
-            </button>
-          </div>
+            </motion.div>
 
-          {message && (
-            <div className="mt-6">
-              <div
-                className={`p-3 rounded-lg border text-sm flex items-center justify-center gap-2
-                ${
-                  status === "success"
-                    ? "bg-green-900/30 border-green-700 text-green-300"
-                    : "bg-red-900/30 border-red-700 text-red-300"
+            {/* OTP inputs */}
+            <div className="mb-8 flex items-center justify-center gap-3">
+              {otp.map((digit, index) => (
+                <motion.div
+                  key={index}
+                  initial={{ opacity: 0, y: 16 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  transition={{ delay: 0.3 + index * 0.06, type: "spring", stiffness: 200, damping: 18 }}
+                  className="relative"
+                >
+                  <motion.input
+                    whileFocus={{ scale: 1.08 }}
+                    ref={(el) => { inputRefs.current[index] = el; }}
+                    type="text"
+                    inputMode="numeric"
+                    pattern="[0-9]*"
+                    maxLength={2}
+                    value={digit}
+                    onChange={(e) => handleChange(e.target, index)}
+                    onKeyDown={(e) => handleKeyDown(e, index)}
+                    onPaste={index === 0 ? handlePaste : undefined}
+                    className={`h-14 w-11 rounded-xl bg-[#0b1c2e] text-center text-2xl font-bold text-white outline-none transition-all duration-200 sm:h-16 sm:w-13 ${
+                      digit
+                        ? "shadow-[0_0_0_2px_rgba(59,130,246,0.6),0_0_20px_rgba(59,130,246,0.15)]"
+                        : "shadow-[0_0_0_1.5px_rgba(30,60,90,0.8)] focus:shadow-[0_0_0_2px_rgba(59,130,246,0.5),0_0_20px_rgba(59,130,246,0.1)]"
+                    }`}
+                  />
+                  {/* Bottom fill indicator */}
+                  <motion.div
+                    animate={{ scaleX: digit ? 1 : 0 }}
+                    transition={{ type: "spring", stiffness: 300, damping: 20 }}
+                    className="absolute bottom-0 left-1/2 h-0.5 w-6 origin-left -translate-x-1/2 rounded-full bg-blue-500"
+                  />
+                </motion.div>
+              ))}
+            </div>
+
+            {/* Action buttons */}
+            <div className="space-y-3">
+              <motion.button
+                whileHover={isFull && !isVerifying ? { scale: 1.02, y: -1 } : {}}
+                whileTap={isFull && !isVerifying ? { scale: 0.97 } : {}}
+                onClick={handleVerify}
+                disabled={!isFull || isVerifying}
+                className={`relative w-full overflow-hidden rounded-xl py-3.5 text-base font-bold transition-all duration-300 ${
+                  isFull && !isVerifying
+                    ? "bg-gradient-to-r from-blue-600 to-indigo-600 text-white shadow-[0_8px_32px_rgba(59,130,246,0.35)]"
+                    : "bg-[#0b1c2e] text-slate-600 cursor-not-allowed"
                 }`}
               >
-                <span>{message}</span>
-              </div>
+                <AnimatePresence mode="wait">
+                  {isVerifying ? (
+                    <motion.span
+                      key="loading"
+                      initial={{ opacity: 0 }}
+                      animate={{ opacity: 1 }}
+                      exit={{ opacity: 0 }}
+                      className="flex items-center justify-center gap-2"
+                    >
+                      <motion.div
+                        animate={{ rotate: 360 }}
+                        transition={{ duration: 1, repeat: Infinity, ease: "linear" }}
+                        className="h-5 w-5 rounded-full border-2 border-white/30 border-t-white"
+                      />
+                      Proveravam...
+                    </motion.span>
+                  ) : (
+                    <motion.span key="idle" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}>
+                      Potvrdi kod
+                    </motion.span>
+                  )}
+                </AnimatePresence>
+              </motion.button>
+
+              {/* Resend */}
+              <button
+                onClick={handleResend}
+                disabled={cooldown > 0}
+                className={`flex w-full items-center justify-center gap-2 rounded-xl py-2.5 text-sm transition-all duration-200 ${
+                  cooldown > 0
+                    ? "cursor-not-allowed text-slate-600"
+                    : "text-slate-500 hover:text-slate-300"
+                }`}
+              >
+                <RefreshCw className={`h-4 w-4 ${cooldown > 0 ? "text-slate-700" : "text-slate-500"}`} />
+                {cooldown > 0 ? (
+                  <span>
+                    Pošalji ponovo za{" "}
+                    <span className="font-mono font-bold text-slate-500">{cooldown}s</span>
+                  </span>
+                ) : (
+                  "Niste dobili kod? Pošalji ponovo"
+                )}
+              </button>
             </div>
-          )}
+
+            {/* Status message */}
+            <AnimatePresence>
+              {message && (
+                <motion.div
+                  initial={{ opacity: 0, height: 0, marginTop: 0 }}
+                  animate={{ opacity: 1, height: "auto", marginTop: 16 }}
+                  exit={{ opacity: 0, height: 0, marginTop: 0 }}
+                  className="overflow-hidden"
+                >
+                  <div
+                    className={`flex items-start gap-2.5 rounded-xl p-3.5 text-sm ${
+                      isSuccess
+                        ? "bg-emerald-500/10 text-emerald-300 shadow-[0_0_0_1px_rgba(16,185,129,0.2)]"
+                        : "bg-red-500/10 text-red-300 shadow-[0_0_0_1px_rgba(239,68,68,0.2)]"
+                    }`}
+                  >
+                    {isSuccess ? (
+                      <CheckCircle2 className="mt-0.5 h-4 w-4 shrink-0" />
+                    ) : (
+                      <AlertCircle className="mt-0.5 h-4 w-4 shrink-0" />
+                    )}
+                    <span className="text-left leading-relaxed">{message}</span>
+                  </div>
+                </motion.div>
+              )}
+            </AnimatePresence>
+          </div>
         </div>
-      </div>
+
+        {/* Floating hint below card */}
+        <motion.p
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          transition={{ delay: 0.6 }}
+          className="mt-5 text-center text-xs text-slate-600"
+        >
+          Proverite spam/junk folder ukoliko niste dobili email.
+        </motion.p>
+      </motion.div>
     </div>
   );
 };
