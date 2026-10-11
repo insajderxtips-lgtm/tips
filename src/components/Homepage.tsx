@@ -691,24 +691,32 @@ export default function Homepage(): React.ReactNode {
   const [dropSport, setDropSport] = useState<"sve" | SportKey>("sve");
 
   // Normalize each raw dropping-odds item once (sport, numbers, timestamp) for filtering & sorting.
-  const droppingProcessed = useMemo(() => {
-    return droppingOdds.map((item: any, idx: number) => {
-      const ts =
-        typeof item.timestamp === "number"
-          ? item.timestamp * 1000
-          : item.date
-          ? new Date(item.date).getTime()
-          : 0;
-      return {
-        raw: item,
-        idx,
-        sport: normalizeSport(item.sport?.name || item.sport || item.sportName || item.category),
-        drop: Math.round(Number(item.dropPercentage || 0)),
-        current: Number(item.currentOdd || 0),
-        ts,
-      };
-    });
-  }, [droppingOdds]);
+const droppingProcessed = useMemo(() => {
+  const odds = Array.isArray(droppingOdds) ? droppingOdds : [];
+
+  return odds.map((item: any, idx: number) => {
+    const ts =
+      typeof item.timestamp === "number"
+        ? item.timestamp * 1000
+        : item.date
+        ? new Date(item.date).getTime()
+        : 0;
+
+    return {
+      raw: item,
+      idx,
+      sport: normalizeSport(
+        item.sport?.name ||
+          item.sport ||
+          item.sportName ||
+          item.category
+      ),
+      drop: Math.round(Number(item.dropPercentage || 0)),
+      current: Number(item.currentOdd || 0),
+      ts,
+    };
+  });
+}, [droppingOdds]);
 
   const droppingSports = useMemo(
     () => SPORT_ORDER.filter((s) => droppingProcessed.some((d) => d.sport === s)),
@@ -968,7 +976,7 @@ export default function Homepage(): React.ReactNode {
                       <svg className="h-4 w-4 text-amber-400" fill="none" stroke="currentColor" strokeWidth={2.2} viewBox="0 0 24 24">
                         <path strokeLinecap="round" strokeLinejoin="round" d="M5 11V7a5 5 0 0110 0v4M5 11h10a2 2 0 012 2v5a2 2 0 01-2 2H5a2 2 0 01-2-2v-5a2 2 0 012-2z" />
                       </svg>
-                      <span className="text-[10px] font-black uppercase tracking-[0.2em] text-amber-400">Premium zakljucan</span>
+                      <span className="text-[10px] font-black uppercase tracking-[0.2em] text-amber-400">Premium</span>
                     </div>
                     <h2 className="text-lg font-black leading-tight text-white">Otkljucaj Admin tiket i premium analize</h2>
                     <p className="mt-1 text-sm leading-relaxed text-slate-400">

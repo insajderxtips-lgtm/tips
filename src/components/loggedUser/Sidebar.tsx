@@ -205,7 +205,7 @@ export default function Sidebar(): ReactNode {
                       <span className="relative z-10">{link.label}</span>
                       {premium && (
                         <span className="relative z-10 ml-auto rounded-md bg-amber-500/15 px-1.5 py-0.5 text-[8px] font-black uppercase tracking-wider text-amber-400">
-                          PRO
+                        P
                         </span>
                       )}
                     </motion.button>
