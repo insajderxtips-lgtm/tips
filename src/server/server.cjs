@@ -33,7 +33,7 @@ app.use(cors());
 // ─── Socket.IO ────────────────────────────────────────────────────────────────
 const io = socketIo(server, {
   cors: {
-    origin:  "https://insajder.tips",
+    origin:  "*",
     methods: ["GET", "POST"],
   },
 });
