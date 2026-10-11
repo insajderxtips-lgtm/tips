@@ -16,14 +16,11 @@ const { gunzipSync, brotliDecompressSync, inflateSync } = require("zlib");
 const crypto         = require("crypto");
 const cloudinary     = require("cloudinary").v2;
 const multer         = require("multer");
-const path = require('path');
+
 
 // ─── App setup ────────────────────────────────────────────────────────────────
 const app    = express();
-app.use(express.static(path.join(__dirname, "../../dist")));
-app.get(/(.*)/, (req, res) => {
-  res.sendFile(path.join(__dirname, '../../dist/index.html'));
-});
+
 const server = http.createServer(app);
 
 app.use(cookieParser());
@@ -2551,6 +2548,11 @@ app.post("/oddsChecker/getOdds/", oddsLimiter, async (req, res) => {
     return res.status(500).json({ error: "Failed to fetch odds data" });
   }
 });
+const path = require('path');
+app.use(express.static(path.join(__dirname, '../../dist')));
 
+app.get(/(.*)/, (req, res) => {
+  res.sendFile(path.join(__dirname, '../../dist/index.html'));
+});
 // ─── Start server ─────────────────────────────────────────────────────────────
 server.listen(1337, () => console.log("Listening on port 1337."));
